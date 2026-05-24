@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::{BgState, CgState, SpriteManager, TextureCache};
-use crate::script::FgPosition;
+use crate::resources::{BgState, BgCrossFade, CgState, SpriteManager, TextureCache};
+use crate::script::{FgPosition, Transition};
 use crate::state::AppState;
 use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowCgMessage, HideCgMessage,
@@ -23,12 +23,13 @@ impl Plugin for RenderingPlugin {
             .add_systems(OnEnter(AppState::Gameplay), setup_rendering)
             .add_systems(OnExit(AppState::Gameplay), cleanup_rendering)
             .add_systems(Update, (
+                update_bg_fade,
                 handle_set_bg,
                 handle_show_fg,
                 handle_hide_fg,
                 handle_show_cg,
                 handle_hide_cg,
-            ).run_if(in_state(AppState::Gameplay)));
+            ).chain().run_if(in_state(AppState::Gameplay)));
     }
 }
 
@@ -112,9 +113,18 @@ fn handle_set_bg(
     mut bg_state: ResMut<BgState>,
     mut cache: ResMut<TextureCache>,
     asset_server: Res<AssetServer>,
-    mut query: Query<(&mut ImageNode, &mut Visibility)>,
+    mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor)>,
 ) {
     for msg in msg.read() {
+        // Complete any in-progress fade instantly
+        if bg_state.fade.is_some() {
+            if let Ok((_, mut vis, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
+                *vis = Visibility::Hidden;
+            }
+            bg_state.active_idx = 1 - bg_state.active_idx;
+            bg_state.fade = None;
+        }
+
         let path = format!("images/bg/{}", msg.file);
         let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
             asset_server.load(&path)
@@ -123,17 +133,28 @@ fn handle_set_bg(
         let inactive_idx = 1 - bg_state.active_idx;
         let inactive_entity = bg_state.entities[inactive_idx];
 
-        if let Ok((mut image_node, mut vis)) = query.get_mut(inactive_entity) {
+        if let Ok((mut image_node, mut vis, mut bg)) = query.get_mut(inactive_entity) {
             image_node.image = handle;
-            *vis = Visibility::Visible;
+            match msg.transition {
+                Some(Transition::Fade) => {
+                    let dur = msg.duration.unwrap_or(0.5) as f32;
+                    bg.0 = Color::srgba(0.0, 0.0, 0.0, 0.0);
+                    *vis = Visibility::Visible;
+                    bg_state.fade = Some(BgCrossFade {
+                        timer: Timer::from_seconds(dur, TimerMode::Once),
+                    });
+                }
+                _ => {
+                    *vis = Visibility::Visible;
+                    bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
+                    if let Ok((_, mut old_vis, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
+                        *old_vis = Visibility::Hidden;
+                    }
+                    bg_state.active_idx = inactive_idx;
+                    bg_state.fade = None;
+                }
+            }
         }
-
-        let active_entity = bg_state.entities[bg_state.active_idx];
-        if let Ok((_, mut vis)) = query.get_mut(active_entity) {
-            *vis = Visibility::Hidden;
-        }
-
-        bg_state.active_idx = inactive_idx;
     }
 }
 
@@ -237,5 +258,46 @@ fn handle_hide_cg(
         }
         cg_state.active = false;
         cg_state.texture = None;
+    }
+}
+
+fn update_bg_fade(
+    time: Res<Time>,
+    mut bg_state: ResMut<BgState>,
+    mut query: Query<(&mut BackgroundColor, &mut Visibility)>,
+) {
+    if bg_state.fade.is_none() {
+        return;
+    }
+
+    let active_idx = bg_state.active_idx;
+    let entities = bg_state.entities;
+    let active_entity = entities[active_idx];
+    let inactive_entity = entities[1 - active_idx];
+
+    let finished = {
+        let fade = bg_state.fade.as_mut().unwrap();
+        fade.timer.tick(time.delta());
+        let t = fade.timer.fraction();
+
+        if let Ok((mut bg, _)) = query.get_mut(active_entity) {
+            bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0 - t);
+        }
+        if let Ok((mut bg, _)) = query.get_mut(inactive_entity) {
+            bg.0 = Color::srgba(0.0, 0.0, 0.0, t);
+        }
+
+        let finished = fade.timer.just_finished();
+        if finished {
+            if let Ok((_, mut vis)) = query.get_mut(active_entity) {
+                *vis = Visibility::Hidden;
+            }
+        }
+        finished
+    };
+
+    if finished {
+        bg_state.active_idx = 1 - bg_state.active_idx;
+        bg_state.fade = None;
     }
 }

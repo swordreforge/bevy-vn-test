@@ -101,11 +101,16 @@ pub struct DialogueState {
     pub text_queue: Vec<String>,
 }
 
+pub struct BgCrossFade {
+    pub timer: Timer,
+}
+
 /// Tracks background state with dual-buffer entities
 #[derive(Resource)]
 pub struct BgState {
     pub entities: [Entity; 2],
     pub active_idx: usize,
+    pub fade: Option<BgCrossFade>,
 }
 
 impl Default for BgState {
@@ -113,6 +118,7 @@ impl Default for BgState {
         Self {
             entities: [Entity::PLACEHOLDER; 2],
             active_idx: 0,
+            fade: None,
         }
     }
 }
