@@ -150,7 +150,7 @@ bevy-vn/
 
 ### Phase 7: 设置 + 打磨 ✅
 - [x] Settings interactivity (sliders + toggles wired to runtime)
-- [ ] 过渡动画系统 (deferred to sub-phase)
+- [x] 过渡动画系统 (BG cross-fade, FG/CG fade, state fade-to-black)
 - [ ] Android 适配 (deferred to sub-phase)
 
 ### Phase 8: artemis-export 转换工具
