@@ -4,6 +4,26 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use crate::script::FgPosition;
 
+pub struct SpriteFade {
+    pub timer: Timer,
+    pub kind: SpriteFadeKind,
+}
+
+pub enum SpriteFadeKind {
+    FadeIn,
+    FadeOut,
+}
+
+pub struct CgFade {
+    pub timer: Timer,
+    pub kind: CgFadeKind,
+}
+
+pub enum CgFadeKind {
+    FadeIn,
+    FadeOut,
+}
+
 #[derive(Resource, Default, Debug, Clone)]
 pub struct AffectionMap(pub HashMap<String, i32>);
 
@@ -134,6 +154,7 @@ pub struct SpriteSlotInfo {
     pub expression: String,
     pub entity: Entity,
     pub texture: Option<Handle<Image>>,
+    pub fade: Option<SpriteFade>,
 }
 
 /// Tracks CG overlay state
@@ -142,6 +163,7 @@ pub struct CgState {
     pub active: bool,
     pub entity: Option<Entity>,
     pub texture: Option<Handle<Image>>,
+    pub fade: Option<CgFade>,
 }
 
 /// On-demand texture cache

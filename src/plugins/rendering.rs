@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::{BgState, BgCrossFade, CgState, SpriteManager, TextureCache};
+use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, SpriteManager, SpriteFade, SpriteFadeKind, TextureCache};
 use crate::script::{FgPosition, Transition};
 use crate::state::AppState;
 use crate::rendering_messages::{
@@ -24,6 +24,8 @@ impl Plugin for RenderingPlugin {
             .add_systems(OnExit(AppState::Gameplay), cleanup_rendering)
             .add_systems(Update, (
                 update_bg_fade,
+                update_fg_fade,
+                update_cg_fade,
                 handle_set_bg,
                 handle_show_fg,
                 handle_hide_fg,
@@ -98,6 +100,7 @@ fn setup_rendering(mut commands: Commands, mut bg_state: ResMut<BgState>, mut sp
             expression: String::new(),
             entity,
             texture: None,
+            fade: None,
         });
     }
 }
@@ -166,7 +169,7 @@ fn handle_show_fg(
     mut sprite_mgr: ResMut<SpriteManager>,
     mut cache: ResMut<TextureCache>,
     asset_server: Res<AssetServer>,
-    mut query: Query<(&mut ImageNode, &mut Visibility)>,
+    mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor)>,
 ) {
     for msg in msg.read() {
         let slot = sprite_mgr.slots.get_mut(&msg.position);
@@ -180,9 +183,24 @@ fn handle_show_fg(
             slot.expression = msg.expression.clone();
             slot.texture = Some(handle.clone());
 
-            if let Ok((mut image_node, mut vis)) = query.get_mut(slot.entity) {
+            if let Ok((mut image_node, mut vis, mut bg)) = query.get_mut(slot.entity) {
                 image_node.image = handle;
-                *vis = Visibility::Visible;
+                match msg.transition {
+                    Some(Transition::Fade) => {
+                        let dur = msg.duration.unwrap_or(0.5) as f32;
+                        bg.0 = Color::srgba(0.0, 0.0, 0.0, 0.0);
+                        *vis = Visibility::Visible;
+                        slot.fade = Some(SpriteFade {
+                            timer: Timer::from_seconds(dur, TimerMode::Once),
+                            kind: SpriteFadeKind::FadeIn,
+                        });
+                    }
+                    _ => {
+                        bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
+                        *vis = Visibility::Visible;
+                        slot.fade = None;
+                    }
+                }
             }
         } else {
             warn!("No sprite slot for position: {:?}", msg.position);
@@ -193,20 +211,30 @@ fn handle_show_fg(
 fn handle_hide_fg(
     mut msg: MessageReader<HideFgMessage>,
     mut sprite_mgr: ResMut<SpriteManager>,
-    mut query: Query<(&mut ImageNode, &mut Visibility)>,
+    mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor)>,
 ) {
     for msg in msg.read() {
         let slot = sprite_mgr.slots.values_mut()
             .find(|s| s.char_id == msg.char_id);
 
         if let Some(slot) = slot {
-            slot.char_id.clear();
-            slot.expression.clear();
-            slot.texture = None;
-
-            if let Ok((mut image_node, mut vis)) = query.get_mut(slot.entity) {
-                image_node.image = Handle::default();
-                *vis = Visibility::Hidden;
+            match msg.transition {
+                Some(Transition::Fade) => {
+                    let dur = msg.duration.unwrap_or(0.5) as f32;
+                    slot.fade = Some(SpriteFade {
+                        timer: Timer::from_seconds(dur, TimerMode::Once),
+                        kind: SpriteFadeKind::FadeOut,
+                    });
+                }
+                _ => {
+                    slot.char_id.clear();
+                    slot.expression.clear();
+                    slot.texture = None;
+                    if let Ok((mut image_node, mut vis, _)) = query.get_mut(slot.entity) {
+                        image_node.image = Handle::default();
+                        *vis = Visibility::Hidden;
+                    }
+                }
             }
         }
     }
@@ -229,6 +257,11 @@ fn handle_show_cg(
             asset_server.load(&path)
         }).clone();
 
+        let initial_alpha = match msg.transition {
+            Some(Transition::Fade) => 0.0,
+            _ => 1.0,
+        };
+
         let entity = commands.spawn((
             CgRoot,
             Node {
@@ -240,6 +273,7 @@ fn handle_show_cg(
                 ..default()
             },
             ImageNode::new(handle.clone()),
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, initial_alpha)),
             Visibility::Visible,
             ZIndex(2),
         )).id();
@@ -247,6 +281,17 @@ fn handle_show_cg(
         cg_state.active = true;
         cg_state.entity = Some(entity);
         cg_state.texture = Some(handle);
+
+        match msg.transition {
+            Some(Transition::Fade) => {
+                let dur = msg.duration.unwrap_or(0.5) as f32;
+                cg_state.fade = Some(CgFade {
+                    timer: Timer::from_seconds(dur, TimerMode::Once),
+                    kind: CgFadeKind::FadeIn,
+                });
+            }
+            _ => {}
+        }
     }
 }
 
@@ -255,12 +300,25 @@ fn handle_hide_cg(
     mut cg_state: ResMut<CgState>,
     mut commands: Commands,
 ) {
-    for _ in msg.read() {
-        if let Some(entity) = cg_state.entity.take() {
-            commands.entity(entity).despawn();
+    for msg in msg.read() {
+        match msg.transition {
+            Some(Transition::Fade) => {
+                if cg_state.entity.is_some() {
+                    let dur = msg.duration.unwrap_or(0.5) as f32;
+                    cg_state.fade = Some(CgFade {
+                        timer: Timer::from_seconds(dur, TimerMode::Once),
+                        kind: CgFadeKind::FadeOut,
+                    });
+                }
+            }
+            _ => {
+                if let Some(entity) = cg_state.entity.take() {
+                    commands.entity(entity).despawn();
+                }
+                cg_state.active = false;
+                cg_state.texture = None;
+            }
         }
-        cg_state.active = false;
-        cg_state.texture = None;
     }
 }
 
@@ -302,5 +360,84 @@ fn update_bg_fade(
     if finished {
         bg_state.active_idx = 1 - bg_state.active_idx;
         bg_state.fade = None;
+    }
+}
+
+fn update_fg_fade(
+    time: Res<Time>,
+    mut sprite_mgr: ResMut<SpriteManager>,
+    mut query: Query<(&mut BackgroundColor, &mut Visibility)>,
+) {
+    for (_position, slot) in sprite_mgr.slots.iter_mut() {
+        let finished = {
+            let fade = match &mut slot.fade {
+                Some(f) => f,
+                None => continue,
+            };
+
+            fade.timer.tick(time.delta());
+            let t = fade.timer.fraction();
+
+            if let Ok((mut bg, _)) = query.get_mut(slot.entity) {
+                let alpha = match fade.kind {
+                    SpriteFadeKind::FadeIn => t,
+                    SpriteFadeKind::FadeOut => 1.0 - t,
+                };
+                bg.0 = Color::srgba(0.0, 0.0, 0.0, alpha);
+            }
+
+            let finished = fade.timer.just_finished();
+            if finished && matches!(fade.kind, SpriteFadeKind::FadeOut) {
+                if let Ok((_, mut vis)) = query.get_mut(slot.entity) {
+                    *vis = Visibility::Hidden;
+                }
+            }
+            finished
+        };
+
+        if finished {
+            slot.fade = None;
+        }
+    }
+}
+
+fn update_cg_fade(
+    time: Res<Time>,
+    mut cg_state: ResMut<CgState>,
+    mut query: Query<(&mut BackgroundColor, &mut Visibility)>,
+) {
+    let entity = cg_state.entity;
+    let finished = {
+        let fade = match &mut cg_state.fade {
+            Some(f) => f,
+            None => return,
+        };
+
+        fade.timer.tick(time.delta());
+        let t = fade.timer.fraction();
+
+        if let Some(entity) = entity {
+            if let Ok((mut bg, _)) = query.get_mut(entity) {
+                let alpha = match fade.kind {
+                    CgFadeKind::FadeIn => t,
+                    CgFadeKind::FadeOut => 1.0 - t,
+                };
+                bg.0 = Color::srgba(0.0, 0.0, 0.0, alpha);
+            }
+
+            let finished = fade.timer.just_finished();
+            if finished && matches!(fade.kind, CgFadeKind::FadeOut) {
+                if let Ok((_, mut vis)) = query.get_mut(entity) {
+                    *vis = Visibility::Hidden;
+                }
+            }
+            finished
+        } else {
+            true
+        }
+    };
+
+    if finished {
+        cg_state.fade = None;
     }
 }
