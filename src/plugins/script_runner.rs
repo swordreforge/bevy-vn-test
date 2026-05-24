@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::resources::{AffectionMap, ChoiceState, DialogueState};
+use crate::resources::{AffectionMap, ChoiceState, DialogueState, UnlockState};
 use crate::audio_messages::{
     PlayBgmMessage, StopBgmMessage, PlaySeMessage, PlayVoiceMessage,
 };
@@ -36,6 +36,7 @@ fn process_advance(
     mut engine: ResMut<ScriptEngine>,
     mut dialogue: ResMut<DialogueState>,
     mut affection: ResMut<AffectionMap>,
+    mut unlock_state: ResMut<UnlockState>,
     mut set_bg_writer: MessageWriter<SetBgMessage>,
     mut show_fg_writer: MessageWriter<ShowFgMessage>,
     mut hide_fg_writer: MessageWriter<HideFgMessage>,
@@ -129,7 +130,23 @@ fn process_advance(
                 Some(ScriptCmd::AffectionChange { char_id, delta }) => {
                     *affection.0.entry(char_id).or_insert(0) += delta;
                 }
+                Some(ScriptCmd::AffectionCondition { char_id, value, operator, goto }) => {
+                    let affection_val = affection.0.get(&char_id).copied().unwrap_or(0);
+                    let met = match operator {
+                        ConditionOp::Greater => affection_val > value,
+                        ConditionOp::Less => affection_val < value,
+                        ConditionOp::Equal => affection_val == value,
+                        ConditionOp::GreaterEqual => affection_val >= value,
+                        ConditionOp::LessEqual => affection_val <= value,
+                    };
+                    if met && !engine.jump_to_label(&goto) {
+                        warn!("AffectionCondition jump target not found: {}", goto);
+                    }
+                }
                 Some(ScriptCmd::SavePoint) => {}
+                Some(ScriptCmd::UnlockCg { file }) => {
+                    unlock_state.cg_unlocked.insert(file);
+                }
                 Some(ScriptCmd::SetBg { file, transition: _, duration: _ }) => {
                     set_bg_writer.write(SetBgMessage { file });
                 }
@@ -140,7 +157,8 @@ fn process_advance(
                     hide_fg_writer.write(HideFgMessage { char_id });
                 }
                 Some(ScriptCmd::ShowCg { file, transition: _ }) => {
-                    show_cg_writer.write(ShowCgMessage { file });
+                    show_cg_writer.write(ShowCgMessage { file: file.clone() });
+                    unlock_state.cg_unlocked.insert(file);
                 }
                 Some(ScriptCmd::HideCg { transition: _ }) => {
                     hide_cg_writer.write(HideCgMessage);
