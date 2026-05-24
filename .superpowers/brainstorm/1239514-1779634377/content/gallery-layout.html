@@ -1,0 +1,51 @@
+<h2>CG Gallery — Grid Layout</h2>
+<p class="subtitle">Which layout do you prefer for the gallery grid?</p>
+
+<div class="options">
+  <div class="option" data-choice="3col" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>3 Columns</h3>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px">
+        <div style="aspect-ratio:16/9;background:#2a2a3a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888">CG 1</div>
+        <div style="aspect-ratio:16/9;background:#2a2a3a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888">CG 2</div>
+        <div style="aspect-ratio:16/9;background:#2a2a3a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888">CG 3</div>
+        <div style="aspect-ratio:16/9;background:#1a1a2a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#555">🔒 Locked</div>
+        <div style="aspect-ratio:16/9;background:#1a1a2a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#555">🔒 Locked</div>
+      </div>
+      <p style="margin-top:8px;font-size:13px;color:#999">5 items visible, more fit per row. Good for portrait-oriented CGs.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="2col" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>2 Columns</h3>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px">
+        <div style="aspect-ratio:16/9;background:#2a2a3a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888">CG 1</div>
+        <div style="aspect-ratio:16/9;background:#2a2a3a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888">CG 2</div>
+        <div style="aspect-ratio:16/9;background:#1a1a2a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#555">🔒 Locked</div>
+        <div style="aspect-ratio:16/9;background:#1a1a2a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#555">🔒 Locked</div>
+      </div>
+      <p style="margin-top:8px;font-size:13px;color:#999">Larger thumbnails, fewer per row. Better for landscape CGs.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="4col" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>4 Columns</h3>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">
+        <div style="aspect-ratio:16/9;background:#2a2a3a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#888">CG</div>
+        <div style="aspect-ratio:16/9;background:#2a2a3a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#888">CG</div>
+        <div style="aspect-ratio:16/9;background:#2a2a3a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#888">CG</div>
+        <div style="aspect-ratio:16/9;background:#2a2a3a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#888">CG</div>
+        <div style="aspect-ratio:16/9;background:#1a1a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#555">🔒</div>
+        <div style="aspect-ratio:16/9;background:#1a1a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#555">🔒</div>
+        <div style="aspect-ratio:16/9;background:#1a1a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#555">🔒</div>
+        <div style="aspect-ratio:16/9;background:#1a1a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#555">🔒</div>
+      </div>
+      <p style="margin-top:8px;font-size:13px;color:#999">Denser grid, more CGs visible at once. Smaller thumbnails.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:24px">Take a look and let me know which column count you prefer.</p>

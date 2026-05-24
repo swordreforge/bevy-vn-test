@@ -1,0 +1,75 @@
+<h2>Background &amp; CG Rendering</h2>
+<p class="subtitle">How to handle background images and fullscreen CG/event images</p>
+
+<div class="section">
+  <h3>Backgrounds (SetBg)</h3>
+  <p>BG images are 1280x720 JPG files (<code>bg_XXXX.jpg</code>). Only one active background at a time.</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="simple-img" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Single ImageNode entity</h3>
+      <p>One entity with ImageNode. SetBg swaps the texture. Simple, one entity to manage.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="dual-buffer" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Dual-buffer for transitions</h3>
+      <p>Two ImageNode entities. Cross-fade between old and new bg by lerping alpha. Enables smooth transitions.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>CG / Event Images (ShowCg)</h3>
+  <p>CG images are 1280x720 RGBA PNG (<code>eve_XXXXXX.png</code>). Fullscreen overlay, hides sprites and dialogue.</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="cg-overlay" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Overlay entity</h3>
+      <p>Spawn CG entity on ShowCg (on top of bg, covering sprites). Despawn on HideCg. Separate from bg system.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="cg-replace" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Reuse bg entity</h3>
+      <p>ShowCg replaces the bg texture. Simpler but mixes concerns.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Transition handling</h3>
+  <p>ScriptCmd has <code>transition: Option&lt;Transition&gt;</code> on SetBg/ShowFg/HideFg. For Phase 3, should we implement:</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="fade-all" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Fade transitions everywhere</h3>
+      <p>Fade in/out for bg changes, sprite show/hide, CG show/hide. Duration from script or default 500ms.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="instant-first" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Instant first, transitions later</h3>
+      <p>Phase 3 = instant swaps. Transitions as a separate Phase 3.1 or Phase 4 task.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="bg-fade" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Fade for BG/CG only</h3>
+      <p>Instant sprite swaps, fade transitions for background/CG changes. Balanced approach.</p>
+    </div>
+  </div>
+</div>

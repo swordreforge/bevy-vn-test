@@ -1,0 +1,62 @@
+<h2>Phase 3: 对话 + 立绘 + 背景</h2>
+<p class="subtitle">Current screen layout (1280x720) — Dialogue box at bottom, everything else placeholder</p>
+
+<div class="mockup">
+  <div class="mockup-header">Bevy VN — Current Screen Layout</div>
+  <div class="mockup-body" style="position:relative;width:800px;height:450px;background:#1a1a2e;overflow:hidden;">
+
+    <div style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">
+      [ Background Image — 1280x720 ]
+    </div>
+
+    <div style="position:absolute;bottom:0;left:0;width:100%;height:125px;background:rgba(0,0,0,0.7);border-top:2px solid #333;">
+      <div style="position:absolute;top:-28px;left:25px;background:#1a1a2e;padding:4px 12px;border-radius:4px 4px 0 0;color:#ffcc99;font-size:14px;font-weight:bold;">
+        ｜ナユタ
+      </div>
+      <div style="padding:16px 20px;color:white;font-size:13px;">
+        目が覚めたか。長い間、眠っていたようだ。
+      </div>
+    </div>
+
+    <div style="position:absolute;top:10px;left:10px;background:rgba(255,255,255,0.05);border:1px dashed #555;padding:4px 8px;color:#666;font-size:11px;border-radius:4px;">
+      Character Sprite<br>780x720 (overlapping bg + dialog)
+    </div>
+
+    <div style="position:absolute;top:60px;left:10px;color:#555;font-size:11px;">
+      FgPosition options:<br>
+      • Left (x: 0)<br>
+      • Center (x: 250)<br>
+      • Right (x: 500)
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:32px;">Asset pipeline question</h3>
+
+<div class="options">
+  <div class="option" data-choice="embedded" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Embedded assets</h3>
+      <p>Copy relevant FG/BG/CG assets into <code>bevy-vn/assets/images/</code>. Simple, self-contained, duplicate storage.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="symlink" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Symlink to game-source</h3>
+      <p>Symlink <code>assets/images/</code> → <code>game-source/image/</code>. Zero duplication, but relies on external path.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="reference" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Reference paths in scripts</h3>
+      <p>Script commands reference game-source paths directly. Most flexible for dev, needs path config at runtime.</p>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:24px;color:#999;font-size:12px;">
+Current assets: FG sprites (780x720 palette PNG), BG images (1280x720 JPG/RGB), CG/EV (1280x720 RGBA PNG)
+</p>

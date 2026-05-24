@@ -1,0 +1,83 @@
+<h2>Character Sprite Architecture</h2>
+<p class="subtitle">How should sprites be rendered and managed?</p>
+
+<div class="mockup">
+  <div class="mockup-header">Sprite positions on 1280x720 (sprites are 780x720)</div>
+  <div class="mockup-body" style="position:relative;width:800px;height:450px;background:#2a1a2e;overflow:hidden;">
+
+    <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1a1a3e,#2a1a2e);">
+      <div style="position:absolute;top:50%;left:0;transform:translateY(-50%);width:487px;height:450px;background:rgba(255,100,100,0.15);border:1px dashed rgba(255,100,100,0.4);display:flex;align-items:center;justify-content:center;color:rgba(255,100,100,0.6);font-size:11px;">
+        Left (x: 0)
+      </div>
+      <div style="position:absolute;top:50%;left:156px;transform:translateY(-50%);width:487px;height:450px;background:rgba(100,255,100,0.15);border:1px dashed rgba(100,255,100,0.4);display:flex;align-items:center;justify-content:center;color:rgba(100,255,100,0.6);font-size:11px;">
+        Center (x: 156)
+      </div>
+      <div style="position:absolute;top:50%;left:312px;transform:translateY(-50%);width:487px;height:450px;background:rgba(100,100,255,0.15);border:1px dashed rgba(100,100,255,0.4);display:flex;align-items:center;justify-content:center;color:rgba(100,100,255,0.6);font-size:11px;">
+        Right (x: 312)
+      </div>
+    </div>
+
+    <div style="position:absolute;bottom:0;left:0;width:100%;height:100px;background:rgba(0,0,0,0.7);">
+      <div style="padding:12px 16px;color:white;font-size:12px;">
+        Dialogue box (200px → scaled to 125px in mockup)
+      </div>
+    </div>
+
+    <div style="position:absolute;top:4px;right:8px;color:#888;font-size:10px;">
+      Sprites overlap bg, dialogue box rendered on top
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:24px;">Approach</h3>
+
+<div class="options">
+  <div class="option" data-choice="perchar" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Per-character entities</h3>
+      <p>ShowFg → spawn sprite entity + CharacterSprite component. HideFg → despawn. Clean ECS, easy transitions per entity.</p>
+      <div class="pros-cons" style="margin-top:8px;">
+        <div class="pros"><small>Simple, testable, natural ECS</small></div>
+        <div class="cons"><small>Need to track which chars are visible</small></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="pooled" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Pooled sprite entities</h3>
+      <p>Pre-spawn N sprite entities (e.g. 3 for L/C/R). ShowFg assigns texture + position. Reuses entities, fewer spawn/despawn.</p>
+      <div class="pros-cons" style="margin-top:8px;">
+        <div class="pros"><small>No alloc churn, good perf</small></div>
+        <div class="cons"><small>More complex state mgmt</small></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:24px;">Texture loading</h3>
+
+<div class="options">
+  <div class="option" data-choice="ondemand" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>On-demand (lazy)</h3>
+      <p>Load texture via AssetServer when ShowFg fires. Simpler startup, slight frame delay on first show.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="preload" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Preload all</h3>
+      <p>Load all FG textures at Gameplay OnEnter. Instant transitions, longer initial load.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Cache-on-use</h3>
+      <p>Load on first use, cache handle in resource. Subsequent ShowFg instant. Best of both.</p>
+    </div>
+  </div>
+</div>
