@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::DialogueState;
+use crate::resources::{DialogueState, Settings};
 use crate::state::AppState;
 
 pub struct DialoguePlugin;
@@ -9,7 +9,10 @@ impl Plugin for DialoguePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DialogueState>()
             .add_systems(OnEnter(AppState::Gameplay), setup_dialogue_ui)
-            .add_systems(Update, update_dialogue.run_if(in_state(AppState::Gameplay)))
+            .add_systems(Update, (
+                update_dialogue,
+                apply_message_opacity,
+            ).run_if(in_state(AppState::Gameplay)))
             .add_systems(OnExit(AppState::Gameplay), cleanup_dialogue);
     }
 }
@@ -85,5 +88,15 @@ fn update_dialogue(
     }
     if let Ok(mut speaker) = speaker_query.single_mut() {
         speaker.0 = state.current_speaker.clone().unwrap_or_default();
+    }
+}
+
+fn apply_message_opacity(
+    settings: Res<Settings>,
+    mut query: Query<&mut BackgroundColor, With<DialogueBox>>,
+) {
+    let alpha = (settings.message_window_opacity as f32) / 100.0;
+    for mut bg in query.iter_mut() {
+        *bg = BackgroundColor(Color::srgba(0.0, 0.0, 0.0, alpha));
     }
 }
