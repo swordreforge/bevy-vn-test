@@ -122,6 +122,9 @@ fn handle_set_bg(
                 *vis = Visibility::Hidden;
             }
             bg_state.active_idx = 1 - bg_state.active_idx;
+            if let Ok((_, _, mut bg)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
+                bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
+            }
             bg_state.fade = None;
         }
 
