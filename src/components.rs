@@ -90,3 +90,6 @@ pub enum AudioType {
     Se,
     Voice,
 }
+
+#[derive(Component)]
+pub struct TransitionOverlay;

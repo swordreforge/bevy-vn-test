@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use crate::script::FgPosition;
+use crate::state::AppState;
 
 pub struct SpriteFade {
     pub timer: Timer,
@@ -190,4 +191,23 @@ pub struct SaveLoadMode(pub bool); // true = Save, false = Load
 #[derive(Resource, Default)]
 pub struct GalleryState {
     pub fullscreen: Option<String>,
+}
+
+#[derive(Resource, Default)]
+pub struct ScreenTransition {
+    pub overlay: Option<Entity>,
+    pub phase: TransitionPhase,
+    pub pending_state: Option<AppState>,
+}
+
+pub enum TransitionPhase {
+    Idle,
+    FadingToBlack { timer: Timer },
+    FadingFromBlack { timer: Timer },
+}
+
+impl Default for TransitionPhase {
+    fn default() -> Self {
+        Self::Idle
+    }
 }
