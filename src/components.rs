@@ -57,3 +57,36 @@ pub struct GalleryFullscreen;
 
 #[derive(Component)]
 pub struct GalleryBackButton;
+
+// === Settings UI Components ===
+#[derive(Component)]
+pub struct SettingsBackButton;
+
+#[derive(Component)]
+pub struct SliderSegment(pub usize);
+
+#[derive(Component, Clone, Copy, PartialEq)]
+pub enum SliderSetting {
+    BgmVolume,
+    SeVolume,
+    VoiceVolume,
+    TextSpeed,
+    MsgOpacity,
+}
+
+#[derive(Component)]
+pub struct SliderValueText;
+
+#[derive(Component)]
+pub struct ToggleOption {
+    pub group: String,
+    pub value: bool,
+}
+
+// === Audio type markers ===
+#[derive(Component, Clone, Copy, PartialEq)]
+pub enum AudioType {
+    Bgm,
+    Se,
+    Voice,
+}
