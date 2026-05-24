@@ -1,6 +1,7 @@
 use bevy::{audio::Volume, prelude::*};
 use crate::audio_messages::*;
-use crate::resources::BgmManager;
+use crate::components::AudioType;
+use crate::resources::{BgmManager, Settings};
 
 pub struct AudioPlugin;
 
@@ -17,6 +18,7 @@ impl Plugin for AudioPlugin {
                 handle_stop_bgm,
                 handle_play_se,
                 handle_play_voice,
+                apply_audio_settings,
             ));
     }
 }
@@ -28,7 +30,7 @@ fn handle_play_bgm(
     mut bgm: ResMut<BgmManager>,
 ) {
     for msg in reader.read() {
-        if let Some(entity) = bgm.entity {
+        if let Some(entity) = bgm.entity.take() {
             commands.entity(entity).despawn();
         }
 
@@ -42,6 +44,7 @@ fn handle_play_bgm(
                 volume: Volume::Linear(volume),
                 ..default()
             },
+            AudioType::Bgm,
         )).id();
 
         bgm.current_id = Some(msg.id.clone());
@@ -55,11 +58,10 @@ fn handle_stop_bgm(
     mut bgm: ResMut<BgmManager>,
 ) {
     for _ in reader.read() {
-        if let Some(entity) = bgm.entity {
+        if let Some(entity) = bgm.entity.take() {
             commands.entity(entity).despawn();
         }
         bgm.current_id = None;
-        bgm.entity = None;
     }
 }
 
@@ -74,6 +76,7 @@ fn handle_play_se(
         commands.spawn((
             AudioPlayer(handle),
             PlaybackSettings::DESPAWN,
+            AudioType::Se,
         ));
     }
 }
@@ -89,6 +92,21 @@ fn handle_play_voice(
         commands.spawn((
             AudioPlayer(handle),
             PlaybackSettings::DESPAWN,
+            AudioType::Voice,
         ));
+    }
+}
+
+fn apply_audio_settings(
+    settings: Res<Settings>,
+    mut query: Query<(&AudioType, &mut AudioSink)>,
+) {
+    for (audio_type, mut sink) in query.iter_mut() {
+        let volume = match audio_type {
+            AudioType::Bgm => settings.bgm_volume,
+            AudioType::Se => settings.se_volume,
+            AudioType::Voice => settings.voice_volume,
+        };
+        sink.set_volume(Volume::Linear(volume));
     }
 }
