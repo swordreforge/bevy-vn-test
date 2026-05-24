@@ -26,6 +26,7 @@ use plugins::settings::SettingsPlugin;
 use plugins::gallery::GalleryPlugin;
 use plugins::rendering::RenderingPlugin;
 use plugins::choice::ChoicePlugin;
+use plugins::screen_transition::ScreenTransitionPlugin;
 
 fn main() {
     App::new()
@@ -52,6 +53,7 @@ fn main() {
         .add_plugins(AudioPlugin)
         .add_plugins(RenderingPlugin)
         .add_plugins(ChoicePlugin)
+        .add_plugins(ScreenTransitionPlugin)
         .add_systems(Startup, startup)
         .run();
 }
