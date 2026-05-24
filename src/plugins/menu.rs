@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::resources::SaveLoadMode;
+use crate::resources::{SaveLoadMode, ScreenTransition};
 use crate::state::AppState;
 use crate::plugins::inputs::MenuToggleEvent;
 
@@ -82,6 +82,7 @@ fn handle_menu_button_interaction(
     query: Query<(&MenuButtonAction, &Interaction), Changed<Interaction>>,
     mut mode: ResMut<SaveLoadMode>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut screen_transition: ResMut<ScreenTransition>,
 ) {
     for (action, interaction) in &query {
         if *interaction != Interaction::Pressed {
@@ -92,7 +93,7 @@ fn handle_menu_button_interaction(
             MenuButtonAction::Load => { mode.0 = false; next_state.set(AppState::SaveLoad); }
             MenuButtonAction::Settings => next_state.set(AppState::Settings),
             MenuButtonAction::Gallery => next_state.set(AppState::Gallery),
-            MenuButtonAction::Title => next_state.set(AppState::Title),
+            MenuButtonAction::Title => screen_transition.pending_state = Some(AppState::Title),
         }
     }
 }

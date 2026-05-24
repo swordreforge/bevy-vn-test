@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use crate::resources::ScreenTransition;
 use crate::state::AppState;
 
 pub struct TitlePlugin;
@@ -39,12 +40,12 @@ fn setup_title(mut commands: Commands) {
 }
 
 fn title_click(
-    mut next_state: ResMut<NextState<AppState>>,
+    mut screen_transition: ResMut<ScreenTransition>,
     mouse: Res<ButtonInput<MouseButton>>,
     touches: Res<Touches>,
 ) {
     if mouse.just_pressed(MouseButton::Left) || touches.any_just_pressed() {
-        next_state.set(AppState::Gameplay);
+        screen_transition.pending_state = Some(AppState::Gameplay);
     }
 }
 
