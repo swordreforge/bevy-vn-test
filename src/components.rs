@@ -42,3 +42,18 @@ pub struct ConfirmYesButton;
 
 #[derive(Component)]
 pub struct ConfirmNoButton;
+
+#[derive(Component)]
+pub struct GalleryRoot;
+
+#[derive(Component)]
+pub struct GalleryThumbnail(pub String);
+
+#[derive(Component)]
+pub struct GalleryLocked;
+
+#[derive(Component)]
+pub struct GalleryFullscreen;
+
+#[derive(Component)]
+pub struct GalleryBackButton;

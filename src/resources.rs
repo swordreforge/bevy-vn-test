@@ -158,3 +158,8 @@ pub struct ChoiceState {
 
 #[derive(Resource, Default)]
 pub struct SaveLoadMode(pub bool); // true = Save, false = Load
+
+#[derive(Resource, Default)]
+pub struct GalleryState {
+    pub fullscreen: Option<String>,
+}
