@@ -7,7 +7,8 @@ pub struct SettingsPlugin;
 
 impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Settings), setup_settings_ui)
+        app.init_resource::<Settings>()
+            .add_systems(OnEnter(AppState::Settings), setup_settings_ui)
             .add_systems(OnExit(AppState::Settings), cleanup_settings)
             .add_systems(Update, (
                 handle_slider_clicks,

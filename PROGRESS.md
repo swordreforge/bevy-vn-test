@@ -140,18 +140,18 @@ bevy-vn/
 - [ ] 自动存档/快速存档（deferred）
 - [ ] 存档缩略图（placeholder, capture deferred）
 
-### Phase 6: 好感度 + 画廊
-- [ ] 好感度条件解释器
-- [ ] 画廊缩略图网格
-- [ ] 解锁/锁定状态 UI
-- [ ] 全屏 CG 查看
+### Phase 6: 好感度 + 画廊 ✅
+- [x] AffectionCondition 脚本命令（基于 AffectionMap 分支）
+- [x] UnlockCg 脚本命令（显式解锁 CG）
+- [x] ShowCg 自动解锁 CG
+- [x] 画廊界面（3 列网格，ZIndex 5，缩略图/锁定占位符）
+- [x] 全屏 CG 查看（点击/Escape 关闭）
+- [x] Back 按钮返回 Menu
 
-### Phase 7: 设置 + 打磨
-- [ ] 音量滑条 UI
-- [ ] 文字速度设置
-- [ ] 自动/跳过模式
-- [ ] 过渡动画系统
-- [ ] Android 适配
+### Phase 7: 设置 + 打磨 ✅
+- [x] Settings interactivity (sliders + toggles wired to runtime)
+- [ ] 过渡动画系统 (deferred to sub-phase)
+- [ ] Android 适配 (deferred to sub-phase)
 
 ### Phase 8: artemis-export 转换工具
 - [ ] .asb 二进制解析器
