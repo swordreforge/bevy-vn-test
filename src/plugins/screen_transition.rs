@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::components::TransitionOverlay;
-use crate::resources::ScreenTransition;
+use crate::resources::{ScreenTransition, TransitionPhase};
 use crate::state::AppState;
 
 pub struct ScreenTransitionPlugin;
@@ -19,24 +19,23 @@ fn handle_screen_transition(
     mut commands: Commands,
     mut overlay_query: Query<&mut BackgroundColor, With<TransitionOverlay>>,
 ) {
-    // Process active fades
+    let overlay_entity = transition.overlay;
+
     let finished = match &mut transition.phase {
         TransitionPhase::FadingToBlack { timer } => {
             timer.tick(time.delta());
-            let alpha = timer.fraction();
-            if let Some(entity) = transition.overlay {
+            if let Some(entity) = overlay_entity {
                 if let Ok(mut bg) = overlay_query.get_mut(entity) {
-                    bg.0 = Color::srgba(0.0, 0.0, 0.0, alpha);
+                    bg.0 = Color::srgba(0.0, 0.0, 0.0, timer.fraction());
                 }
             }
             timer.just_finished()
         }
         TransitionPhase::FadingFromBlack { timer } => {
             timer.tick(time.delta());
-            let alpha = 1.0 - timer.fraction();
-            if let Some(entity) = transition.overlay {
+            if let Some(entity) = overlay_entity {
                 if let Ok(mut bg) = overlay_query.get_mut(entity) {
-                    bg.0 = Color::srgba(0.0, 0.0, 0.0, alpha);
+                    bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0 - timer.fraction());
                 }
             }
             timer.just_finished()
@@ -64,7 +63,6 @@ fn handle_screen_transition(
         return;
     }
 
-    // Start new transition if idle and pending
     if matches!(transition.phase, TransitionPhase::Idle) && transition.pending_state.is_some() {
         let entity = commands.spawn((
             TransitionOverlay,
