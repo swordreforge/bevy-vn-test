@@ -196,21 +196,21 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                     Some(ScriptCmd::UnlockCg { file }) => {
                         unlock_state.cg_unlocked.insert(file);
                     }
-                    Some(ScriptCmd::SetBg { file, transition: _, duration: _ }) => {
-                        set_bg_writer.write(SetBgMessage { file });
+                    Some(ScriptCmd::SetBg { file, transition, duration }) => {
+                        set_bg_writer.write(SetBgMessage { file, transition, duration: duration.map(|d| d as f64) });
                     }
-                    Some(ScriptCmd::ShowFg { char_id, expression, position, transition: _ }) => {
-                        show_fg_writer.write(ShowFgMessage { char_id, expression, position });
+                    Some(ScriptCmd::ShowFg { char_id, expression, position, transition }) => {
+                        show_fg_writer.write(ShowFgMessage { char_id, expression, position, transition, duration: None });
                     }
-                    Some(ScriptCmd::HideFg { char_id, transition: _ }) => {
-                        hide_fg_writer.write(HideFgMessage { char_id });
+                    Some(ScriptCmd::HideFg { char_id, transition }) => {
+                        hide_fg_writer.write(HideFgMessage { char_id, transition, duration: None });
                     }
-                    Some(ScriptCmd::ShowCg { file, transition: _ }) => {
-                        show_cg_writer.write(ShowCgMessage { file: file.clone() });
+                    Some(ScriptCmd::ShowCg { file, transition }) => {
+                        show_cg_writer.write(ShowCgMessage { file: file.clone(), transition, duration: None });
                         unlock_state.cg_unlocked.insert(file);
                     }
-                    Some(ScriptCmd::HideCg { transition: _ }) => {
-                        hide_cg_writer.write(HideCgMessage);
+                    Some(ScriptCmd::HideCg { transition }) => {
+                        hide_cg_writer.write(HideCgMessage { transition, duration: None });
                     }
                     Some(ScriptCmd::PlayBgm { id, volume, fade_in }) => {
                         play_bgm_writer.write(PlayBgmMessage { id, volume, fade_in });
@@ -297,23 +297,23 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                 Some(ScriptCmd::UnlockCg { file }) => {
                     unlock_state.cg_unlocked.insert(file);
                 }
-                Some(ScriptCmd::SetBg { file, transition: _, duration: _ }) => {
-                    set_bg_writer.write(SetBgMessage { file });
-                }
-                Some(ScriptCmd::ShowFg { char_id, expression, position, transition: _ }) => {
-                    show_fg_writer.write(ShowFgMessage { char_id, expression, position });
-                }
-                Some(ScriptCmd::HideFg { char_id, transition: _ }) => {
-                    hide_fg_writer.write(HideFgMessage { char_id });
-                }
-                Some(ScriptCmd::ShowCg { file, transition: _ }) => {
-                    show_cg_writer.write(ShowCgMessage { file: file.clone() });
-                    unlock_state.cg_unlocked.insert(file);
-                }
-                Some(ScriptCmd::HideCg { transition: _ }) => {
-                    hide_cg_writer.write(HideCgMessage);
-                }
-                Some(ScriptCmd::PlayBgm { id, volume, fade_in }) => {
+                    Some(ScriptCmd::SetBg { file, .. }) => {
+                        set_bg_writer.write(SetBgMessage { file, transition: None, duration: None });
+                    }
+                    Some(ScriptCmd::ShowFg { char_id, expression, position, .. }) => {
+                        show_fg_writer.write(ShowFgMessage { char_id, expression, position, transition: None, duration: None });
+                    }
+                    Some(ScriptCmd::HideFg { char_id, .. }) => {
+                        hide_fg_writer.write(HideFgMessage { char_id, transition: None, duration: None });
+                    }
+                    Some(ScriptCmd::ShowCg { file, .. }) => {
+                        show_cg_writer.write(ShowCgMessage { file: file.clone(), transition: None, duration: None });
+                        unlock_state.cg_unlocked.insert(file);
+                    }
+                    Some(ScriptCmd::HideCg { .. }) => {
+                        hide_cg_writer.write(HideCgMessage { transition: None, duration: None });
+                    }
+                    Some(ScriptCmd::PlayBgm { id, volume, fade_in }) => {
                     play_bgm_writer.write(PlayBgmMessage { id, volume, fade_in });
                 }
                 Some(ScriptCmd::StopBgm { id, fade_out }) => {
