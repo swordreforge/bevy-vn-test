@@ -55,16 +55,6 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
             ..default()
         },
     )).with_children(|parent| {
-        parent.spawn((
-            ImageNode::new(asset_server.load("images/title/logo.png")),
-            Node {
-                width: Val::Px(400.0),
-                height: Val::Auto,
-                margin: UiRect::bottom(Val::Px(50.0)),
-                ..default()
-            },
-        ));
-
         let items: [(TitleButtonAction, &str); 4] = [
             (TitleButtonAction::NewGame, "New Game"),
             (TitleButtonAction::LoadGame, "Load Game"),
