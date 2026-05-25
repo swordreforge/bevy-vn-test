@@ -197,6 +197,9 @@ pub struct GalleryState {
     pub fullscreen: Option<String>,
 }
 
+#[derive(Resource)]
+pub struct GameFont(pub Handle<bevy::text::Font>);
+
 #[derive(Resource, Default)]
 pub struct ScreenTransition {
     pub overlay: Option<Entity>,

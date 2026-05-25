@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::{DialogueState, Settings};
+use crate::resources::{DialogueState, GameFont, Settings};
 use crate::state::AppState;
 
 pub struct DialoguePlugin;
@@ -17,7 +17,7 @@ impl Plugin for DialoguePlugin {
     }
 }
 
-fn setup_dialogue_ui(mut commands: Commands) {
+fn setup_dialogue_ui(mut commands: Commands, game_font: Res<GameFont>) {
     commands.spawn((
         DialogueUiRoot,
         DialogueBox,
@@ -41,6 +41,7 @@ fn setup_dialogue_ui(mut commands: Commands) {
         SpeakerNameDisplay,
         Text::new(""),
         TextFont {
+            font: game_font.0.clone(),
             font_size: 24.0,
             ..default()
         },
@@ -59,6 +60,7 @@ fn setup_dialogue_ui(mut commands: Commands) {
         DialogueTextDisplay,
         Text::new(""),
         TextFont {
+            font: game_font.0.clone(),
             font_size: 20.0,
             ..default()
         },

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::{SaveLoadMode, SaveManager, SaveData, AffectionMap};
+use crate::resources::{GameFont, SaveLoadMode, SaveManager, SaveData, AffectionMap};
 use crate::state::AppState;
 use crate::script::ScriptEngine;
 
@@ -30,6 +30,7 @@ fn setup_save_load_ui(
     mut commands: Commands,
     mode: Res<SaveLoadMode>,
     save_mgr: Res<SaveManager>,
+    game_font: Res<GameFont>,
 ) {
     commands.spawn((
         SaveLoadUiRoot,
@@ -47,7 +48,7 @@ fn setup_save_load_ui(
     )).with_children(|parent| {
         parent.spawn((
             Text::new(if mode.0 { "SAVE" } else { "LOAD" }),
-            TextFont { font_size: 32.0, ..default() },
+            TextFont { font: game_font.0.clone(), font_size: 32.0, ..default() },
             TextColor(Color::WHITE),
             Node { margin: UiRect::bottom(Val::Px(20.0)), ..default() },
         ));
@@ -82,33 +83,33 @@ fn setup_save_load_ui(
                     }
                     slot.with_child((
                         Text::new(format!("{}", idx + 1)),
-                        TextFont { font_size: 14.0, ..default() },
+                        TextFont { font: game_font.0.clone(), font_size: 14.0, ..default() },
                         TextColor(Color::srgb(0.4, 0.4, 0.4)),
                         Node { ..default() },
                     ));
                     if let Some(ref data) = save_mgr.slots[idx] {
                         slot.with_child((
                             Text::new(&data.scene_name),
-                            TextFont { font_size: 16.0, ..default() },
+                            TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
                             TextColor(Color::WHITE),
                             Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
                         ));
                         slot.with_child((
                             Text::new(&data.timestamp),
-                            TextFont { font_size: 12.0, ..default() },
+                            TextFont { font: game_font.0.clone(), font_size: 12.0, ..default() },
                             TextColor(Color::srgb(0.6, 0.6, 0.6)),
                             Node { margin: UiRect::top(Val::Px(2.0)), ..default() },
                         ));
                         slot.with_child((
                             Text::new(format!("line {}", data.script_line)),
-                            TextFont { font_size: 12.0, ..default() },
+                            TextFont { font: game_font.0.clone(), font_size: 12.0, ..default() },
                             TextColor(Color::srgb(0.6, 0.6, 0.6)),
                             Node { ..default() },
                         ));
                     } else {
                         slot.with_child((
                             Text::new("-- EMPTY --"),
-                            TextFont { font_size: 16.0, ..default() },
+                            TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
                             TextColor(Color::srgb(0.3, 0.3, 0.3)),
                             Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
                         ));
@@ -131,6 +132,7 @@ fn handle_slot_click(
     mode: Res<SaveLoadMode>,
     save_mgr: Res<SaveManager>,
     existing: Query<Entity, With<ConfirmDialogRoot>>,
+    game_font: Res<GameFont>,
 ) {
     if !existing.is_empty() {
         return;
@@ -167,7 +169,7 @@ fn handle_slot_click(
         )).with_children(|parent| {
             parent.spawn((
                 Text::new(text),
-                TextFont { font_size: 24.0, ..default() },
+                TextFont { font: game_font.0.clone(), font_size: 24.0, ..default() },
                 TextColor(Color::WHITE),
                 Node { ..default() },
             ));
@@ -183,7 +185,7 @@ fn handle_slot_click(
                     ConfirmYesButton,
                     Button,
                     Text::new("Yes"),
-                    TextFont { font_size: 20.0, ..default() },
+                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(Color::srgb(0.6, 1.0, 0.6)),
                     Node {
                         width: Val::Px(120.0),
@@ -198,7 +200,7 @@ fn handle_slot_click(
                     ConfirmNoButton,
                     Button,
                     Text::new("No"),
-                    TextFont { font_size: 20.0, ..default() },
+                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(Color::srgb(1.0, 0.6, 0.6)),
                     Node {
                         width: Val::Px(120.0),

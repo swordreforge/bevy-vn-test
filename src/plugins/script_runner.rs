@@ -179,6 +179,14 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                             warn!("Condition jump target not found: {}", goto);
                         }
                     }
+                    Some(ScriptCmd::SetFlag { name, value }) => {
+                        engine.flags.insert(name, value);
+                    }
+                    Some(ScriptCmd::Halt) => {
+                        engine.call_stack.clear();
+                        engine.current_script.clear();
+                        engine.current_line = 0;
+                    }
                     Some(ScriptCmd::AffectionChange { char_id, delta }) => {
                         *affection.0.entry(char_id).or_insert(0) += delta;
                     }
@@ -282,6 +290,14 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                     if met && !engine.jump_to_label(&goto) {
                         warn!("Condition jump target not found: {}", goto);
                     }
+                }
+                Some(ScriptCmd::SetFlag { name, value }) => {
+                    engine.flags.insert(name, value);
+                }
+                Some(ScriptCmd::Halt) => {
+                    engine.call_stack.clear();
+                    engine.current_script.clear();
+                    engine.current_line = 0;
                 }
                 Some(ScriptCmd::AffectionChange { char_id, delta }) => {
                     *affection.0.entry(char_id).or_insert(0) += delta;

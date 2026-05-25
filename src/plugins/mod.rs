@@ -12,3 +12,4 @@ pub mod gallery;
 pub mod rendering;
 pub mod choice;
 pub mod screen_transition;
+pub mod splash;

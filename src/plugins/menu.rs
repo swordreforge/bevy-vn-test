@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::resources::{SaveLoadMode, ScreenTransition};
+use crate::resources::{GameFont, SaveLoadMode, ScreenTransition};
 use crate::state::AppState;
 use crate::plugins::inputs::MenuToggleEvent;
 
@@ -30,7 +30,7 @@ impl Plugin for MenuPlugin {
     }
 }
 
-fn setup_menu_ui(mut commands: Commands) {
+fn setup_menu_ui(mut commands: Commands, game_font: Res<GameFont>) {
     commands.spawn((
         MenuUiRoot,
         Node {
@@ -48,7 +48,7 @@ fn setup_menu_ui(mut commands: Commands) {
     )).with_children(|parent| {
         parent.spawn((
             Text::new("MENU"),
-            TextFont { font_size: 36.0, ..default() },
+            TextFont { font: game_font.0.clone(), font_size: 36.0, ..default() },
             TextColor(Color::WHITE),
             Node { ..default() },
         ));
@@ -64,7 +64,7 @@ fn setup_menu_ui(mut commands: Commands) {
                 action,
                 Button,
                 Text::new(label),
-                TextFont { font_size: 24.0, ..default() },
+                TextFont { font: game_font.0.clone(), font_size: 24.0, ..default() },
                 TextColor(Color::srgb(0.8, 0.8, 1.0)),
                 Node { ..default() },
             ));

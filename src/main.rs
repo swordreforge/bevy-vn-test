@@ -12,6 +12,7 @@ mod choice_messages;
 mod script;
 
 use state::AppState;
+use resources::GameFont;
 use script::ScriptEngine;
 use plugins::audio::AudioPlugin;
 use plugins::title::TitlePlugin;
@@ -23,6 +24,7 @@ use plugins::affection::AffectionPlugin;
 use plugins::save_load::SaveLoadPlugin;
 use plugins::dialogue::DialoguePlugin;
 use plugins::settings::SettingsPlugin;
+use plugins::splash::SplashPlugin;
 use plugins::gallery::GalleryPlugin;
 use plugins::rendering::RenderingPlugin;
 use plugins::choice::ChoicePlugin;
@@ -33,13 +35,14 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 resolution: (1280, 720).into(),
-                title: "Bevy VN".to_string(),
+                title: "穢翼のユースティア".to_string(),
                 ..default()
             }),
             ..default()
         }))
         .init_state::<AppState>()
         .init_resource::<ScriptEngine>()
+        .add_plugins(SplashPlugin)
         .add_plugins(TitlePlugin)
         .add_plugins(InputPlugin)
         .add_plugins(MenuPlugin)
@@ -58,6 +61,12 @@ fn main() {
         .run();
 }
 
-fn startup(mut next_state: ResMut<NextState<AppState>>) {
-    next_state.set(AppState::Title);
+fn startup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    commands.spawn(Camera2d);
+    commands.insert_resource(GameFont(asset_server.load("fonts/sourcehansans-medium.otf")));
+    next_state.set(AppState::Splash);
 }

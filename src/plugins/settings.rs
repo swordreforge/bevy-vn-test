@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::Settings;
+use crate::resources::{GameFont, Settings};
 use crate::state::AppState;
 
 pub struct SettingsPlugin;
@@ -31,7 +31,7 @@ fn color_for_filled(filled: bool) -> Color {
     }
 }
 
-fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>) {
+fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font: Res<GameFont>) {
     let slider_defs: [(&str, SliderSetting, f32); 5] = [
         ("BGM Volume", SliderSetting::BgmVolume, settings.bgm_volume * 100.0),
         ("SE Volume", SliderSetting::SeVolume, settings.se_volume * 100.0),
@@ -58,7 +58,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>) {
         parent.spawn((
             SettingsBackButton,
             Text::new("← Back"),
-            TextFont { font_size: 20.0, ..default() },
+            TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
             TextColor(Color::srgb(0.6, 0.6, 0.8)),
             Node {
                 position_type: PositionType::Absolute,
@@ -71,7 +71,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>) {
         // Title
         parent.spawn((
             Text::new("Settings"),
-            TextFont { font_size: 36.0, ..default() },
+            TextFont { font: game_font.0.clone(), font_size: 36.0, ..default() },
             TextColor(Color::WHITE),
             Node { margin: UiRect::bottom(Val::Px(30.0)), ..default() },
         ));
@@ -92,7 +92,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>) {
                 // Label
                 row.spawn((
                     Text::new(*label),
-                    TextFont { font_size: 20.0, ..default() },
+                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(Color::WHITE),
                     Node { width: Val::Px(150.0), ..default() },
                 ));
@@ -118,7 +118,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>) {
                 row.spawn((
                     SliderValueText,
                     Text::new(format!("{:>3.0}", initial_val)),
-                    TextFont { font_size: 20.0, ..default() },
+                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(Color::WHITE),
                     Node {
                         width: Val::Px(50.0),
@@ -149,7 +149,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>) {
             )).with_children(|row| {
                 row.spawn((
                     Text::new(*label),
-                    TextFont { font_size: 20.0, ..default() },
+                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(Color::WHITE),
                     Node { width: Val::Px(150.0), ..default() },
                 ));
@@ -159,7 +159,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>) {
                 row.spawn((
                     ToggleOption { group: group.to_string(), value: true },
                     Text::new("ON"),
-                    TextFont { font_size: 20.0, ..default() },
+                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(if on_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
                     Node {
                         width: Val::Px(50.0),
@@ -176,7 +176,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>) {
                 row.spawn((
                     ToggleOption { group: group.to_string(), value: false },
                     Text::new("OFF"),
-                    TextFont { font_size: 20.0, ..default() },
+                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(if off_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
                     Node {
                         width: Val::Px(50.0),
@@ -228,10 +228,16 @@ fn handle_toggle_clicks(
 fn handle_back_click(
     mut next_state: ResMut<NextState<AppState>>,
     query: Query<&Interaction, (With<SettingsBackButton>, Changed<Interaction>)>,
+    dialogue: Res<crate::resources::DialogueState>,
 ) {
     for interaction in query.iter() {
         if *interaction == Interaction::Pressed {
-            next_state.set(AppState::Menu);
+            let target = if dialogue.current_text.is_empty() {
+                AppState::Title
+            } else {
+                AppState::Menu
+            };
+            next_state.set(target);
         }
     }
 }

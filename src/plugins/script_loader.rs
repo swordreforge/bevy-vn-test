@@ -48,8 +48,10 @@ fn load_all_scripts(mut engine: ResMut<ScriptEngine>) {
         }
     }
 
-    // Set initial script to first in sequence
-    if engine.scripts.contains_key("aiy00010") {
+    // Start from master routing script
+    if engine.scripts.contains_key("main") {
+        engine.current_script = "main".to_string();
+    } else if engine.scripts.contains_key("aiy00010") {
         engine.current_script = "aiy00010".to_string();
     }
     engine.current_line = 0;

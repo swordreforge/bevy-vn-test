@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::choice_messages::ChoiceSelectedMessage;
 use crate::components::{ChoiceUiRoot, ChoiceButtonIndex};
-use crate::resources::ChoiceState;
+use crate::resources::{ChoiceState, GameFont};
 
 pub struct ChoicePlugin;
 
@@ -27,6 +27,7 @@ fn choice_ui_spawn(
     mut commands: Commands,
     state: Res<ChoiceState>,
     existing: Query<Entity, With<ChoiceUiRoot>>,
+    game_font: Res<GameFont>,
 ) {
     if !existing.is_empty() {
         return;
@@ -64,6 +65,7 @@ fn choice_ui_spawn(
             BackgroundColor(CHOICE_BUTTON_COLOR),
             Text::new(&option.text),
             TextFont {
+                font: game_font.0.clone(),
                 font_size: 22.0,
                 ..default()
             },

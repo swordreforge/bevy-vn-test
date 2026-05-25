@@ -105,6 +105,11 @@ pub enum ScriptCmd {
     Label {
         name: String,
     },
+    SetFlag {
+        name: String,
+        value: i32,
+    },
+    Halt,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

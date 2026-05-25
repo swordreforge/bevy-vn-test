@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::state::AppState;
-use crate::resources::{UnlockState, GalleryState, TextureCache};
+use crate::resources::{GameFont, GalleryState, TextureCache, UnlockState};
 use crate::components::*;
 
 pub struct GalleryPlugin;
@@ -32,6 +32,7 @@ fn setup_gallery(
     _gallery_state: Res<GalleryState>,
     asset_server: Res<AssetServer>,
     mut cache: ResMut<TextureCache>,
+    game_font: Res<GameFont>,
 ) {
     commands.spawn((
         GalleryRoot,
@@ -67,14 +68,14 @@ fn setup_gallery(
         )).with_child((
             GalleryScreen,
             Text::new("← Back"),
-            TextFont { font_size: 18.0, ..default() },
+            TextFont { font: game_font.0.clone(), font_size: 18.0, ..default() },
             TextColor(Color::WHITE),
         ));
 
         parent.spawn((
             GalleryScreen,
             Text::new("CG Gallery"),
-            TextFont { font_size: 28.0, ..default() },
+            TextFont { font: game_font.0.clone(), font_size: 28.0, ..default() },
             TextColor(Color::WHITE),
             Node {
                 margin: UiRect::top(Val::Px(12.0)),
@@ -132,7 +133,7 @@ fn setup_gallery(
                     )).with_child((
                         GalleryScreen,
                         Text::new("🔒"),
-                        TextFont { font_size: 32.0, ..default() },
+                        TextFont { font: game_font.0.clone(), font_size: 32.0, ..default() },
                         TextColor(Color::srgb(0.3, 0.3, 0.4)),
                     ));
                 }
@@ -184,10 +185,16 @@ fn handle_thumbnail_click(
 fn handle_back_button(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<GalleryBackButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
+    dialogue: Res<crate::resources::DialogueState>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
-            next_state.set(AppState::Menu);
+            let target = if dialogue.current_text.is_empty() {
+                AppState::Title
+            } else {
+                AppState::Menu
+            };
+            next_state.set(target);
         }
     }
 }
