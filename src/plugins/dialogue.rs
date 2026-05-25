@@ -22,55 +22,53 @@ fn setup_dialogue_ui(mut commands: Commands, game_font: Res<GameFont>) {
         DialogueUiRoot,
         DialogueBox,
         Node {
-            width: Val::Percent(100.0),
-            height: Val::Px(200.0),
+            width: Val::Percent(92.0),
             position_type: PositionType::Absolute,
             bottom: Val::Px(0.0),
-            left: Val::Px(0.0),
+            left: Val::Percent(4.0),
+            right: Val::Percent(4.0),
             justify_content: JustifyContent::FlexStart,
             align_items: AlignItems::FlexStart,
-            padding: UiRect::all(Val::Px(20.0)),
+            flex_direction: FlexDirection::Column,
+            padding: UiRect::new(Val::Px(40.0), Val::Px(40.0), Val::Px(12.0), Val::Px(12.0)),
+            overflow: Overflow::clip(),
             ..default()
         },
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
         ZIndex(3),
-    ));
+    )).with_children(|parent| {
+        parent.spawn((
+            SpeakerNameDisplay,
+            Text::new(""),
+            TextFont {
+                font: game_font.0.clone(),
+                font_size: 22.0,
+                ..default()
+            },
+            TextColor(Color::srgb(1.0, 0.8, 0.6)),
+            Node {
+                margin: UiRect::bottom(Val::Px(4.0)),
+                ..default()
+            },
+            ZIndex(3),
+        ));
 
-    commands.spawn((
-        DialogueUiRoot,
-        SpeakerNameDisplay,
-        Text::new(""),
-        TextFont {
-            font: game_font.0.clone(),
-            font_size: 24.0,
-            ..default()
-        },
-        TextColor(Color::srgb(1.0, 0.8, 0.6)),
-        Node {
-            position_type: PositionType::Absolute,
-            bottom: Val::Px(200.0),
-            left: Val::Px(40.0),
-            ..default()
-        },
-        ZIndex(3),
-    ));
-
-    commands.spawn((
-        DialogueUiRoot,
-        DialogueTextDisplay,
-        Text::new(""),
-        TextFont {
-            font: game_font.0.clone(),
-            font_size: 20.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Node {
-            width: Val::Percent(95.0),
-            ..default()
-        },
-        ZIndex(3),
-    ));
+        parent.spawn((
+            DialogueTextDisplay,
+            Text::new(""),
+            TextFont {
+                font: game_font.0.clone(),
+                font_size: 20.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            Node {
+                width: Val::Percent(100.0),
+                ..default()
+            },
+            ZIndex(3),
+        ));
+    });
 }
 
 fn cleanup_dialogue(mut commands: Commands, query: Query<Entity, With<DialogueUiRoot>>) {
