@@ -85,8 +85,8 @@ fn update_dialogue(
     mut speaker_query: Query<&mut Text, (With<SpeakerNameDisplay>, Without<DialogueTextDisplay>)>,
 ) {
     if let Ok(mut text) = text_query.single_mut() {
-        let end = state.text_progress.min(state.current_text.len());
-        text.0 = state.current_text[..end].to_string();
+        let visible_count = state.text_progress.min(state.current_text.chars().count());
+        text.0 = state.current_text.chars().take(visible_count).collect();
     }
     if let Ok(mut speaker) = speaker_query.single_mut() {
         speaker.0 = state.current_speaker.clone().unwrap_or_default();
