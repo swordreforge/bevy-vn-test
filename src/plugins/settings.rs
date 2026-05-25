@@ -120,6 +120,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
                 // Value text
                 row.spawn((
                     SliderValueText,
+                    setting_copy,
                     Text::new(format!("{:>3.0}", initial_val)),
                     TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(Color::WHITE),
@@ -177,11 +178,11 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
                 // OFF button
                 let off_active = !*initial_val;
                 row.spawn((
-                    ToggleOption { group: group.to_string(), value: true },
+                    ToggleOption { group: group.to_string(), value: false },
                     Button,
-                    Text::new("ON"),
+                    Text::new("OFF"),
                     TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                    TextColor(if on_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
+                    TextColor(if off_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
                     Node {
                         width: Val::Px(50.0),
                         height: Val::Px(30.0),
@@ -189,7 +190,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
                         align_items: AlignItems::Center,
                         ..default()
                     },
-                    BackgroundColor(if on_active { Color::srgb(0.15, 0.3, 0.6) } else { Color::srgb(0.12, 0.12, 0.18) }),
+                    BackgroundColor(if off_active { Color::srgb(0.3, 0.12, 0.12) } else { Color::srgb(0.12, 0.12, 0.18) }),
                 ));
 
                 // OFF button
@@ -266,6 +267,7 @@ fn handle_back_click(
 fn update_slider_visuals(
     settings: Res<Settings>,
     mut query: Query<(&SliderSegment, &SliderSetting, &mut BackgroundColor)>,
+    mut text_query: Query<(&SliderSetting, &mut Text), With<SliderValueText>>,
 ) {
     for (segment, slider_setting, mut bg) in query.iter_mut() {
         let current = match slider_setting {
@@ -277,6 +279,16 @@ fn update_slider_visuals(
         };
         let seg_val = (segment.0 as f32) * 10.0;
         *bg = BackgroundColor(color_for_filled(seg_val <= current));
+    }
+    for (setting, mut text) in text_query.iter_mut() {
+        let current = match setting {
+            SliderSetting::BgmVolume => settings.bgm_volume * 100.0,
+            SliderSetting::SeVolume => settings.se_volume * 100.0,
+            SliderSetting::VoiceVolume => settings.voice_volume * 100.0,
+            SliderSetting::TextSpeed => settings.text_speed as f32,
+            SliderSetting::MsgOpacity => settings.message_window_opacity as f32,
+        };
+        text.0 = format!("{:>3.0}", current);
     }
 }
 
