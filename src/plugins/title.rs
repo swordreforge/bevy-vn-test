@@ -70,6 +70,7 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
                 Text::new(label),
                 TextFont { font: game_font.0.clone(), font_size: 22.0, ..default() },
                 TextColor(Color::srgb(0.9, 0.9, 0.95)),
+                TextLayout::new_with_justify(Justify::Center),
                 Node {
                     width: Val::Px(BTN_W),
                     height: Val::Px(BTN_H),
