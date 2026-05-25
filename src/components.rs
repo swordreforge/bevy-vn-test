@@ -17,7 +17,7 @@ pub struct DialogueUiRoot;
 pub struct BackgroundRoot;
 
 #[derive(Component)]
-pub struct SpriteSlotMarker(pub FgPosition);
+pub struct SpriteSlotMarker(#[allow(dead_code)] pub FgPosition);
 
 #[derive(Component)]
 pub struct CgRoot;

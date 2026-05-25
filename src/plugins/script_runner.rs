@@ -160,6 +160,9 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                     Some(ScriptCmd::Call { target }) => {
                         engine.call_label(&target);
                     }
+                    Some(ScriptCmd::CallScript { script, label }) => {
+                        engine.call_script(&script, label.as_deref());
+                    }
                     Some(ScriptCmd::Return) => {
                         engine.return_from_call();
                     }
@@ -260,6 +263,9 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                 }
                 Some(ScriptCmd::Call { target }) => {
                     engine.call_label(&target);
+                }
+                Some(ScriptCmd::CallScript { script, label }) => {
+                    engine.call_script(&script, label.as_deref());
                 }
                 Some(ScriptCmd::Return) => {
                     engine.return_from_call();

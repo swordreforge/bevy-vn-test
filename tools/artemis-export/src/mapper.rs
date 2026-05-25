@@ -128,6 +128,12 @@ fn map_command(
         }
         "SetJumpLabel" => None,
         "return_main" => Some(ScriptCmd::Return),
+        "CallScript" => {
+            let target = cmd.attrs.get("0")?;
+            let label = cmd.attrs.get("1").filter(|s| !s.is_empty()).cloned();
+            let script = format!("aiy{:05}", target.parse::<u32>().ok()?);
+            Some(ScriptCmd::CallScript { script, label })
+        }
         "calllua" => map_calllua(cmd, _config),
         _ => None,
     }

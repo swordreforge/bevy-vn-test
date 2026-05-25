@@ -29,7 +29,7 @@ struct GalleryScreen;
 fn setup_gallery(
     mut commands: Commands,
     unlock_state: Res<UnlockState>,
-    gallery_state: Res<GalleryState>,
+    _gallery_state: Res<GalleryState>,
     asset_server: Res<AssetServer>,
     mut cache: ResMut<TextureCache>,
 ) {

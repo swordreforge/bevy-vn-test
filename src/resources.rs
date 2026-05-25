@@ -53,6 +53,7 @@ impl SaveManager {
         }
     }
 
+    #[allow(dead_code)]
     pub fn refresh_from_disk(&mut self) {
         for i in 0..self.slots.len() {
             let path = format!("saves/slot_{}.json", i);
@@ -109,7 +110,9 @@ impl Default for Settings {
 #[derive(Resource, Default, Clone)]
 pub struct UnlockState {
     pub cg_unlocked: HashSet<String>,
+    #[allow(dead_code)]
     pub bgm_unlocked: HashSet<String>,
+    #[allow(dead_code)]
     pub scene_cleared: HashSet<String>,
 }
 
@@ -119,6 +122,7 @@ pub struct DialogueState {
     pub current_speaker: Option<String>,
     pub text_progress: usize,
     pub is_displaying: bool,
+    #[allow(dead_code)]
     pub text_queue: Vec<String>,
 }
 

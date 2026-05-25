@@ -80,6 +80,10 @@ pub enum ScriptCmd {
     Call {
         target: String,
     },
+    CallScript {
+        script: String,
+        label: Option<String>,
+    },
     Return,
     Condition {
         var: String,
@@ -119,6 +123,7 @@ pub enum ConditionOp {
     LessEqual,
 }
 
+#[allow(dead_code)]
 pub type Script = Vec<ScriptCmd>;
 
 #[derive(Resource, Default)]
@@ -131,6 +136,7 @@ pub struct ScriptEngine {
 }
 
 impl ScriptEngine {
+    #[allow(dead_code)]
     pub fn load(&mut self, name: &str, script: Vec<ScriptCmd>) {
         self.current_script = name.to_string();
         self.scripts.insert(name.to_string(), script);
@@ -145,6 +151,7 @@ impl ScriptEngine {
         Some(cmd)
     }
 
+    #[allow(dead_code)]
     pub fn peek(&self) -> Option<&ScriptCmd> {
         self.scripts
             .get(&self.current_script)?
@@ -170,6 +177,21 @@ impl ScriptEngine {
         let return_line = self.current_line;
         if self.jump_to_label(label) {
             self.call_stack.push((self.current_script.clone(), return_line));
+        }
+    }
+
+    pub fn call_script(&mut self, script: &str, label: Option<&str>) {
+        let return_line = self.current_line;
+        let return_script = self.current_script.clone();
+
+        if self.scripts.contains_key(script) {
+            self.current_script = script.to_string();
+            if let Some(lbl) = label {
+                self.jump_to_label(lbl);
+            } else {
+                self.current_line = 0;
+            }
+            self.call_stack.push((return_script, return_line));
         }
     }
 

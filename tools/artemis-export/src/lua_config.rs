@@ -11,7 +11,9 @@ pub struct GameConfig {
 
 #[derive(Debug, Clone)]
 pub struct SceneEntry {
+    #[allow(dead_code)]
     pub file: String,
+    #[allow(dead_code)]
     pub label: String,
 }
 
