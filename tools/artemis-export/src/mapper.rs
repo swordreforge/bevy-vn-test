@@ -96,17 +96,23 @@ fn map_command(
             })
         }
         "BgmPlay" => {
-            let id = cmd.attrs.get("0")?;
+            let file_id = cmd.attrs.get("1")?;
+            let volume = match cmd.attrs.get("2").map(|s| s.as_str()) {
+                Some("MIN") => Some(0.5),
+                _ => None,
+            };
             Some(ScriptCmd::PlayBgm {
-                id: id.to_string(),
-                volume: None,
+                id: file_id.to_string(),
+                volume,
                 fade_in: None,
             })
         }
         "BgmStop" => {
-            let id = cmd.attrs.get("0").map(|s| s.to_string());
-            let fade_out = cmd.attrs.get("1").and_then(|s| s.parse::<u64>().ok());
-            Some(ScriptCmd::StopBgm { id, fade_out })
+            let fade_out = match cmd.attrs.get("1").map(|s| s.as_str()) {
+                Some("FADE") => Some(500u64),
+                _ => Some(0u64),
+            };
+            Some(ScriptCmd::StopBgm { id: None, fade_out })
         }
         "SEPlay" => {
             let file = cmd.attrs.get("0")?;

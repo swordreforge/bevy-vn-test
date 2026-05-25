@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "timestamp": "1779681796",
+  "scene_name": "aiy00010",
+  "script_path": "aiy00010.bscript.ron",
+  "script_line": 153,
+  "call_stack": [
+    [
+      "main",
+      2
+    ]
+  ],
+  "flags": {},
+  "affection": {},
+  "play_time": 0
+}
