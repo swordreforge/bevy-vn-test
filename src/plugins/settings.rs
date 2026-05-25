@@ -100,7 +100,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
                 ));
 
                 // Track with 10 segments
-                for i in 0..10 {
+                for i in 0..11 {
                     let seg_val = (i as f32) * 10.0;
                     let filled = seg_val <= initial_val;
                     row.spawn((
