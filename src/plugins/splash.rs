@@ -34,7 +34,6 @@ fn setup_splash(mut commands: Commands, asset_server: Res<AssetServer>) {
         },
         BackgroundColor(Color::BLACK),
     )).with_child((
-        SplashRoot,
         ImageNode::new(asset_server.load("images/splash.png")),
         Node {
             width: Val::Px(300.0),

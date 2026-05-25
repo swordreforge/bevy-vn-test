@@ -52,7 +52,6 @@ fn setup_gallery(
     )).with_children(|parent| {
         parent.spawn((
             GalleryBackButton,
-            GalleryScreen,
             Button,
             Node {
                 width: Val::Px(80.0),
@@ -66,14 +65,12 @@ fn setup_gallery(
             },
             BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
         )).with_child((
-            GalleryScreen,
             Text::new("← Back"),
             TextFont { font: game_font.0.clone(), font_size: 18.0, ..default() },
             TextColor(Color::WHITE),
         ));
 
         parent.spawn((
-            GalleryScreen,
             Text::new("CG Gallery"),
             TextFont { font: game_font.0.clone(), font_size: 28.0, ..default() },
             TextColor(Color::WHITE),
@@ -84,7 +81,6 @@ fn setup_gallery(
         ));
 
         parent.spawn((
-            GalleryScreen,
             Node {
                 width: Val::Percent(90.0),
                 height: Val::Auto,
@@ -106,7 +102,6 @@ fn setup_gallery(
                         .clone();
                     grid.spawn((
                         GalleryThumbnail(file.to_string()),
-                        GalleryScreen,
                         Button,
                         Node {
                             width: Val::Px(360.0),
@@ -120,7 +115,6 @@ fn setup_gallery(
                     grid.spawn((
                         GalleryThumbnail(file.to_string()),
                         GalleryLocked,
-                        GalleryScreen,
                         Node {
                             width: Val::Px(360.0),
                             height: Val::Px(200.0),
@@ -131,7 +125,6 @@ fn setup_gallery(
                         BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
                         ZIndex(5),
                     )).with_child((
-                        GalleryScreen,
                         Text::new("🔒"),
                         TextFont { font: game_font.0.clone(), font_size: 32.0, ..default() },
                         TextColor(Color::srgb(0.3, 0.3, 0.4)),

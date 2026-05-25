@@ -35,7 +35,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 resolution: (1280, 720).into(),
-                title: "穢翼のユースティア".to_string(),
+                title: "Aiyoku no Eustia".to_string(),
                 ..default()
             }),
             ..default()

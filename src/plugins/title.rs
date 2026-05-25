@@ -56,7 +56,6 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
         },
     )).with_children(|parent| {
         parent.spawn((
-            TitleRoot,
             ImageNode::new(asset_server.load("images/title/logo.png")),
             Node {
                 width: Val::Px(400.0),
@@ -74,7 +73,6 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
         ];
         for (action, label) in items {
             parent.spawn((
-                TitleRoot,
                 action,
                 Button,
                 Node {
@@ -87,7 +85,6 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
                 },
                 BackgroundColor(BTN_COLOR),
             )).with_child((
-                TitleRoot,
                 Text::new(label),
                 TextFont { font: game_font.0.clone(), font_size: 22.0, ..default() },
                 TextColor(Color::srgb(0.9, 0.9, 0.95)),
