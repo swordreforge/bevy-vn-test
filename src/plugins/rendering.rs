@@ -7,6 +7,35 @@ use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowCgMessage, HideCgMessage,
 };
 
+fn char_dir(char_id: &str) -> Option<&'static str> {
+    let prefix = &char_id[..2];
+    match prefix {
+        "01" => Some("001_eus"),
+        "02" => Some("002_eri"),
+        "03" => Some("003_ire"),
+        "04" => Some("004_lic"),
+        "05" => Some("005_fio"),
+        "11" => Some("011_sis"),
+        "12" => Some("012_mel"),
+        "13" => Some("013_lav"),
+        "14" => Some("014_cla"),
+        "15" => Some("015_ris"),
+        "16" => Some("016_iri"),
+        "17" => Some("017_gau"),
+        "32" => Some("032_luc"),
+        "33" => Some("033_kur"),
+        "34" => Some("034_sie"),
+        "35" => Some("035_oz"),
+        "36" => Some("036_gil"),
+        "40" => Some("040_vel"),
+        "41" => Some("041_val"),
+        "42" => Some("042_kok"),
+        "43" => Some("043_lan"),
+        "44" => Some("044_nud"),
+        _ => None,
+    }
+}
+
 pub struct RenderingPlugin;
 
 impl Plugin for RenderingPlugin {
@@ -174,7 +203,11 @@ fn handle_show_fg(
     for msg in msg.read() {
         let slot = sprite_mgr.slots.get_mut(&msg.position);
         if let Some(slot) = slot {
-            let path = format!("images/fg/{}/tati_{}.png", msg.char_id, msg.expression);
+            let Some(dir) = char_dir(&msg.char_id) else {
+                warn!("No FG mapping for char_id: {}", msg.char_id);
+                continue;
+            };
+            let path = format!("images/fg/{}/tati_{}.png", dir, msg.char_id);
             let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
                 asset_server.load(&path)
             }).clone();
@@ -208,34 +241,46 @@ fn handle_show_fg(
     }
 }
 
+fn hide_slot(
+    slot: &mut crate::resources::SpriteSlotInfo,
+    query: &mut Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor)>,
+    transition: Option<Transition>,
+    duration: Option<f64>,
+) {
+    match transition {
+        Some(Transition::Fade) => {
+            let dur = duration.unwrap_or(0.5) as f32;
+            slot.fade = Some(SpriteFade {
+                timer: Timer::from_seconds(dur, TimerMode::Once),
+                kind: SpriteFadeKind::FadeOut,
+            });
+        }
+        _ => {
+            slot.char_id.clear();
+            slot.expression.clear();
+            slot.texture = None;
+            if let Ok((mut image_node, mut vis, _)) = query.get_mut(slot.entity) {
+                image_node.image = Handle::default();
+                *vis = Visibility::Hidden;
+            }
+        }
+    }
+}
+
 fn handle_hide_fg(
     mut msg: MessageReader<HideFgMessage>,
     mut sprite_mgr: ResMut<SpriteManager>,
     mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor)>,
 ) {
     for msg in msg.read() {
-        let slot = sprite_mgr.slots.values_mut()
-            .find(|s| s.char_id == msg.char_id);
-
-        if let Some(slot) = slot {
-            match msg.transition {
-                Some(Transition::Fade) => {
-                    let dur = msg.duration.unwrap_or(0.5) as f32;
-                    slot.fade = Some(SpriteFade {
-                        timer: Timer::from_seconds(dur, TimerMode::Once),
-                        kind: SpriteFadeKind::FadeOut,
-                    });
-                }
-                _ => {
-                    slot.char_id.clear();
-                    slot.expression.clear();
-                    slot.texture = None;
-                    if let Ok((mut image_node, mut vis, _)) = query.get_mut(slot.entity) {
-                        image_node.image = Handle::default();
-                        *vis = Visibility::Hidden;
-                    }
-                }
+        if msg.char_id == "all" {
+            for slot in sprite_mgr.slots.values_mut() {
+                hide_slot(slot, &mut query, msg.transition.clone(), msg.duration);
             }
+        } else if let Some(slot) = sprite_mgr.slots.values_mut()
+            .find(|s| s.char_id == msg.char_id)
+        {
+            hide_slot(slot, &mut query, msg.transition.clone(), msg.duration);
         }
     }
 }
