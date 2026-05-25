@@ -62,6 +62,16 @@ fn map_command(
                 file: file.to_string(),
             })
         }
+        "Tati" => {
+            let char_id = cmd.attrs.get("0")?;
+            let expression = cmd.attrs.get("1").cloned().unwrap_or("000".into());
+            Some(ScriptCmd::ShowFg {
+                char_id: char_id.to_string(),
+                expression,
+                position: FgPosition::Center,
+                transition: None,
+            })
+        }
         "TatiFa" => {
             let char_id = cmd.attrs.get("0")?;
             let expression = cmd.attrs.get("1").cloned().unwrap_or("000".into());
@@ -93,6 +103,14 @@ fn map_command(
             Some(ScriptCmd::HideFg {
                 char_id: "all".into(),
                 transition: None,
+            })
+        }
+        "Back" => {
+            let num = cmd.attrs.get("0")?;
+            Some(ScriptCmd::SetBg {
+                file: format!("bg_{}.jpg", num),
+                transition: None,
+                duration: None,
             })
         }
         "BgmPlay" => {

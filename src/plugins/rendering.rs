@@ -160,7 +160,8 @@ fn handle_set_bg(
             bg_state.fade = None;
         }
 
-        let path = format!("images/bg/{}", msg.file);
+        let file = if msg.file.contains('.') { msg.file.clone() } else { format!("{}.jpg", msg.file) };
+        let path = format!("images/bg/{}", file);
         let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
             asset_server.load(&path)
         }).clone();
