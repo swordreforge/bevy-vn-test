@@ -1,0 +1,11 @@
+[package]
+name = "artemis-export"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy_vn = { path = "../..", package = "bevy-vn" }
+serde = { version = "1", features = ["derive"] }
+ron = "0.8"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }

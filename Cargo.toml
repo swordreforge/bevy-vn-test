@@ -3,6 +3,10 @@ name = "bevy-vn"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "bevy_vn"
+path = "src/lib.rs"
+
 [dependencies]
 bevy = { version = "0.18", features = ["bevy_asset", "bevy_audio", "vorbis"] }
 serde = { version = "1", features = ["derive"] }
@@ -15,6 +19,9 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
+[workspace]
+members = ["tools/artemis-export"]
 
 [profile.release]
 opt-level = 3
