@@ -57,6 +57,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
         // Back button
         parent.spawn((
             SettingsBackButton,
+            Button,
             Text::new("← Back"),
             TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
             TextColor(Color::srgb(0.6, 0.6, 0.8)),
@@ -64,6 +65,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
                 position_type: PositionType::Absolute,
                 top: Val::Px(20.0),
                 left: Val::Px(20.0),
+                padding: UiRect::all(Val::Px(8.0)),
                 ..default()
             },
         ));
@@ -104,6 +106,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
                     row.spawn((
                         SliderSegment(i),
                         setting_copy,
+                        Button,
                         Node {
                             width: Val::Px(20.0),
                             height: Val::Px(22.0),
@@ -174,7 +177,25 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
                 // OFF button
                 let off_active = !*initial_val;
                 row.spawn((
+                    ToggleOption { group: group.to_string(), value: true },
+                    Button,
+                    Text::new("ON"),
+                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
+                    TextColor(if on_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
+                    Node {
+                        width: Val::Px(50.0),
+                        height: Val::Px(30.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(if on_active { Color::srgb(0.15, 0.3, 0.6) } else { Color::srgb(0.12, 0.12, 0.18) }),
+                ));
+
+                // OFF button
+                row.spawn((
                     ToggleOption { group: group.to_string(), value: false },
+                    Button,
                     Text::new("OFF"),
                     TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(if off_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
