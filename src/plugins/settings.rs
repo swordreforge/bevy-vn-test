@@ -162,6 +162,7 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
                 let on_active = *initial_val;
                 row.spawn((
                     ToggleOption { group: group.to_string(), value: true },
+                    Button,
                     Text::new("ON"),
                     TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
                     TextColor(if on_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
@@ -177,23 +178,6 @@ fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font:
 
                 // OFF button
                 let off_active = !*initial_val;
-                row.spawn((
-                    ToggleOption { group: group.to_string(), value: false },
-                    Button,
-                    Text::new("OFF"),
-                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                    TextColor(if off_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
-                    Node {
-                        width: Val::Px(50.0),
-                        height: Val::Px(30.0),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BackgroundColor(if off_active { Color::srgb(0.3, 0.12, 0.12) } else { Color::srgb(0.12, 0.12, 0.18) }),
-                ));
-
-                // OFF button
                 row.spawn((
                     ToggleOption { group: group.to_string(), value: false },
                     Button,
