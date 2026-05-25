@@ -17,8 +17,8 @@ enum TitleButtonAction {
     Gallery,
 }
 
-const BTN_COLOR: Color = Color::srgba(0.08, 0.08, 0.12, 0.85);
-const BTN_HOVER: Color = Color::srgba(0.25, 0.25, 0.35, 0.9);
+const BTN_COLOR: Color = Color::srgba(0.2, 0.2, 0.3, 0.9);
+const BTN_HOVER: Color = Color::srgba(0.35, 0.35, 0.5, 0.9);
 const BTN_W: f32 = 280.0;
 const BTN_H: f32 = 48.0;
 
@@ -41,6 +41,7 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
             ..default()
         },
         ImageNode::new(asset_server.load("images/title/bg.png")),
+        ZIndex(0),
     ));
 
     commands.spawn((
@@ -54,6 +55,7 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
             position_type: PositionType::Absolute,
             ..default()
         },
+        ZIndex(1),
     )).with_children(|parent| {
         let items: [(TitleButtonAction, &str); 4] = [
             (TitleButtonAction::NewGame, "New Game"),
@@ -65,6 +67,9 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
             parent.spawn((
                 action,
                 Button,
+                Text::new(label),
+                TextFont { font: game_font.0.clone(), font_size: 22.0, ..default() },
+                TextColor(Color::srgb(0.9, 0.9, 0.95)),
                 Node {
                     width: Val::Px(BTN_W),
                     height: Val::Px(BTN_H),
@@ -74,10 +79,6 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
                     ..default()
                 },
                 BackgroundColor(BTN_COLOR),
-            )).with_child((
-                Text::new(label),
-                TextFont { font: game_font.0.clone(), font_size: 22.0, ..default() },
-                TextColor(Color::srgb(0.9, 0.9, 0.95)),
             ));
         }
     });
