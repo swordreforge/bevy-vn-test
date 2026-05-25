@@ -1,3 +1,10 @@
+mod asb;
+mod lua_config;
+mod mapper;
+
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
 use clap::Parser;
 
 #[derive(Parser)]
@@ -13,9 +20,92 @@ struct Args {
     dry_run: bool,
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
     let args = Args::parse();
-    println!("Input: {}", args.input);
-    println!("Output: {}", args.output);
+    let input_root = PathBuf::from(&args.input);
+    let output_dir = PathBuf::from(&args.output);
+
+    if !input_root.exists() {
+        anyhow::bail!("Input directory not found: {}", args.input);
+    }
+
+    if !args.dry_run {
+        std::fs::create_dir_all(&output_dir).context("Failed to create output directory")?;
+    }
+
+    eprintln!("[1/3] Extracting Lua configs...");
+    let config =
+        lua_config::extract_config(&input_root).context("Failed to extract Lua configs")?;
+
+    let asb_files = discover_asb_files(&input_root);
+    if asb_files.is_empty() {
+        anyhow::bail!("No .asb files found under {:?}", input_root);
+    }
+    eprintln!("[2/3] Found {} .asb files", asb_files.len());
+
+    let mut converted = 0;
+    let mut skipped = 0;
+
+    for asb_path in &asb_files {
+        let script = match asb::parse_asb(asb_path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("  [warn] Failed to parse {:?}: {}", asb_path, e);
+                skipped += 1;
+                continue;
+            }
+        };
+
+        let output_name = asb_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown");
+        let output_path = output_dir.join(format!("{}.bscript.ron", output_name));
+
+        let ron_cmds = mapper::map_script(&script, &config, args.verbose);
+
+        if !args.dry_run {
+            let ron_str = ron::ser::to_string_pretty(
+                &ron_cmds,
+                ron::ser::PrettyConfig::default(),
+            )
+            .context("RON serialization failed")?;
+            std::fs::write(&output_path, ron_str)
+                .with_context(|| format!("Failed to write {:?}", output_path))?;
+        }
+
+        if args.verbose {
+            eprintln!("  -> {} ({} commands)", output_name, ron_cmds.len());
+        }
+        converted += 1;
+    }
+
+    eprintln!(
+        "[3/3] Done: {} converted, {} skipped",
+        converted, skipped
+    );
     Ok(())
+}
+
+fn discover_asb_files(root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    let scenario_dir = root.join("scenario");
+    if scenario_dir.exists() {
+        collect_asb_files(&scenario_dir, &mut files);
+    }
+    files.sort();
+    files
+}
+
+fn collect_asb_files(dir: &Path, files: &mut Vec<PathBuf>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_asb_files(&path, files);
+            } else if path.extension().map(|e| e == "asb").unwrap_or(false) {
+                files.push(path);
+            }
+        }
+    }
 }

@@ -10,7 +10,7 @@ pub enum FgPosition {
     OffScreen,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Transition {
     Fade,
     Dissolve,
