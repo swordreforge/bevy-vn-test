@@ -120,6 +120,7 @@ fn setup_rendering(mut commands: Commands, mut bg_state: ResMut<BgState>, mut sp
                 ..default()
             },
             ImageNode::default(),
+            BackgroundColor(Color::NONE),
             Visibility::Hidden,
             ZIndex(1),
         )).id();
@@ -230,7 +231,7 @@ fn handle_show_fg(
                         });
                     }
                     _ => {
-                        bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
+                        bg.0 = Color::srgba(0.0, 0.0, 0.0, 0.0);
                         *vis = Visibility::Visible;
                         slot.fade = None;
                     }
