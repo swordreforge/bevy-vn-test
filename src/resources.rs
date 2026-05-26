@@ -226,6 +226,9 @@ pub struct ChoiceState {
 pub struct SaveLoadMode(pub bool); // true = Save, false = Load
 
 #[derive(Resource, Default)]
+pub struct SaveLoadPage(pub usize);
+
+#[derive(Resource, Default)]
 pub struct GalleryState {
     pub fullscreen: Option<String>,
     pub page: usize,

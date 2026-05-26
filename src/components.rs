@@ -44,6 +44,18 @@ pub struct ConfirmYesButton;
 pub struct ConfirmNoButton;
 
 #[derive(Component)]
+pub struct SaveLoadSlotGrid;
+
+#[derive(Component)]
+pub struct SaveLoadPageLeftBtn;
+
+#[derive(Component)]
+pub struct SaveLoadPageRightBtn;
+
+#[derive(Component)]
+pub struct SaveLoadPageText;
+
+#[derive(Component)]
 pub struct GalleryRoot;
 
 #[derive(Component)]
