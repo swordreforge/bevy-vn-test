@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_scrollbar::{Scrollbar, ThumbColor};
 use crate::state::AppState;
 use crate::resources::{GameFont, GalleryState, TextureCache, UnlockState, AllCgFiles};
 use crate::components::*;
@@ -18,6 +17,7 @@ impl Plugin for GalleryPlugin {
                 handle_back_button,
                 handle_fullscreen_click,
                 handle_gallery_escape,
+                handle_gallery_page_nav,
             ).run_if(in_state(AppState::Gallery)))
             .add_systems(OnExit(AppState::Gallery), cleanup_gallery);
     }
@@ -26,16 +26,23 @@ impl Plugin for GalleryPlugin {
 #[derive(Component)]
 struct GalleryScreen;
 
+#[derive(Component)]
+struct GalleryPageText;
+
+const CGS_PER_PAGE: usize = 9;
+
 fn setup_gallery(
     mut commands: Commands,
     unlock_state: Res<UnlockState>,
-    _gallery_state: Res<GalleryState>,
+    gallery_state: Res<GalleryState>,
     asset_server: Res<AssetServer>,
     mut cache: ResMut<TextureCache>,
     game_font: Res<GameFont>,
     cg_files: Res<AllCgFiles>,
 ) {
-    let root = commands.spawn((
+    let total_pages = ((cg_files.0.len() + CGS_PER_PAGE - 1) / CGS_PER_PAGE).max(1);
+
+    commands.spawn((
         GalleryRoot,
         GalleryScreen,
         Node {
@@ -50,43 +57,8 @@ fn setup_gallery(
         },
         BackgroundColor(Color::srgba(0.05, 0.05, 0.1, 0.95)),
         ZIndex(5),
-    )).id();
-
-    let row = commands.spawn((
-        Node {
-            width: Val::Percent(90.0),
-            flex_grow: 1.0,
-            flex_direction: FlexDirection::Row,
-            ..default()
-        },
-    )).id();
-
-    let scroll_id = commands.spawn((
-        Node {
-            flex_grow: 1.0,
-            height: Val::Percent(100.0),
-            overflow: Overflow::scroll_y(),
-            ..default()
-        },
-    )).id();
-
-    commands.spawn((
-        Scrollbar { scrollable: scroll_id },
-        Node {
-            width: Val::Px(8.0),
-            height: Val::Percent(100.0),
-            flex_shrink: 0.0,
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.15, 0.15, 0.18, 1.0)),
-        ThumbColor(Color::srgba(0.45, 0.45, 0.5, 1.0)),
-    )).set_parent_in_place(row);
-
-    commands.entity(scroll_id).set_parent_in_place(row);
-    commands.entity(row).set_parent_in_place(root);
-
-    commands.entity(root).with_children(|parent| {
-        parent.spawn((
+    )).with_children(|root| {
+        root.spawn((
             GalleryBackButton,
             Button,
             Node {
@@ -106,7 +78,7 @@ fn setup_gallery(
             TextColor(Color::WHITE),
         ));
 
-        parent.spawn((
+        root.spawn((
             Text::new("CG Gallery"),
             TextFont { font: game_font.0.clone(), font_size: 28.0, ..default() },
             TextColor(Color::WHITE),
@@ -115,61 +87,74 @@ fn setup_gallery(
                 ..default()
             },
         ));
-    });
 
-    commands.entity(scroll_id).with_children(|scroll| {
-        scroll.spawn((
+        root.spawn((
+            GalleryPageText,
+            Text::new(format!("←  Page {}/{}  →", gallery_state.page + 1, total_pages)),
+            TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
+            TextColor(Color::srgb(0.7, 0.7, 0.8)),
+            Node {
+                margin: UiRect::vertical(Val::Px(6.0)),
+                ..default()
+            },
+        ));
+
+        root.spawn((
             GalleryGridContent,
             Node {
-                width: Val::Percent(100.0),
-                height: Val::Auto,
+                width: Val::Percent(90.0),
+                flex_grow: 1.0,
                 flex_direction: FlexDirection::Row,
                 flex_wrap: FlexWrap::Wrap,
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::FlexStart,
+                align_content: AlignContent::FlexStart,
                 column_gap: Val::Px(12.0),
                 row_gap: Val::Px(12.0),
                 ..default()
             },
         )).with_children(|grid| {
-        for file in &cg_files.0 {
-            if unlock_state.cg_unlocked.contains(file) {
-                let path = format!("images/ev/{}", file);
-                let handle = cache.cache.entry(path.clone())
-                    .or_insert_with(|| asset_server.load(&path))
-                    .clone();
-                grid.spawn((
-                    GalleryThumbnail(file.clone()),
-                    Button,
-                    Node {
-                        width: Val::Px(360.0),
-                        height: Val::Px(200.0),
-                        ..default()
-                    },
-                    ImageNode::new(handle),
-                    ZIndex(5),
-                ));
-            } else {
-                grid.spawn((
-                    GalleryThumbnail(file.clone()),
-                    GalleryLocked,
-                    Node {
-                        width: Val::Px(360.0),
-                        height: Val::Px(200.0),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
-                    ZIndex(5),
-                )).with_child((
-                    Text::new("[ LOCKED ]"),
-                    TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
-                    TextColor(Color::srgb(0.3, 0.3, 0.4)),
-                ));
+            let start = gallery_state.page * CGS_PER_PAGE;
+            let end = (start + CGS_PER_PAGE).min(cg_files.0.len());
+            for i in start..end {
+                let file = &cg_files.0[i];
+                if unlock_state.cg_unlocked.contains(file) {
+                    let path = format!("images/ev/{}", file);
+                    let handle = cache.cache.entry(path.clone())
+                        .or_insert_with(|| asset_server.load(&path))
+                        .clone();
+                    grid.spawn((
+                        GalleryThumbnail(file.clone()),
+                        Button,
+                        Node {
+                            width: Val::Px(360.0),
+                            height: Val::Px(200.0),
+                            ..default()
+                        },
+                        ImageNode::new(handle),
+                        ZIndex(5),
+                    ));
+                } else {
+                    grid.spawn((
+                        GalleryThumbnail(file.clone()),
+                        GalleryLocked,
+                        Node {
+                            width: Val::Px(360.0),
+                            height: Val::Px(200.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
+                        ZIndex(5),
+                    )).with_child((
+                        Text::new("[ LOCKED ]"),
+                        TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
+                        TextColor(Color::srgb(0.3, 0.3, 0.4)),
+                    ));
+                }
             }
-        }
-    });
+        });
     });
 }
 
@@ -242,6 +227,97 @@ fn handle_fullscreen_click(
                 commands.entity(entity).despawn();
             }
             gallery_state.fullscreen = None;
+        }
+    }
+}
+
+fn handle_gallery_page_nav(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut gallery_state: ResMut<GalleryState>,
+    grid_query: Query<Entity, With<GalleryGridContent>>,
+    children_query: Query<&Children, With<GalleryGridContent>>,
+    page_text_query: Query<Entity, With<GalleryPageText>>,
+    mut commands: Commands,
+    unlock_state: Res<UnlockState>,
+    asset_server: Res<AssetServer>,
+    mut cache: ResMut<TextureCache>,
+    cg_files: Res<AllCgFiles>,
+    game_font: Res<GameFont>,
+) {
+    if gallery_state.fullscreen.is_some() {
+        return;
+    }
+
+    let total_pages = ((cg_files.0.len() + CGS_PER_PAGE - 1) / CGS_PER_PAGE).max(1);
+    let old_page = gallery_state.page;
+
+    if keys.just_pressed(KeyCode::ArrowLeft) || keys.just_pressed(KeyCode::ArrowUp) {
+        gallery_state.page = if gallery_state.page == 0 {
+            total_pages - 1
+        } else {
+            gallery_state.page - 1
+        };
+    }
+    if keys.just_pressed(KeyCode::ArrowRight) || keys.just_pressed(KeyCode::ArrowDown) {
+        gallery_state.page = (gallery_state.page + 1) % total_pages;
+    }
+
+    if gallery_state.page != old_page {
+        for children in &children_query {
+            for child in children.iter() {
+                commands.entity(child).despawn();
+            }
+        }
+
+        for entity in &grid_query {
+            commands.entity(entity).with_children(|grid| {
+                let start = gallery_state.page * CGS_PER_PAGE;
+                let end = (start + CGS_PER_PAGE).min(cg_files.0.len());
+                for i in start..end {
+                    let file = &cg_files.0[i];
+                    if unlock_state.cg_unlocked.contains(file) {
+                        let path = format!("images/ev/{}", file);
+                        let handle = cache.cache.entry(path.clone())
+                            .or_insert_with(|| asset_server.load(&path))
+                            .clone();
+                        grid.spawn((
+                            GalleryThumbnail(file.clone()),
+                            Button,
+                            Node {
+                                width: Val::Px(360.0),
+                                height: Val::Px(200.0),
+                                ..default()
+                            },
+                            ImageNode::new(handle),
+                            ZIndex(5),
+                        ));
+                    } else {
+                        grid.spawn((
+                            GalleryThumbnail(file.clone()),
+                            GalleryLocked,
+                            Node {
+                                width: Val::Px(360.0),
+                                height: Val::Px(200.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
+                            ZIndex(5),
+                        )).with_child((
+                            Text::new("[ LOCKED ]"),
+                            TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
+                            TextColor(Color::srgb(0.3, 0.3, 0.4)),
+                        ));
+                    }
+                }
+            });
+        }
+
+        for entity in &page_text_query {
+            commands.entity(entity).insert(Text::new(
+                format!("←  Page {}/{}  →", gallery_state.page + 1, total_pages),
+            ));
         }
     }
 }
