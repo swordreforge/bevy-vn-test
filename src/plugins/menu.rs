@@ -14,6 +14,7 @@ pub enum MenuButtonAction {
     Load,
     Settings,
     Gallery,
+    Backlog,
     Title,
 }
 
@@ -52,9 +53,10 @@ fn setup_menu_ui(mut commands: Commands, game_font: Res<GameFont>) {
             TextColor(Color::WHITE),
             Node { ..default() },
         ));
-        let items: [(MenuButtonAction, &str); 5] = [
+        let items: [(MenuButtonAction, &str); 6] = [
             (MenuButtonAction::Save, "Save"),
             (MenuButtonAction::Load, "Load"),
+            (MenuButtonAction::Backlog, "Backlog"),
             (MenuButtonAction::Settings, "Settings"),
             (MenuButtonAction::Gallery, "Gallery"),
             (MenuButtonAction::Title, "Back to Title"),
@@ -93,6 +95,7 @@ fn handle_menu_button_interaction(
             MenuButtonAction::Load => { mode.0 = false; next_state.set(AppState::SaveLoad); }
             MenuButtonAction::Settings => next_state.set(AppState::Settings),
             MenuButtonAction::Gallery => next_state.set(AppState::Gallery),
+            MenuButtonAction::Backlog => next_state.set(AppState::Backlog),
             MenuButtonAction::Title => screen_transition.pending_state = Some(AppState::Title),
         }
     }

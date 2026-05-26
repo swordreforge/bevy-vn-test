@@ -159,6 +159,19 @@ pub struct DialogueState {
     pub text_queue: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct BacklogEntry {
+    pub speaker: Option<String>,
+    pub text: String,
+    #[allow(dead_code)]
+    pub voice_file: Option<String>,
+}
+
+#[derive(Resource, Default)]
+pub struct Backlog {
+    pub entries: Vec<BacklogEntry>,
+}
+
 pub struct BgCrossFade {
     pub timer: Timer,
 }

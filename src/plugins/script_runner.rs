@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
-use crate::resources::{AffectionMap, ChoiceState, DialogueState, Settings, UnlockState};
+use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, Settings, UnlockState};
 use crate::audio_messages::{
     PlayBgmMessage, StopBgmMessage, PlaySeMessage, PlayVoiceMessage,
 };
@@ -32,6 +32,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     engine: ResMut<'w, ScriptEngine>,
     dialogue: ResMut<'w, DialogueState>,
     affection: ResMut<'w, AffectionMap>,
+    backlog: ResMut<'w, Backlog>,
     unlock_state: ResMut<'w, UnlockState>,
     set_bg_writer: MessageWriter<'w, SetBgMessage>,
     show_fg_writer: MessageWriter<'w, ShowFgMessage>,
@@ -78,6 +79,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
         ref mut engine,
         ref mut dialogue,
         ref mut affection,
+        ref mut backlog,
         ref mut unlock_state,
         ref mut set_bg_writer,
         ref mut show_fg_writer,
@@ -131,10 +133,20 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
 
         // Skip mode: when not in a choice and skip is enabled, skip through everything
         if settings.skip_mode {
+            let mut pending_voice = None;
             while engine.has_more() {
                 let cmd = engine.advance().cloned();
                 match cmd {
                     Some(ScriptCmd::Dialogue { speaker, text }) => {
+                        let text_clone = text.clone();
+                        backlog.entries.push(BacklogEntry {
+                            speaker: speaker.clone(),
+                            text: text_clone,
+                            voice_file: pending_voice.take(),
+                        });
+                        if backlog.entries.len() > 200 {
+                            backlog.entries.remove(0);
+                        }
                         dialogue.current_speaker = speaker;
                         let text_len = text.len();
                         dialogue.current_text = text;
@@ -233,6 +245,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                         play_se_writer.write(PlaySeMessage { file, volume });
                     }
                     Some(ScriptCmd::PlayVoice { file }) => {
+                        pending_voice = Some(file.clone());
                         play_voice_writer.write(PlayVoiceMessage { file, volume: None });
                     }
                     Some(cmd) => {
@@ -248,10 +261,20 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
         }
 
         // Normal mode
+        let mut pending_voice = None;
         while engine.has_more() {
             let cmd = engine.advance().cloned();
             match cmd {
                 Some(ScriptCmd::Dialogue { speaker, text }) => {
+                    let text_clone = text.clone();
+                    backlog.entries.push(BacklogEntry {
+                        speaker: speaker.clone(),
+                        text: text_clone,
+                        voice_file: pending_voice.take(),
+                    });
+                    if backlog.entries.len() > 200 {
+                        backlog.entries.remove(0);
+                    }
                     dialogue.current_speaker = speaker;
                     dialogue.current_text = text;
                     dialogue.text_progress = 0;
@@ -345,6 +368,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                     play_se_writer.write(PlaySeMessage { file, volume });
                 }
                 Some(ScriptCmd::PlayVoice { file }) => {
+                    pending_voice = Some(file.clone());
                     play_voice_writer.write(PlayVoiceMessage { file, volume: None });
                 }
                 Some(ScriptCmd::Choice { options }) => {

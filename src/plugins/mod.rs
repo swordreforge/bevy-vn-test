@@ -13,3 +13,4 @@ pub mod rendering;
 pub mod choice;
 pub mod screen_transition;
 pub mod splash;
+pub mod backlog;

@@ -11,4 +11,5 @@ pub enum AppState {
     SaveLoad,
     Gallery,
     Settings,
+    Backlog,
 }
