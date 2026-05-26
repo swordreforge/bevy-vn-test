@@ -210,6 +210,16 @@ pub struct TextureCache {
     pub cache: HashMap<String, Handle<Image>>,
 }
 
+pub struct PendingBgmLoad {
+    pub id: String,
+    pub handle_a: Handle<AudioSource>,
+    pub handle_b: Handle<AudioSource>,
+    pub volume: f32,
+}
+
+#[derive(Resource, Default)]
+pub struct PendingBgm(pub Option<PendingBgmLoad>);
+
 #[derive(Resource, Default)]
 pub struct BgmManager {
     pub current_id: Option<String>,

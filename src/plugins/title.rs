@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use crate::audio_messages::{PlayBgmMessage, StopBgmMessage};
 use crate::resources::GameFont;
 use crate::resources::ScreenTransition;
 use crate::resources::SaveLoadMode;
@@ -17,6 +18,7 @@ enum TitleButtonAction {
     Gallery,
 }
 
+const TITLE_BGM: &str = "0401";
 const BTN_COLOR: Color = Color::srgba(0.2, 0.2, 0.3, 0.9);
 const BTN_HOVER: Color = Color::srgba(0.35, 0.35, 0.5, 0.9);
 const BTN_W: f32 = 280.0;
@@ -31,7 +33,12 @@ impl Plugin for TitlePlugin {
     }
 }
 
-fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font: Res<GameFont>) {
+fn setup_title(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    game_font: Res<GameFont>,
+    mut bgm_writer: MessageWriter<PlayBgmMessage>,
+) {
     commands.spawn((
         TitleRoot,
         Node {
@@ -83,6 +90,8 @@ fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>, game_font
             ));
         }
     });
+
+    bgm_writer.write(PlayBgmMessage { id: TITLE_BGM.to_string(), volume: None, fade_in: None });
 }
 
 fn handle_title_buttons(
@@ -121,8 +130,13 @@ fn handle_title_buttons(
     }
 }
 
-fn cleanup_title(mut commands: Commands, query: Query<Entity, With<TitleRoot>>) {
+fn cleanup_title(
+    mut commands: Commands,
+    query: Query<Entity, With<TitleRoot>>,
+    mut bgm_writer: MessageWriter<StopBgmMessage>,
+) {
     for entity in &query {
         commands.entity(entity).despawn();
     }
+    bgm_writer.write(StopBgmMessage { id: None, fade_out: None });
 }
