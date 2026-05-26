@@ -80,6 +80,7 @@ impl Plugin for RenderingPlugin {
                 handle_fade_sprite,
                 handle_move_sprite,
                 update_sprite_tweens,
+                update_overlay_tween,
             ).chain().run_if(in_state(AppState::Gameplay)));
     }
 }
@@ -162,6 +163,21 @@ fn setup_rendering(
             fade: None,
         });
     }
+
+    commands.spawn((
+        ScreenOverlayRoot,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            position_type: PositionType::Absolute,
+            top: Val::Px(0.0),
+            left: Val::Px(0.0),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+        ZIndex((u16::MAX - 1) as i32),
+        Visibility::Hidden,
+    ));
 
     initialized.0 = true;
 }
@@ -731,6 +747,28 @@ fn update_sprite_tweens(
                     commands.entity(entity).remove::<SpriteTween>();
                 }
             }
+        }
+    }
+}
+
+fn update_overlay_tween(
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut BackgroundColor, &mut OverlayTween), With<ScreenOverlayRoot>>,
+    mut commands: Commands,
+) {
+    for (entity, mut bg, mut tween) in query.iter_mut() {
+        tween.timer.tick(time.delta());
+        let progress = tween.timer.fraction().min(1.0);
+        let eased = 1.0 - (1.0 - progress) * (1.0 - progress);
+        let alpha = tween.start_alpha + (tween.end_alpha - tween.start_alpha) * eased;
+        let mut color = bg.0;
+        color.set_alpha(alpha.clamp(0.0, 1.0));
+        *bg = BackgroundColor(color);
+        if tween.timer.just_finished() {
+            if tween.end_alpha <= 0.0 {
+                commands.entity(entity).insert(Visibility::Hidden);
+            }
+            commands.entity(entity).remove::<OverlayTween>();
         }
     }
 }
