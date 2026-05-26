@@ -54,6 +54,7 @@ impl Plugin for ScriptRunnerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AutoSkipTimer>()
             .add_systems(OnEnter(AppState::Gameplay), start_script_execution)
+            .add_systems(OnEnter(AppState::Title), reset_engine_on_title)
             .add_systems(
                 Update,
                 (
@@ -74,6 +75,18 @@ fn start_script_execution(
     dialogue.current_speaker = None;
     dialogue.text_progress = 0;
     dialogue.is_displaying = false;
+}
+
+fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
+    engine.current_line = 0;
+    engine.call_stack.clear();
+    engine.flags.clear();
+    engine.dialogue_idx = 0;
+    if engine.scripts.contains_key("main") {
+        engine.current_script = "main".to_string();
+    } else if engine.scripts.contains_key("aiy00010") {
+        engine.current_script = "aiy00010".to_string();
+    }
 }
 
 fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
