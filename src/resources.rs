@@ -38,6 +38,8 @@ pub struct SaveData {
     pub call_stack: Vec<(String, usize)>,
     pub flags: HashMap<String, i32>,
     pub affection: HashMap<String, i32>,
+    #[serde(default)]
+    pub unlock_state: UnlockState,
     pub play_time: u64,
 }
 
@@ -107,7 +109,38 @@ impl Default for Settings {
     }
 }
 
-#[derive(Resource, Default, Clone)]
+#[derive(Resource)]
+pub struct AllCgFiles(pub Vec<String>);
+
+impl AllCgFiles {
+    pub fn scan() -> Self {
+        let mut files = Vec::new();
+        if let Ok(entries) = std::fs::read_dir("assets/images/ev") {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                        if ext == "png" || ext == "jpg" || ext == "jpeg" {
+                            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                                files.push(name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        files.sort();
+        Self(files)
+    }
+}
+
+impl Default for AllCgFiles {
+    fn default() -> Self {
+        Self::scan()
+    }
+}
+
+#[derive(Debug, Resource, Default, Clone, Serialize, Deserialize)]
 pub struct UnlockState {
     pub cg_unlocked: HashSet<String>,
     #[allow(dead_code)]

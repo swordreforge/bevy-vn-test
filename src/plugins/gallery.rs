@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::state::AppState;
-use crate::resources::{GameFont, GalleryState, TextureCache, UnlockState};
+use crate::resources::{GameFont, GalleryState, TextureCache, UnlockState, AllCgFiles};
 use crate::components::*;
 
 pub struct GalleryPlugin;
@@ -10,6 +10,7 @@ impl Plugin for GalleryPlugin {
         app.init_resource::<UnlockState>()
             .init_resource::<GalleryState>()
             .init_resource::<TextureCache>()
+            .init_resource::<AllCgFiles>()
             .add_systems(OnEnter(AppState::Gallery), setup_gallery)
             .add_systems(Update, (
                 handle_thumbnail_click,
@@ -21,8 +22,6 @@ impl Plugin for GalleryPlugin {
     }
 }
 
-const ALL_CG_FILES: &[&str] = &["eve_010101.png"];
-
 #[derive(Component)]
 struct GalleryScreen;
 
@@ -33,6 +32,7 @@ fn setup_gallery(
     asset_server: Res<AssetServer>,
     mut cache: ResMut<TextureCache>,
     game_font: Res<GameFont>,
+    cg_files: Res<AllCgFiles>,
 ) {
     commands.spawn((
         GalleryRoot,
@@ -94,14 +94,14 @@ fn setup_gallery(
                 ..default()
             },
         )).with_children(|grid| {
-            for file in ALL_CG_FILES {
-                if unlock_state.cg_unlocked.contains(*file) {
+            for file in &cg_files.0 {
+                if unlock_state.cg_unlocked.contains(file) {
                     let path = format!("images/ev/{}", file);
                     let handle = cache.cache.entry(path.clone())
                         .or_insert_with(|| asset_server.load(&path))
                         .clone();
                     grid.spawn((
-                        GalleryThumbnail(file.to_string()),
+                        GalleryThumbnail(file.clone()),
                         Button,
                         Node {
                             width: Val::Px(360.0),
@@ -113,7 +113,7 @@ fn setup_gallery(
                     ));
                 } else {
                     grid.spawn((
-                        GalleryThumbnail(file.to_string()),
+                        GalleryThumbnail(file.clone()),
                         GalleryLocked,
                         Node {
                             width: Val::Px(360.0),

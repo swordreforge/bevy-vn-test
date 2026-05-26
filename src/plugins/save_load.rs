@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::{GameFont, SaveLoadMode, SaveManager, SaveData, AffectionMap};
+use crate::resources::{GameFont, SaveLoadMode, SaveManager, SaveData, AffectionMap, UnlockState};
 use crate::state::AppState;
 use crate::script::ScriptEngine;
 
@@ -226,6 +226,7 @@ fn handle_confirm(
     mut save_mgr: ResMut<SaveManager>,
     mut script_engine: ResMut<ScriptEngine>,
     affection: Res<AffectionMap>,
+    mut unlock_state: ResMut<UnlockState>,
     mut next_state: ResMut<NextState<AppState>>,
     mut commands: Commands,
 ) {
@@ -235,12 +236,13 @@ fn handle_confirm(
     for interaction in &yes_query {
         if *interaction == Interaction::Pressed {
             if mode.0 {
-                let data = build_save_data(&script_engine, &affection);
+                let data = build_save_data(&script_engine, &affection, &unlock_state);
                 save_mgr.save_slot(idx, data);
             } else if let Some(data) = save_mgr.load_slot_from_disk(idx) {
                 script_engine.current_line = data.script_line;
                 script_engine.call_stack = data.call_stack;
                 script_engine.flags = data.flags;
+                *unlock_state = data.unlock_state;
             }
             commands.remove_resource::<ConfirmState>();
             if mode.0 {
@@ -273,7 +275,7 @@ fn handle_save_load_escape(
     }
 }
 
-fn build_save_data(engine: &ScriptEngine, affection: &AffectionMap) -> SaveData {
+fn build_save_data(engine: &ScriptEngine, affection: &AffectionMap, unlock_state: &UnlockState) -> SaveData {
     use std::time::SystemTime;
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -288,6 +290,7 @@ fn build_save_data(engine: &ScriptEngine, affection: &AffectionMap) -> SaveData 
         call_stack: engine.call_stack.clone(),
         flags: engine.flags.clone(),
         affection: affection.0.clone(),
+        unlock_state: unlock_state.clone(),
         play_time: 0,
     }
 }
