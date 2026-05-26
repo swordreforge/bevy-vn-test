@@ -16,6 +16,7 @@ enum TitleButtonAction {
     LoadGame,
     Settings,
     Gallery,
+    Exit,
 }
 
 const TITLE_BGM: &str = "0401";
@@ -60,15 +61,17 @@ fn setup_title(
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
             position_type: PositionType::Absolute,
+            margin: UiRect::top(Val::Px(60.0)),
             ..default()
         },
         ZIndex(1),
     )).with_children(|parent| {
-        let items: [(TitleButtonAction, &str); 4] = [
+        let items: [(TitleButtonAction, &str); 5] = [
             (TitleButtonAction::NewGame, "New Game"),
             (TitleButtonAction::LoadGame, "Load Game"),
             (TitleButtonAction::Settings, "Settings"),
             (TitleButtonAction::Gallery, "Gallery"),
+            (TitleButtonAction::Exit, "Exit"),
         ];
         for (action, label) in items {
             parent.spawn((
@@ -117,6 +120,9 @@ fn handle_title_buttons(
                     }
                     TitleButtonAction::Gallery => {
                         next_state.set(AppState::Gallery);
+                    }
+                    TitleButtonAction::Exit => {
+                        std::process::exit(0);
                     }
                 }
             }
