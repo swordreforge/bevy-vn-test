@@ -19,9 +19,9 @@ impl Plugin for AudioPlugin {
             .add_message::<PlaySeMessage>()
             .add_message::<PlayVoiceMessage>()
             .add_systems(Update, (
+                handle_stop_bgm,
                 handle_play_bgm,
                 process_pending_bgm,
-                handle_stop_bgm,
                 handle_play_se,
                 handle_play_voice,
                 apply_audio_settings,

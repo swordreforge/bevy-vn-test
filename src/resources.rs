@@ -258,6 +258,9 @@ pub struct ChoiceState {
 }
 
 #[derive(Resource, Default)]
+pub struct IntroPhase(pub bool);
+
+#[derive(Resource, Default)]
 pub struct SaveLoadMode(pub bool); // true = Save, false = Load
 
 #[derive(Resource, Default)]

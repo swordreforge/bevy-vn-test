@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
-use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, NarrationOverlay, Settings, UnlockState};
+use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase, NarrationOverlay, Settings, UnlockState};
 use crate::audio_messages::{
     PlayBgmMessage, StopBgmMessage, PlaySeMessage, PlayVoiceMessage,
 };
@@ -48,12 +48,14 @@ pub struct ProcessAdvanceParams<'w, 's> {
     play_voice_writer: MessageWriter<'w, PlayVoiceMessage>,
     settings: Res<'w, Settings>,
     auto_skip: ResMut<'w, AutoSkipTimer>,
+    intro: ResMut<'w, IntroPhase>,
 }
 
 impl Plugin for ScriptRunnerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AutoSkipTimer>()
-            .add_systems(OnEnter(AppState::Gameplay), start_script_execution)
+            .init_resource::<IntroPhase>()
+            .add_systems(OnEnter(AppState::Gameplay), (start_script_execution, start_intro_bgm))
             .add_systems(OnEnter(AppState::Title), reset_engine_on_title)
             .add_systems(
                 Update,
@@ -75,6 +77,26 @@ fn start_script_execution(
     dialogue.current_speaker = None;
     dialogue.text_progress = 0;
     dialogue.is_displaying = false;
+}
+
+fn start_intro_bgm(
+    engine: Res<ScriptEngine>,
+    mut play_bgm: MessageWriter<PlayBgmMessage>,
+    mut intro: ResMut<IntroPhase>,
+) {
+    if engine.current_line != 0 {
+        return;
+    }
+    let is_start = engine.current_script == "main"
+        || engine.current_script == "aiy00010";
+    if is_start {
+        play_bgm.write(PlayBgmMessage {
+            id: "0304".to_string(),
+            volume: None,
+            fade_in: None,
+        });
+        intro.0 = true;
+    }
 }
 
 fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
@@ -111,6 +133,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
         ref mut play_voice_writer,
         ref settings,
         ref mut auto_skip,
+        ref mut intro,
     } = &mut params;
 
     for _ in advance_ev.read() {
@@ -166,6 +189,9 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                 match cmd {
                     Some(ScriptCmd::Dialogue { speaker, text }) => {
                         engine.dialogue_idx += 1;
+                        if intro.0 && speaker.is_some() {
+                            intro.0 = false;
+                        }
                         let text_clone = text.clone();
                         backlog.entries.push(BacklogEntry {
                             speaker: speaker.clone(),
@@ -259,10 +285,14 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                         hide_cg_writer.write(HideCgMessage { transition: None, duration: None });
                     }
                     Some(ScriptCmd::PlayBgm { id, volume, fade_in }) => {
-                        play_bgm_writer.write(PlayBgmMessage { id, volume, fade_in });
+                        if !intro.0 {
+                            play_bgm_writer.write(PlayBgmMessage { id, volume, fade_in });
+                        }
                     }
                     Some(ScriptCmd::StopBgm { id, fade_out }) => {
-                        stop_bgm_writer.write(StopBgmMessage { id, fade_out });
+                        if !intro.0 {
+                            stop_bgm_writer.write(StopBgmMessage { id, fade_out });
+                        }
                     }
                     Some(ScriptCmd::PlaySe { file, volume }) => {
                         play_se_writer.write(PlaySeMessage { file, volume });
@@ -290,6 +320,9 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
             match cmd {
                 Some(ScriptCmd::Dialogue { speaker, text }) => {
                     engine.dialogue_idx += 1;
+                    if intro.0 && speaker.is_some() {
+                        intro.0 = false;
+                    }
                     let text_clone = text.clone();
                     backlog.entries.push(BacklogEntry {
                         speaker: speaker.clone(),
@@ -383,10 +416,14 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                     hide_cg_writer.write(HideCgMessage { transition, duration: None });
                 }
                 Some(ScriptCmd::PlayBgm { id, volume, fade_in }) => {
-                    play_bgm_writer.write(PlayBgmMessage { id, volume, fade_in });
+                    if !intro.0 {
+                        play_bgm_writer.write(PlayBgmMessage { id, volume, fade_in });
+                    }
                 }
                 Some(ScriptCmd::StopBgm { id, fade_out }) => {
-                    stop_bgm_writer.write(StopBgmMessage { id, fade_out });
+                    if !intro.0 {
+                        stop_bgm_writer.write(StopBgmMessage { id, fade_out });
+                    }
                 }
                 Some(ScriptCmd::PlaySe { file, volume }) => {
                     play_se_writer.write(PlaySeMessage { file, volume });
