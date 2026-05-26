@@ -36,6 +36,9 @@ fn char_dir(char_id: &str) -> Option<&'static str> {
     }
 }
 
+#[derive(Resource, Default)]
+pub struct RenderingInitialized(pub bool);
+
 pub struct RenderingPlugin;
 
 impl Plugin for RenderingPlugin {
@@ -49,8 +52,9 @@ impl Plugin for RenderingPlugin {
             .init_resource::<SpriteManager>()
             .init_resource::<CgState>()
             .init_resource::<TextureCache>()
+            .init_resource::<RenderingInitialized>()
             .add_systems(OnEnter(AppState::Gameplay), setup_rendering)
-            .add_systems(OnExit(AppState::Gameplay), cleanup_rendering)
+            .add_systems(OnEnter(AppState::Title), cleanup_rendering)
             .add_systems(Update, (
                 update_bg_fade,
                 update_fg_fade,
@@ -64,7 +68,16 @@ impl Plugin for RenderingPlugin {
     }
 }
 
-fn setup_rendering(mut commands: Commands, mut bg_state: ResMut<BgState>, mut sprite_mgr: ResMut<SpriteManager>) {
+fn setup_rendering(
+    mut commands: Commands,
+    mut bg_state: ResMut<BgState>,
+    mut sprite_mgr: ResMut<SpriteManager>,
+    mut initialized: ResMut<RenderingInitialized>,
+) {
+    if initialized.0 {
+        return;
+    }
+
     // Spawn dual-buffer background entities
     let bg_a = commands.spawn((
         BackgroundRoot,
@@ -133,12 +146,27 @@ fn setup_rendering(mut commands: Commands, mut bg_state: ResMut<BgState>, mut sp
             fade: None,
         });
     }
+
+    initialized.0 = true;
 }
 
-fn cleanup_rendering(mut commands: Commands, query: Query<Entity, Or<(With<BackgroundRoot>, With<SpriteSlotMarker>, With<CgRoot>)>>) {
+fn cleanup_rendering(
+    mut commands: Commands,
+    query: Query<Entity, Or<(With<BackgroundRoot>, With<SpriteSlotMarker>, With<CgRoot>)>>,
+    mut bg_state: ResMut<BgState>,
+    mut sprite_mgr: ResMut<SpriteManager>,
+    mut cg_state: ResMut<CgState>,
+    mut cache: ResMut<TextureCache>,
+    mut initialized: ResMut<RenderingInitialized>,
+) {
     for entity in &query {
         commands.entity(entity).despawn();
     }
+    *bg_state = BgState::default();
+    *sprite_mgr = SpriteManager::default();
+    *cg_state = CgState::default();
+    cache.cache.clear();
+    initialized.0 = false;
 }
 
 fn handle_set_bg(

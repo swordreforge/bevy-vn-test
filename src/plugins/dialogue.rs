@@ -3,21 +3,37 @@ use crate::components::*;
 use crate::resources::{DialogueState, GameFont, Settings};
 use crate::state::AppState;
 
+#[derive(Resource, Default)]
+pub struct DialogueInitialized(pub bool);
+
 pub struct DialoguePlugin;
 
 impl Plugin for DialoguePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DialogueState>()
+            .init_resource::<DialogueInitialized>()
             .add_systems(OnEnter(AppState::Gameplay), setup_dialogue_ui)
             .add_systems(Update, (
                 update_dialogue,
                 apply_message_opacity,
             ).run_if(in_state(AppState::Gameplay)))
-            .add_systems(OnExit(AppState::Gameplay), cleanup_dialogue);
+            .add_systems(OnExit(AppState::Gameplay), hide_dialogue)
+            .add_systems(OnEnter(AppState::Title), cleanup_dialogue);
     }
 }
 
-fn setup_dialogue_ui(mut commands: Commands, game_font: Res<GameFont>) {
+fn setup_dialogue_ui(
+    mut commands: Commands,
+    game_font: Res<GameFont>,
+    mut initialized: ResMut<DialogueInitialized>,
+    mut show_query: Query<&mut Visibility, With<DialogueUiRoot>>,
+) {
+    if initialized.0 {
+        for mut vis in show_query.iter_mut() {
+            *vis = Visibility::Visible;
+        }
+        return;
+    }
     commands.spawn((
         DialogueUiRoot,
         DialogueBox,
@@ -69,12 +85,26 @@ fn setup_dialogue_ui(mut commands: Commands, game_font: Res<GameFont>) {
             ZIndex(3),
         ));
     });
+    initialized.0 = true;
 }
 
-fn cleanup_dialogue(mut commands: Commands, query: Query<Entity, With<DialogueUiRoot>>) {
+fn hide_dialogue(
+    mut hide_query: Query<&mut Visibility, With<DialogueUiRoot>>,
+) {
+    for mut vis in hide_query.iter_mut() {
+        *vis = Visibility::Hidden;
+    }
+}
+
+fn cleanup_dialogue(
+    mut commands: Commands,
+    query: Query<Entity, With<DialogueUiRoot>>,
+    mut initialized: ResMut<DialogueInitialized>,
+) {
     for entity in &query {
         commands.entity(entity).despawn();
     }
+    initialized.0 = false;
 }
 
 fn update_dialogue(
