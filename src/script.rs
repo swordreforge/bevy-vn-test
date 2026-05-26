@@ -114,10 +114,15 @@ pub enum ScriptCmd {
         z: i32,
         alpha: i32,
         priority: i32,
+        #[serde(default)]
         time: u64,
+        #[serde(default)]
         rotation: f32,
+        #[serde(default)]
         anchor_x: f32,
+        #[serde(default)]
         anchor_y: f32,
+        #[serde(default)]
         blend_mode: i32,
     },
     FadeSprite {
@@ -144,6 +149,24 @@ pub enum ScriptCmd {
         value: i32,
     },
     Halt,
+    ScreenOverlay {
+        color: OverlayColor,
+        time: u64,
+    },
+    ClearOverlay {
+        time: u64,
+    },
+    Window {
+        show: bool,
+        #[allow(dead_code)]
+        time: Option<u64>,
+    },
+    ChangeWindowColor {
+        color_idx: i32,
+    },
+    ChangeWindowDesign {
+        design: i32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -160,6 +183,12 @@ pub enum ConditionOp {
     Equal,
     GreaterEqual,
     LessEqual,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum OverlayColor {
+    Black,
+    White,
 }
 
 #[allow(dead_code)]
