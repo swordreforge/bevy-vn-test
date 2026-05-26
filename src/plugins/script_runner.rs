@@ -301,6 +301,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                         pending_voice = Some(file.clone());
                         play_voice_writer.write(PlayVoiceMessage { file, volume: None });
                     }
+                    Some(ScriptCmd::Wait { .. }) => {}
                     Some(cmd) => {
                         info!("Script cmd (no-op): {:?}", cmd);
                     }
@@ -436,6 +437,12 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                     choice_state.active = true;
                     choice_state.options = options;
                     break;
+                }
+                Some(ScriptCmd::Wait { duration }) => {
+                    if settings.auto_mode && !settings.skip_mode {
+                        auto_skip.auto_timer = Some(Timer::from_seconds(duration as f32 / 1000.0, TimerMode::Once));
+                        break;
+                    }
                 }
                 Some(cmd) => {
                     info!("Script cmd (no-op): {:?}", cmd);
