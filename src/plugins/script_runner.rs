@@ -69,13 +69,11 @@ impl Plugin for ScriptRunnerPlugin {
 
 fn start_script_execution(
     mut dialogue: ResMut<DialogueState>,
-    mut engine: ResMut<ScriptEngine>,
 ) {
     dialogue.current_text.clear();
     dialogue.current_speaker = None;
     dialogue.text_progress = 0;
     dialogue.is_displaying = false;
-    engine.dialogue_idx = 0;
 }
 
 fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {

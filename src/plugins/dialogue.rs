@@ -111,9 +111,13 @@ fn hide_dialogue(
 fn cleanup_dialogue(
     mut commands: Commands,
     query: Query<Entity, With<DialogueUiRoot>>,
+    choice_query: Query<Entity, With<ChoiceUiRoot>>,
     mut initialized: ResMut<DialogueInitialized>,
 ) {
     for entity in &query {
+        commands.entity(entity).despawn();
+    }
+    for entity in &choice_query {
         commands.entity(entity).despawn();
     }
     initialized.0 = false;
