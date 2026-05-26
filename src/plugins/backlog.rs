@@ -16,6 +16,7 @@ pub struct BacklogPlugin;
 impl Plugin for BacklogPlugin {
     fn build(&self, app: &mut App) {
         app
+            .init_resource::<Backlog>()
             .add_systems(OnEnter(AppState::Backlog), setup_backlog_ui)
             .add_systems(Update, (
                 handle_backlog_scroll,
