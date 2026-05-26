@@ -5,7 +5,9 @@ use crate::audio_messages::{
     PlayBgmMessage, StopBgmMessage, PlaySeMessage, PlayVoiceMessage,
 };
 use crate::choice_messages::ChoiceSelectedMessage;
-use crate::script::{ConditionOp, ScriptCmd, ScriptEngine};
+use crate::components::{DialogueUiRoot, OverlayTween, ScreenOverlayRoot};
+use crate::resources::WindowOverride;
+use crate::script::{ConditionOp, OverlayColor, ScriptCmd, ScriptEngine};
 use crate::state::AppState;
 use crate::plugins::inputs::AdvanceEvent;
 use crate::rendering_messages::{
@@ -54,7 +56,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     stop_bgm_writer: MessageWriter<'w, StopBgmMessage>,
     play_se_writer: MessageWriter<'w, PlaySeMessage>,
     play_voice_writer: MessageWriter<'w, PlayVoiceMessage>,
-    settings: Res<'w, Settings>,
+    settings: ResMut<'w, Settings>,
     auto_skip: ResMut<'w, AutoSkipTimer>,
     intro: ResMut<'w, IntroPhase>,
 }
@@ -119,7 +121,13 @@ fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
     }
 }
 
-fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
+fn process_advance(
+    mut params: ProcessAdvanceParams<'_, '_>,
+    mut commands: Commands,
+    mut overlay_query: Query<(Entity, &mut BackgroundColor, &mut Visibility), With<ScreenOverlayRoot>>,
+    mut window_query: Query<&mut Visibility, (With<DialogueUiRoot>, Without<ScreenOverlayRoot>)>,
+    mut window_override: ResMut<WindowOverride>,
+) {
     let ProcessAdvanceParams {
         ref mut advance_ev,
         ref mut engine,
@@ -144,7 +152,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
         ref mut stop_bgm_writer,
         ref mut play_se_writer,
         ref mut play_voice_writer,
-        ref settings,
+        ref mut settings,
         ref mut auto_skip,
         ref mut intro,
     } = &mut params;
@@ -330,6 +338,33 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                         play_voice_writer.write(PlayVoiceMessage { file, volume: None });
                     }
                     Some(ScriptCmd::Wait { .. }) => {}
+                    Some(ScriptCmd::ScreenOverlay { color, .. }) => {
+                        for (_, mut bg, mut vis) in overlay_query.iter_mut() {
+                            let base = match color {
+                                OverlayColor::Black => Color::srgba(0.0, 0.0, 0.0, 0.0),
+                                OverlayColor::White => Color::srgba(1.0, 1.0, 1.0, 0.0),
+                            };
+                            *bg = BackgroundColor(base);
+                            *vis = Visibility::Visible;
+                        }
+                    }
+                    Some(ScriptCmd::ClearOverlay { .. }) => {
+                        for (_, _, mut vis) in overlay_query.iter_mut() {
+                            *vis = Visibility::Hidden;
+                        }
+                    }
+                    Some(ScriptCmd::Window { show, .. }) => {
+                        for mut vis in window_query.iter_mut() {
+                            *vis = if show { Visibility::Visible } else { Visibility::Hidden };
+                        }
+                        window_override.0 = !show;
+                    }
+                    Some(ScriptCmd::ChangeWindowColor { color_idx }) => {
+                        settings.window_color_idx = color_idx;
+                    }
+                    Some(ScriptCmd::ChangeWindowDesign { design }) => {
+                        settings.window_design = design;
+                    }
                     Some(cmd) => {
                         info!("Script cmd (no-op): {:?}", cmd);
                     }
@@ -361,6 +396,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                     if backlog.entries.len() > 200 {
                         backlog.entries.remove(0);
                     }
+                    window_override.0 = false;
                     dialogue.current_speaker = speaker;
                     dialogue.current_text = text;
                     dialogue.text_progress = 0;
@@ -486,6 +522,48 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                         auto_skip.auto_timer = Some(Timer::from_seconds(duration as f32 / 1000.0, TimerMode::Once));
                         break;
                     }
+                }
+                Some(ScriptCmd::ScreenOverlay { color, time }) => {
+                    for (entity, mut bg, mut vis) in overlay_query.iter_mut() {
+                        let base = match color {
+                            OverlayColor::Black => Color::srgba(0.0, 0.0, 0.0, 0.0),
+                            OverlayColor::White => Color::srgba(1.0, 1.0, 1.0, 0.0),
+                        };
+                        *bg = BackgroundColor(base);
+                        *vis = Visibility::Visible;
+                        commands.entity(entity).insert(OverlayTween {
+                            timer: Timer::from_seconds(time as f32 / 1000.0, TimerMode::Once),
+                            start_alpha: 0.0,
+                            end_alpha: 1.0,
+                        });
+                    }
+                }
+                Some(ScriptCmd::ClearOverlay { time }) => {
+                    for (entity, bg, mut vis) in overlay_query.iter_mut() {
+                        if time > 0 {
+                            let current_alpha = bg.0.alpha();
+                            commands.entity(entity).insert(OverlayTween {
+                                timer: Timer::from_seconds(time as f32 / 1000.0, TimerMode::Once),
+                                start_alpha: current_alpha,
+                                end_alpha: 0.0,
+                            });
+                        } else {
+                            *vis = Visibility::Hidden;
+                            commands.entity(entity).remove::<OverlayTween>();
+                        }
+                    }
+                }
+                Some(ScriptCmd::Window { show, .. }) => {
+                    for mut vis in window_query.iter_mut() {
+                        *vis = if show { Visibility::Visible } else { Visibility::Hidden };
+                    }
+                    window_override.0 = !show;
+                }
+                Some(ScriptCmd::ChangeWindowColor { color_idx }) => {
+                    settings.window_color_idx = color_idx;
+                }
+                Some(ScriptCmd::ChangeWindowDesign { design }) => {
+                    settings.window_design = design;
                 }
                 Some(cmd) => {
                     info!("Script cmd (no-op): {:?}", cmd);
