@@ -38,7 +38,9 @@ fn handle_play_bgm(
 ) {
     for msg in reader.read() {
         if let Some(entity) = bgm.entity.take() {
-            commands.entity(entity).despawn();
+            if let Ok(mut cmd) = commands.get_entity(entity) {
+                cmd.despawn();
+            }
         }
         pending.0 = None;
         bgm.current_id = Some(msg.id.clone());
@@ -151,7 +153,9 @@ fn handle_stop_bgm(
     for _ in reader.read() {
         pending.0 = None;
         if let Some(entity) = bgm.entity.take() {
-            commands.entity(entity).despawn();
+            if let Ok(mut cmd) = commands.get_entity(entity) {
+                cmd.despawn();
+            }
         }
         bgm.current_id = None;
     }
@@ -181,7 +185,9 @@ fn handle_play_voice(
 ) {
     for msg in reader.read() {
         if let Some(entity) = voice.entity.take() {
-            commands.entity(entity).despawn();
+            if let Ok(mut cmd) = commands.get_entity(entity) {
+                cmd.despawn();
+            }
         }
         let path = format!("audio/voice/{}.ogg", msg.file);
         let handle: Handle<AudioSource> = asset_server.load(&path);
