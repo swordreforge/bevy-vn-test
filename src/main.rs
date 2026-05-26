@@ -29,6 +29,7 @@ use plugins::gallery::GalleryPlugin;
 use plugins::rendering::RenderingPlugin;
 use plugins::choice::ChoicePlugin;
 use plugins::screen_transition::ScreenTransitionPlugin;
+use bevy_scrollbar::ScrollbarPlugin;
 
 fn main() {
     App::new()
@@ -57,6 +58,7 @@ fn main() {
         .add_plugins(RenderingPlugin)
         .add_plugins(ChoicePlugin)
         .add_plugins(ScreenTransitionPlugin)
+        .add_plugins(ScrollbarPlugin)
         .add_systems(Startup, startup)
         .run();
 }
