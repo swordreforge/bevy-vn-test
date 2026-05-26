@@ -29,6 +29,12 @@ struct GalleryScreen;
 #[derive(Component)]
 struct GalleryPageText;
 
+#[derive(Component)]
+struct GalleryPageLeftBtn;
+
+#[derive(Component)]
+struct GalleryPageRightBtn;
+
 const CGS_PER_PAGE: usize = 9;
 
 fn setup_gallery(
@@ -89,15 +95,56 @@ fn setup_gallery(
         ));
 
         root.spawn((
-            GalleryPageText,
-            Text::new(format!("←  Page {}/{}  →", gallery_state.page + 1, total_pages)),
-            TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-            TextColor(Color::srgb(0.7, 0.7, 0.8)),
             Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                column_gap: Val::Px(16.0),
                 margin: UiRect::vertical(Val::Px(6.0)),
                 ..default()
             },
-        ));
+        )).with_children(|nav| {
+            nav.spawn((
+                GalleryPageLeftBtn,
+                Button,
+                Node {
+                    width: Val::Px(36.0),
+                    height: Val::Px(36.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+            )).with_child((
+                Text::new("◀"),
+                TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
+                TextColor(Color::WHITE),
+            ));
+
+            nav.spawn((
+                GalleryPageText,
+                Text::new(format!("Page {}/{}", gallery_state.page + 1, total_pages)),
+                TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
+                TextColor(Color::srgb(0.7, 0.7, 0.8)),
+            ));
+
+            nav.spawn((
+                GalleryPageRightBtn,
+                Button,
+                Node {
+                    width: Val::Px(36.0),
+                    height: Val::Px(36.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+            )).with_child((
+                Text::new("▶"),
+                TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
+                TextColor(Color::WHITE),
+            ));
+        });
 
         root.spawn((
             GalleryGridContent,
@@ -237,6 +284,8 @@ fn handle_gallery_page_nav(
     grid_query: Query<Entity, With<GalleryGridContent>>,
     children_query: Query<&Children, With<GalleryGridContent>>,
     page_text_query: Query<Entity, With<GalleryPageText>>,
+    left_btn_query: Query<&Interaction, (Changed<Interaction>, With<GalleryPageLeftBtn>)>,
+    right_btn_query: Query<&Interaction, (Changed<Interaction>, With<GalleryPageRightBtn>)>,
     mut commands: Commands,
     unlock_state: Res<UnlockState>,
     asset_server: Res<AssetServer>,
@@ -260,6 +309,21 @@ fn handle_gallery_page_nav(
     }
     if keys.just_pressed(KeyCode::ArrowRight) || keys.just_pressed(KeyCode::ArrowDown) {
         gallery_state.page = (gallery_state.page + 1) % total_pages;
+    }
+
+    for interaction in &left_btn_query {
+        if *interaction == Interaction::Pressed {
+            gallery_state.page = if gallery_state.page == 0 {
+                total_pages - 1
+            } else {
+                gallery_state.page - 1
+            };
+        }
+    }
+    for interaction in &right_btn_query {
+        if *interaction == Interaction::Pressed {
+            gallery_state.page = (gallery_state.page + 1) % total_pages;
+        }
     }
 
     if gallery_state.page != old_page {
@@ -316,7 +380,7 @@ fn handle_gallery_page_nav(
 
         for entity in &page_text_query {
             commands.entity(entity).insert(Text::new(
-                format!("←  Page {}/{}  →", gallery_state.page + 1, total_pages),
+                format!("Page {}/{}", gallery_state.page + 1, total_pages),
             ));
         }
     }
