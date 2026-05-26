@@ -65,6 +65,7 @@ impl Plugin for ScriptRunnerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AutoSkipTimer>()
             .init_resource::<IntroPhase>()
+            .init_resource::<WindowOverride>()
             .add_systems(OnEnter(AppState::Gameplay), (start_script_execution, start_intro_bgm))
             .add_systems(OnEnter(AppState::Title), reset_engine_on_title)
             .add_systems(
