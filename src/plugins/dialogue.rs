@@ -50,12 +50,26 @@ fn setup_dialogue_ui(
             align_items: AlignItems::FlexStart,
             flex_direction: FlexDirection::Column,
             padding: UiRect::new(Val::Px(40.0), Val::Px(40.0), Val::Px(12.0), Val::Px(12.0)),
-            overflow: Overflow::clip(),
             ..default()
         },
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
         ZIndex(3),
     )).with_children(|parent| {
+        parent.spawn((
+            FacePortrait,
+            Node {
+                width: Val::Px(276.0),
+                height: Val::Px(144.0),
+                position_type: PositionType::Absolute,
+                bottom: Val::Px(0.0),
+                left: Val::Px(-40.0),
+                ..default()
+            },
+            ImageNode::default(),
+            BackgroundColor(Color::NONE),
+            Visibility::Hidden,
+            ZIndex(4),
+        ));
         parent.spawn((
             SpeakerNameDisplay,
             Text::new(""),
@@ -66,7 +80,7 @@ fn setup_dialogue_ui(
             },
             TextColor(Color::srgb(1.0, 0.8, 0.6)),
             Node {
-                margin: UiRect::bottom(Val::Px(4.0)),
+                margin: UiRect::new(Val::Px(286.0), Val::Px(0.0), Val::Px(0.0), Val::Px(4.0)),
                 ..default()
             },
             ZIndex(3),
@@ -82,6 +96,7 @@ fn setup_dialogue_ui(
             },
             TextColor(Color::WHITE),
             Node {
+                margin: UiRect::left(Val::Px(286.0)),
                 width: Val::Percent(100.0),
                 ..default()
             },

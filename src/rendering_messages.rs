@@ -25,6 +25,14 @@ pub struct HideFgMessage {
 }
 
 #[derive(Message)]
+pub struct ShowFaceMessage {
+    pub char_id: String,
+}
+
+#[derive(Message)]
+pub struct HideFaceMessage;
+
+#[derive(Message)]
 pub struct ShowCgMessage {
     pub file: String,
     pub transition: Option<Transition>,

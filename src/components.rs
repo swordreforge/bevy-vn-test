@@ -108,3 +108,6 @@ pub enum AudioType {
 
 #[derive(Component)]
 pub struct TransitionOverlay;
+
+#[derive(Component)]
+pub struct FacePortrait;

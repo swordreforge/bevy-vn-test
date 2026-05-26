@@ -9,7 +9,9 @@ use crate::script::{ConditionOp, ScriptCmd, ScriptEngine};
 use crate::state::AppState;
 use crate::plugins::inputs::AdvanceEvent;
 use crate::rendering_messages::{
-    SetBgMessage, ShowFgMessage, HideFgMessage, ShowCgMessage, HideCgMessage,
+    SetBgMessage, ShowFgMessage, HideFgMessage,
+    ShowFaceMessage, HideFaceMessage,
+    ShowCgMessage, HideCgMessage,
 };
 
 pub struct ScriptRunnerPlugin;
@@ -38,6 +40,8 @@ pub struct ProcessAdvanceParams<'w, 's> {
     set_bg_writer: MessageWriter<'w, SetBgMessage>,
     show_fg_writer: MessageWriter<'w, ShowFgMessage>,
     hide_fg_writer: MessageWriter<'w, HideFgMessage>,
+    show_face_writer: MessageWriter<'w, ShowFaceMessage>,
+    hide_face_writer: MessageWriter<'w, HideFaceMessage>,
     show_cg_writer: MessageWriter<'w, ShowCgMessage>,
     hide_cg_writer: MessageWriter<'w, HideCgMessage>,
     choice_ev: MessageReader<'w, 's, ChoiceSelectedMessage>,
@@ -123,6 +127,8 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
         ref mut set_bg_writer,
         ref mut show_fg_writer,
         ref mut hide_fg_writer,
+        ref mut show_face_writer,
+        ref mut hide_face_writer,
         ref mut show_cg_writer,
         ref mut hide_cg_writer,
         ref mut choice_ev,
@@ -277,6 +283,12 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                     Some(ScriptCmd::HideFg { char_id, .. }) => {
                         hide_fg_writer.write(HideFgMessage { char_id, transition: None, duration: None });
                     }
+                    Some(ScriptCmd::ShowFace { char_id, .. }) => {
+                        show_face_writer.write(ShowFaceMessage { char_id });
+                    }
+                    Some(ScriptCmd::HideFace { .. }) => {
+                        hide_face_writer.write(HideFaceMessage);
+                    }
                     Some(ScriptCmd::ShowCg { file, .. }) => {
                         show_cg_writer.write(ShowCgMessage { file: file.clone(), transition: None, duration: None });
                         unlock_state.cg_unlocked.insert(file);
@@ -408,6 +420,12 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                 }
                 Some(ScriptCmd::HideFg { char_id, transition }) => {
                     hide_fg_writer.write(HideFgMessage { char_id, transition, duration: None });
+                }
+                Some(ScriptCmd::ShowFace { char_id, .. }) => {
+                    show_face_writer.write(ShowFaceMessage { char_id });
+                }
+                Some(ScriptCmd::HideFace { .. }) => {
+                    hide_face_writer.write(HideFaceMessage);
                 }
                 Some(ScriptCmd::ShowCg { file, transition }) => {
                     show_cg_writer.write(ShowCgMessage { file: file.clone(), transition, duration: None });

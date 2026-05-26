@@ -4,7 +4,8 @@ use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, Sprite
 use crate::script::{FgPosition, Transition};
 use crate::state::AppState;
 use crate::rendering_messages::{
-    SetBgMessage, ShowFgMessage, HideFgMessage, ShowCgMessage, HideCgMessage,
+    SetBgMessage, ShowFgMessage, HideFgMessage, ShowFaceMessage, HideFaceMessage,
+    ShowCgMessage, HideCgMessage,
 };
 
 fn char_dir(char_id: &str) -> Option<&'static str> {
@@ -46,6 +47,8 @@ impl Plugin for RenderingPlugin {
         app.add_message::<SetBgMessage>()
             .add_message::<ShowFgMessage>()
             .add_message::<HideFgMessage>()
+            .add_message::<ShowFaceMessage>()
+            .add_message::<HideFaceMessage>()
             .add_message::<ShowCgMessage>()
             .add_message::<HideCgMessage>()
             .init_resource::<BgState>()
@@ -62,6 +65,10 @@ impl Plugin for RenderingPlugin {
                 handle_set_bg,
                 handle_show_fg,
                 handle_hide_fg,
+            ).chain().run_if(in_state(AppState::Gameplay)))
+            .add_systems(Update, (
+                handle_show_face,
+                handle_hide_face,
                 handle_show_cg,
                 handle_hide_cg,
             ).chain().run_if(in_state(AppState::Gameplay)));
@@ -311,6 +318,37 @@ fn handle_hide_fg(
             .find(|s| s.char_id == msg.char_id)
         {
             hide_slot(slot, &mut query, msg.transition.clone(), msg.duration);
+        }
+    }
+}
+
+fn handle_show_face(
+    mut msg: MessageReader<ShowFaceMessage>,
+    mut cache: ResMut<TextureCache>,
+    asset_server: Res<AssetServer>,
+    mut query: Query<(&mut ImageNode, &mut Visibility), With<FacePortrait>>,
+) {
+    for msg in msg.read() {
+        let path = format!("images/face/face_{}.png", msg.char_id);
+        let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
+            asset_server.load(&path)
+        }).clone();
+
+        if let Ok((mut image_node, mut vis)) = query.single_mut() {
+            image_node.image = handle;
+            *vis = Visibility::Visible;
+        }
+    }
+}
+
+fn handle_hide_face(
+    mut msg: MessageReader<HideFaceMessage>,
+    mut query: Query<(&mut ImageNode, &mut Visibility), With<FacePortrait>>,
+) {
+    for _ in msg.read() {
+        if let Ok((mut image_node, mut vis)) = query.single_mut() {
+            image_node.image = Handle::default();
+            *vis = Visibility::Hidden;
         }
     }
 }

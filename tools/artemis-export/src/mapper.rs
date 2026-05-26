@@ -85,19 +85,10 @@ fn map_command(
         "Face" => {
             let char_id = cmd.attrs.get("0").cloned().unwrap_or("0".into());
             let expression = cmd.attrs.get("1").cloned().unwrap_or("000".into());
-            Some(ScriptCmd::ShowFg {
-                char_id,
-                expression,
-                position: FgPosition::Center,
-                transition: None,
-            })
+            Some(ScriptCmd::ShowFace { char_id, expression })
         }
         "ClrFace" => {
-            let char_id = cmd.attrs.get("0").cloned().unwrap_or("all".into());
-            Some(ScriptCmd::HideFg {
-                char_id,
-                transition: None,
-            })
+            Some(ScriptCmd::HideFace { char_id: "all".into() })
         }
         "ClrTati" => {
             Some(ScriptCmd::HideFg {
@@ -117,7 +108,7 @@ fn map_command(
             let file_id = cmd.attrs.get("1")?;
             let volume = match cmd.attrs.get("2").map(|s| s.as_str()) {
                 Some("MIN") => Some(0.5),
-                _ => None,
+        _ => None,
             };
             Some(ScriptCmd::PlayBgm {
                 id: file_id.to_string(),
@@ -315,18 +306,16 @@ mod tests {
 
     #[test]
     fn test_map_face() {
-        let c = cmd("Face", vec![("0", "001_eus"), ("1", "010002")]);
+        let c = cmd("Face", vec![("0", "350101"), ("1", "000")]);
         let r = map_command("Face", &c, &GameConfig::default());
-        assert!(matches!(r, Some(ScriptCmd::ShowFg { ref char_id, ref expression, .. })
-            if char_id == "001_eus" && expression == "010002"));
+        assert!(matches!(r, Some(ScriptCmd::ShowFace { ref char_id, ref expression })
+            if char_id == "350101" && expression == "000"));
     }
 
     #[test]
     fn test_map_clrface() {
-        assert_hide_fg(
-            map_command("ClrFace", &cmd("ClrFace", vec![("0", "001")]), &GameConfig::default()),
-            "001",
-        );
+        let r = map_command("ClrFace", &cmd("ClrFace", vec![]), &GameConfig::default());
+        assert!(matches!(r, Some(ScriptCmd::HideFace { .. })));
     }
 
     #[test]

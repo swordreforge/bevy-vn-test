@@ -41,6 +41,13 @@ pub enum ScriptCmd {
         char_id: String,
         transition: Option<Transition>,
     },
+    ShowFace {
+        char_id: String,
+        expression: String,
+    },
+    HideFace {
+        char_id: String,
+    },
     ShowCg {
         file: String,
         transition: Option<Transition>,
