@@ -9,6 +9,7 @@ pub struct SaveLoadPlugin;
 impl Plugin for SaveLoadPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(SaveManager::new(15))
+            .add_systems(Startup, |mut mgr: ResMut<SaveManager>| mgr.refresh_from_disk())
             .add_systems(OnEnter(AppState::SaveLoad), setup_save_load_ui)
             .add_systems(OnExit(AppState::SaveLoad), cleanup_save_load_ui)
             .add_systems(Update, (
