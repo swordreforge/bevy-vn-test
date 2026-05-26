@@ -110,6 +110,16 @@ pub enum AudioType {
 pub struct TransitionOverlay;
 
 #[derive(Component)]
+pub struct ScreenOverlayRoot;
+
+#[derive(Component)]
+pub struct OverlayTween {
+    pub timer: Timer,
+    pub start_alpha: f32,
+    pub end_alpha: f32,
+}
+
+#[derive(Component)]
 pub struct FacePortrait;
 
 #[derive(Component)]

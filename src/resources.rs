@@ -93,6 +93,8 @@ pub struct Settings {
     pub auto_mode: bool,
     pub skip_mode: bool,
     pub message_window_opacity: u8,
+    pub window_color_idx: i32,
+    pub window_design: i32,
 }
 
 impl Default for Settings {
@@ -105,6 +107,8 @@ impl Default for Settings {
             auto_mode: false,
             skip_mode: false,
             message_window_opacity: 70,
+            window_color_idx: 0,
+            window_design: 0,
         }
     }
 }
@@ -255,6 +259,9 @@ pub struct NarrationOverlay {
     pub current_file: Option<String>,
     pub active: bool,
 }
+
+#[derive(Resource, Default)]
+pub struct WindowOverride(pub bool);
 
 #[derive(Resource, Default)]
 pub struct ChoiceState {
