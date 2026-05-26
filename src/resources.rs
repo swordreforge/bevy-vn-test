@@ -245,6 +245,12 @@ pub struct VoiceManager {
 }
 
 #[derive(Resource, Default)]
+pub struct NarrationOverlay {
+    pub entity: Option<Entity>,
+    pub current_file: Option<String>,
+}
+
+#[derive(Resource, Default)]
 pub struct ChoiceState {
     pub active: bool,
     pub options: Vec<crate::script::ChoiceOption>,

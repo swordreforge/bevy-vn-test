@@ -138,6 +138,7 @@ pub struct ScriptEngine {
     pub call_stack: Vec<(String, usize)>,
     pub flags: HashMap<String, i32>,
     pub scripts: HashMap<String, Vec<ScriptCmd>>,
+    pub dialogue_idx: usize,
 }
 
 impl ScriptEngine {
@@ -191,6 +192,7 @@ impl ScriptEngine {
 
         if self.scripts.contains_key(script) {
             self.current_script = script.to_string();
+            self.dialogue_idx = 0;
             if let Some(lbl) = label {
                 self.jump_to_label(lbl);
             } else {

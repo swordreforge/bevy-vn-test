@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::{DialogueState, GameFont, Settings};
+use crate::resources::{DialogueState, GameFont, NarrationOverlay, Settings};
+use crate::script::ScriptEngine;
 use crate::state::AppState;
 
 #[derive(Resource, Default)]
@@ -12,11 +13,13 @@ impl Plugin for DialoguePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DialogueState>()
             .init_resource::<DialogueInitialized>()
+            .init_resource::<NarrationOverlay>()
             .add_systems(OnEnter(AppState::Gameplay), setup_dialogue_ui)
             .add_systems(Update, (
+                handle_narration_overlay,
                 update_dialogue,
                 apply_message_opacity,
-            ).run_if(in_state(AppState::Gameplay)))
+            ).chain().run_if(in_state(AppState::Gameplay)))
             .add_systems(OnExit(AppState::Gameplay), hide_dialogue)
             .add_systems(OnEnter(AppState::Title), cleanup_dialogue);
     }
@@ -136,5 +139,51 @@ fn apply_message_opacity(
     let alpha = (settings.message_window_opacity as f32) / 100.0;
     for mut bg in query.iter_mut() {
         *bg = BackgroundColor(Color::srgba(0.0, 0.0, 0.0, alpha));
+    }
+}
+
+fn handle_narration_overlay(
+    state: Res<DialogueState>,
+    engine: Res<ScriptEngine>,
+    mut overlay: ResMut<NarrationOverlay>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    let is_narration = state.current_speaker.is_none() && !state.current_text.is_empty();
+
+    let target_file = if is_narration {
+        let script_num = engine.current_script.strip_prefix("aiy").unwrap_or(&engine.current_script);
+        let file = format!("images/obj/dic/aiy{}_tx{:02}.png", script_num, engine.dialogue_idx);
+        let path = format!("assets/{}", file);
+        if std::path::Path::new(&path).exists() { Some(file) } else { None }
+    } else {
+        None
+    };
+
+    if overlay.current_file.as_deref() == target_file.as_deref() {
+        return;
+    }
+
+    if let Some(entity) = overlay.entity.take() {
+        if let Ok(mut cmd) = commands.get_entity(entity) {
+            cmd.despawn();
+        }
+    }
+    overlay.current_file = None;
+
+    if let Some(file) = target_file {
+        let handle = asset_server.load(&file);
+        let entity = commands.spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                position_type: PositionType::Absolute,
+                ..default()
+            },
+            ImageNode::new(handle),
+            ZIndex(4),
+        )).id();
+        overlay.entity = Some(entity);
+        overlay.current_file = Some(file);
     }
 }

@@ -66,11 +66,15 @@ impl Plugin for ScriptRunnerPlugin {
     }
 }
 
-fn start_script_execution(mut dialogue: ResMut<DialogueState>) {
+fn start_script_execution(
+    mut dialogue: ResMut<DialogueState>,
+    mut engine: ResMut<ScriptEngine>,
+) {
     dialogue.current_text.clear();
     dialogue.current_speaker = None;
     dialogue.text_progress = 0;
     dialogue.is_displaying = false;
+    engine.dialogue_idx = 0;
 }
 
 fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
@@ -138,6 +142,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                 let cmd = engine.advance().cloned();
                 match cmd {
                     Some(ScriptCmd::Dialogue { speaker, text }) => {
+                        engine.dialogue_idx += 1;
                         let text_clone = text.clone();
                         backlog.entries.push(BacklogEntry {
                             speaker: speaker.clone(),
@@ -152,11 +157,6 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                         dialogue.current_text = text;
                         dialogue.text_progress = text_len;
                         dialogue.is_displaying = false;
-                    }
-                    Some(ScriptCmd::Choice { options }) => {
-                        choice_state.active = true;
-                        choice_state.options = options;
-                        break;
                     }
                     Some(ScriptCmd::ClearText) => {
                         dialogue.current_text.clear();
@@ -266,6 +266,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
             let cmd = engine.advance().cloned();
             match cmd {
                 Some(ScriptCmd::Dialogue { speaker, text }) => {
+                    engine.dialogue_idx += 1;
                     let text_clone = text.clone();
                     backlog.entries.push(BacklogEntry {
                         speaker: speaker.clone(),
