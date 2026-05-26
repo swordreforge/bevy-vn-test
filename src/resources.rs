@@ -248,6 +248,7 @@ pub struct VoiceManager {
 pub struct NarrationOverlay {
     pub entity: Option<Entity>,
     pub current_file: Option<String>,
+    pub active: bool,
 }
 
 #[derive(Resource, Default)]

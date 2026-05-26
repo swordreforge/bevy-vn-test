@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
-use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, Settings, UnlockState};
+use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, NarrationOverlay, Settings, UnlockState};
 use crate::audio_messages::{
     PlayBgmMessage, StopBgmMessage, PlaySeMessage, PlayVoiceMessage,
 };
@@ -34,6 +34,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     affection: ResMut<'w, AffectionMap>,
     backlog: ResMut<'w, Backlog>,
     unlock_state: ResMut<'w, UnlockState>,
+    overlay: Res<'w, NarrationOverlay>,
     set_bg_writer: MessageWriter<'w, SetBgMessage>,
     show_fg_writer: MessageWriter<'w, ShowFgMessage>,
     hide_fg_writer: MessageWriter<'w, HideFgMessage>,
@@ -85,6 +86,7 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
         ref mut affection,
         ref mut backlog,
         ref mut unlock_state,
+        ref overlay,
         ref mut set_bg_writer,
         ref mut show_fg_writer,
         ref mut hide_fg_writer,
@@ -104,6 +106,16 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
         // Reset auto/skip timers on manual advance
         auto_skip.auto_timer = None;
         auto_skip.skip_timer = None;
+
+        // If narration overlay is showing a tx intro image, dismiss it
+        // and advance to next script command
+        if overlay.active {
+            dialogue.current_text.clear();
+            dialogue.current_speaker = None;
+            dialogue.text_progress = 0;
+            dialogue.is_displaying = false;
+            // Fall through to process next command
+        }
 
         // If choice is active, check if user made a selection
         if choice_state.active {

@@ -93,10 +93,19 @@ fn setup_dialogue_ui(
 
 fn hide_dialogue(
     mut hide_query: Query<&mut Visibility, With<DialogueUiRoot>>,
+    mut overlay: ResMut<NarrationOverlay>,
+    mut commands: Commands,
 ) {
     for mut vis in hide_query.iter_mut() {
         *vis = Visibility::Hidden;
     }
+    if let Some(entity) = overlay.entity.take() {
+        if let Ok(mut cmd) = commands.get_entity(entity) {
+            cmd.despawn();
+        }
+    }
+    overlay.current_file = None;
+    overlay.active = false;
 }
 
 fn cleanup_dialogue(
@@ -112,12 +121,13 @@ fn cleanup_dialogue(
 
 fn update_dialogue(
     state: Res<DialogueState>,
+    overlay: Res<NarrationOverlay>,
     mut text_query: Query<&mut Text, (With<DialogueTextDisplay>, Without<SpeakerNameDisplay>)>,
     mut speaker_query: Query<&mut Text, (With<SpeakerNameDisplay>, Without<DialogueTextDisplay>)>,
     mut root_query: Query<&mut Visibility, (With<DialogueUiRoot>, Without<DialogueTextDisplay>)>,
 ) {
     if let Ok(mut root_vis) = root_query.single_mut() {
-        *root_vis = if state.current_text.is_empty() {
+        *root_vis = if state.current_text.is_empty() || overlay.active {
             Visibility::Hidden
         } else {
             Visibility::Visible
@@ -170,6 +180,7 @@ fn handle_narration_overlay(
         }
     }
     overlay.current_file = None;
+    overlay.active = false;
 
     if let Some(file) = target_file {
         let handle = asset_server.load(&file);
@@ -178,12 +189,19 @@ fn handle_narration_overlay(
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 position_type: PositionType::Absolute,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
                 ..default()
             },
-            ImageNode::new(handle),
             ZIndex(4),
-        )).id();
+        )).with_children(|parent| {
+            parent.spawn((
+                ImageNode::new(handle),
+                Node::default(),
+            ));
+        }).id();
         overlay.entity = Some(entity);
         overlay.current_file = Some(file);
+        overlay.active = true;
     }
 }
