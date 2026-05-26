@@ -80,7 +80,7 @@ fn setup_dialogue_ui(
             },
             TextColor(Color::srgb(1.0, 0.8, 0.6)),
             Node {
-                margin: UiRect::new(Val::Px(286.0), Val::Px(0.0), Val::Px(0.0), Val::Px(4.0)),
+                margin: UiRect::new(Val::Px(236.0), Val::Px(0.0), Val::Px(0.0), Val::Px(4.0)),
                 ..default()
             },
             ZIndex(3),
@@ -96,7 +96,7 @@ fn setup_dialogue_ui(
             },
             TextColor(Color::WHITE),
             Node {
-                margin: UiRect::left(Val::Px(286.0)),
+                margin: UiRect::left(Val::Px(236.0)),
                 width: Val::Percent(100.0),
                 ..default()
             },

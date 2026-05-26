@@ -9,7 +9,7 @@
 | 缺失类别 | 涉及标签 | 影响范围 |
 |---------|---------|---------|
 | 图层/渲染系统 | DrawSprite, DrawSpriteWithFiltering, FadeSprite, MoveSprite, DrawBG | 所有脚本 |
-| 面部头像 | Face | 所有脚本（每文件 66~104 次） |
+| 面部头像 | Face | 所有脚本（每文件 66~104 次） ✅ |
 | 画面特效 | Quake, StartShakingOfAllObjects, Flash, Fadeout, WhiteoutBySA | 多数脚本 |
 | 消息窗口控制 | Window, DisableWindow, ChangeWindowColor | 多数脚本 |
 | 音频增强 | LoopSE, StopStreamingSE, BgmVol, BgmX | 多数脚本 |
@@ -21,16 +21,13 @@
 
 ## P0 — 严重缺失（核心体验受损）
 
-### P0-1 Face 面部头像系统
+### P0-1 ~~Face 面部头像系统~~ ✅ 已完成
 
 | 项目 | 内容 |
 |------|------|
-| **问题** | `Face` 标签被 mapper 错误映射为 `ShowFg`（全身立绘），原版应显示小头像在消息窗口内（图层 `1.80.10`） |
-| **使用量** | 序章 66 次，后续章节 6~104 次。**远多于 Tati/TatiFa（立绘）** |
-| **影响** | 每次对话都显示全身立绘代替小头像，画面构图完全错误；且 `Face` 和 `Tati` 可以同时存在（立绘+头像），当前无法实现 |
-| **资源** | `root/image/face/` — 1192 个文件 |
-| **路径映射** | `images/face/{char_id}_{expression}.png` |
-| **原版 Lua** | `system/adv/fg.lua` 中 `set_face()` / `del_face()` — 独立图层 `1.80.10` |
+| **状态** | ✅ 已实现 |
+| **改动** | `Face` → `ShowFace`，`ClrFace` → `HideFace`；头像作为对话框子节点 276×144 显示，底部对齐 |
+| **提交** | `36ae2f0` |
 
 ### P0-2 精灵/覆盖物系统（DrawSprite + FadeSprite + MoveSprite）
 
@@ -232,7 +229,7 @@
 
 ```
 Phase 1 (P0) — 核心修复
-├── Face 头像系统（重新映射，独立图层 1.80.10）
+├── ✅ Face 头像系统（重新映射，对话框内子节点定位）
 ├── 精灵系统 DrawSprite（基础版：位置+alpha+图片）
 ├── 精灵动画 FadeSprite / MoveSprite（tween 系统）
 ├── 窗口控制 Window / DisableWindow
