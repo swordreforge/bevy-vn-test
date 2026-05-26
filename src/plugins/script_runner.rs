@@ -227,6 +227,7 @@ fn process_advance(
                         dialogue.current_text = text;
                         dialogue.text_progress = text_len;
                         dialogue.is_displaying = false;
+                        window_override.0 = false;
                     }
                     Some(ScriptCmd::ClearText) => {
                         dialogue.current_text.clear();
@@ -341,16 +342,17 @@ fn process_advance(
                     Some(ScriptCmd::ScreenOverlay { color, .. }) => {
                         for (_, mut bg, mut vis) in overlay_query.iter_mut() {
                             let base = match color {
-                                OverlayColor::Black => Color::srgba(0.0, 0.0, 0.0, 0.0),
-                                OverlayColor::White => Color::srgba(1.0, 1.0, 1.0, 0.0),
+                                OverlayColor::Black => Color::srgba(0.0, 0.0, 0.0, 1.0),
+                                OverlayColor::White => Color::srgba(1.0, 1.0, 1.0, 1.0),
                             };
                             *bg = BackgroundColor(base);
                             *vis = Visibility::Visible;
                         }
                     }
                     Some(ScriptCmd::ClearOverlay { .. }) => {
-                        for (_, _, mut vis) in overlay_query.iter_mut() {
+                        for (entity, _, mut vis) in overlay_query.iter_mut() {
                             *vis = Visibility::Hidden;
+                            commands.entity(entity).remove::<OverlayTween>();
                         }
                     }
                     Some(ScriptCmd::Window { show, .. }) => {
