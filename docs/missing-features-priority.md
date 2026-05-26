@@ -8,13 +8,13 @@
 
 | 缺失类别 | 涉及标签 | 影响范围 |
 |---------|---------|---------|
-| 图层/渲染系统 | DrawSprite, DrawSpriteWithFiltering, FadeSprite, MoveSprite, DrawBG | 所有脚本 |
+| 图层/渲染系统 | DrawSprite, DrawSpriteWithFiltering, FadeSprite, MoveSprite, DrawBG | 所有脚本 ✅ |
 | 面部头像 | Face | 所有脚本（每文件 66~104 次） ✅ |
 | 画面特效 | Quake, StartShakingOfAllObjects, Flash, Fadeout, WhiteoutBySA | 多数脚本 |
 | 消息窗口控制 | Window, DisableWindow, ChangeWindowColor | 多数脚本 |
 | 音频增强 | LoopSE, StopStreamingSE, BgmVol, BgmX | 多数脚本 |
 | 背景系统 | ScrollBG, DrawBG | 部分脚本 |
-| 动画系统 | FadeSprite, MoveSprite, AnimateSprite | 部分脚本 |
+| 动画系统 | AnimateSprite | 部分脚本 |
 | 其他 | PlayMovie, RegisterTextToHistory, ChangeWindowDesign | 少量脚本 |
 
 ---
@@ -29,26 +29,24 @@
 | **改动** | `Face` → `ShowFace`，`ClrFace` → `HideFace`；头像作为对话框子节点 276×144 显示，底部对齐 |
 | **提交** | `36ae2f0` |
 
-### P0-2 精灵/覆盖物系统（DrawSprite + FadeSprite + MoveSprite）
+### P0-2 ~~精灵/覆盖物系统（DrawSprite + FadeSprite + MoveSprite）~~ ✅ 已完成
 
 | 项目 | 内容 |
 |------|------|
-| **标签** | `DrawSprite`、`DrawSpriteWithFiltering`、`FadeSprite`、`FadeSpriteWithFiltering`、`MoveSprite`、`DrawBustshotWithFiltering`、`DrawSpriteEx` |
-| **使用量** | 序章: DrawSprite 10 + DrawSpriteWithFiltering 12 + FadeSprite 12 + MoveSprite 11 = **45 次**。几乎所有章节脚本都有 |
-| **影响** | 所有覆盖物精灵（特效层、装饰元素、表情包图、特写框等）完全丢失。加上无 FadeSprite/MoveSprite，精灵无任何动画（突现突隐） |
+| **状态** | ✅ 已实现 |
+| **改动** | `DrawSprite`/`DrawSpriteWithFiltering`/`FadeSprite`/`FadeSpriteWithFiltering`/`MoveSprite` 映射到对应 `ScriptCmd`；精灵以独立 UI 节点实体管理，支持 ID 复用、alpha、Z 排序、fade-out 渐隐、move tween |
 | **资源** | `root/image/obj/`、`root/image/anime/`（81 帧动画）等 |
-| **原版 Lua** | `system/adv/grph.lua` 中 `sprite()`、`move_sprite()`、`AnimateSprite()` |
 
 **需要实现的功能**：
-- 任意位置（x,y）放置精灵
-- 透明度（alpha，0~255）
-- 深度缩放（基于 z 值的 `getSpriteDepthScale`）
-- 旋转
-- 锚点（anchorx, anchory）
-- 混合模式：normal / add / multiply / screen
-- Mask 遮罩
-- 精灵间 Tween 动画（alpha/位置/缩放/旋转）
-- 多关键帧移动（`move_sprite_ex`）
+- ~~任意位置（x,y）放置精灵~~ ✅
+- ~~透明度（alpha，0~255）~~ ✅
+- ~~深度缩放（基于 z 值的 `getSpriteDepthScale`）~~ ✅ 使用 `1/(1 + z*0.001)` 公式通过 `Transform::scale` 实现
+- ~~旋转（rotation）~~ ✅ 通过 `Transform::rotation` 实现，ASB 角度值自动转弧度
+- 锚点（anchorx, anchory） ⏳ 数据已从 ASB 映射并传至 `DrawSpriteMessage`，但 Bevy 0.18 的 UI 节点无双 `TransformOrigin` 组件，定位默认以节点中心为原点。需要等 Bevy 升级或自行计算偏移量
+- 混合模式：normal / add / multiply / screen ⏳ `SpriteBlendMode` 枚举已定义，`SpriteOverlay::blend_mode` 已存储，但需要自定义 `UiMaterial` 实现不同 blend state。目前仅 `Normal` 有效，其余 fallback 到 normal
+- Mask 遮罩 ⏳ 暂未实现（需要 stencil buffer 或 clipping parent wrapper）
+- ~~精灵间 Tween 动画（alpha/位置）~~ ✅
+- 多关键帧移动（`move_sprite_ex`） ⏳ 暂未映射
 
 ### P0-3 全屏过渡效果（Fadeout / Whiteout / Blackout）
 
@@ -230,8 +228,8 @@
 ```
 Phase 1 (P0) — 核心修复
 ├── ✅ Face 头像系统（重新映射，对话框内子节点定位）
-├── 精灵系统 DrawSprite（基础版：位置+alpha+图片）
-├── 精灵动画 FadeSprite / MoveSprite（tween 系统）
+├── ✅ 精灵系统 DrawSprite（位置+alpha+图片 + FadeSprite/MoveSprite tween）  
+│   └── 深度缩放 ✅ | 旋转 ✅ | 锚点 ⏳ | 混合模式 ⏳ | Mask ⏳
 ├── 窗口控制 Window / DisableWindow
 └── 全屏过渡 Fadeout / Whiteout / Blackout
 

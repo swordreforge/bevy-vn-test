@@ -90,6 +90,51 @@ fn map_command(
         "ClrFace" => {
             Some(ScriptCmd::HideFace { char_id: "all".into() })
         }
+        "DrawSprite" => {
+            let id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let file = cmd.attrs.get("1").cloned().unwrap_or_default();
+            let x = cmd.attrs.get("3").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let y = cmd.attrs.get("4").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let z = cmd.attrs.get("5").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let alpha = cmd.attrs.get("12").and_then(|s| s.parse().ok()).unwrap_or(255);
+            let priority = cmd.attrs.get("13").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let time = cmd.attrs.get("14").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let rotation = cmd.attrs.get("6").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+            let anchor_x = cmd.attrs.get("7").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.5);
+            let anchor_y = cmd.attrs.get("8").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.5);
+            let blend_mode = cmd.attrs.get("2").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+            Some(ScriptCmd::DrawSprite { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode })
+        }
+        "DrawSpriteWithFiltering" => {
+            let id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let file = cmd.attrs.get("1").cloned().unwrap_or_default();
+            let x = cmd.attrs.get("4").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let y = cmd.attrs.get("5").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let alpha = cmd.attrs.get("9").and_then(|s| s.parse().ok()).unwrap_or(255);
+            let priority = cmd.attrs.get("10").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let time = cmd.attrs.get("11").and_then(|s| s.parse().ok()).unwrap_or(0);
+            Some(ScriptCmd::DrawSprite { id, file, x, y, z: 0, alpha, priority, time, rotation: 0.0, anchor_x: 0.5, anchor_y: 0.5, blend_mode: 0 })
+        }
+        "FadeSprite" => {
+            let id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let time = cmd.attrs.get("1").and_then(|s| s.parse().ok()).unwrap_or(500);
+            Some(ScriptCmd::FadeSprite { id, time })
+        }
+        "FadeSpriteWithFiltering" => {
+            let id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let time = cmd.attrs.get("3").and_then(|s| s.parse().ok()).unwrap_or(500);
+            Some(ScriptCmd::FadeSprite { id, time })
+        }
+        "MoveSprite" => {
+            let id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let x = cmd.attrs.get("1").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let y = cmd.attrs.get("2").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let z = cmd.attrs.get("3").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let alpha = cmd.attrs.get("5").and_then(|s| s.parse().ok()).unwrap_or(255);
+            let time = cmd.attrs.get("8").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let wait = cmd.attrs.get("9").map(|s| s == "TRUE").unwrap_or(false);
+            Some(ScriptCmd::MoveSprite { id, x, y, z, alpha, time, wait })
+        }
         "ClrTati" => {
             Some(ScriptCmd::HideFg {
                 char_id: "all".into(),
@@ -370,9 +415,48 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_rendering_tag() {
-        let c = cmd("DrawSprite", vec![("0", "01"), ("1", "sprite_01")]);
-        assert!(map_command("DrawSprite", &c, &GameConfig::default()).is_none());
+    fn test_draw_sprite() {
+        let c = cmd("DrawSprite", vec![
+            ("0", "01"), ("1", "sprite_01"), ("3", "100"), ("4", "200"),
+            ("5", "50"), ("12", "255"), ("13", "10"), ("14", "300"),
+        ]);
+        let r = map_command("DrawSprite", &c, &GameConfig::default());
+        assert!(matches!(r, Some(ScriptCmd::DrawSprite { ref id, ref file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode })
+            if id == "01" && file == "sprite_01" && x == 100.0 && y == 200.0 && z == 50 && alpha == 255 && priority == 10 && time == 300
+            && rotation == 0.0 && anchor_x == 0.5 && anchor_y == 0.5 && blend_mode == 0));
+
+    #[test]
+    fn test_draw_sprite_with_transform() {
+        let c = cmd("DrawSprite", vec![
+            ("0", "fx_01"), ("1", "sparkle"), ("2", "1"), ("3", "400"), ("4", "300"),
+            ("5", "10"), ("6", "45.0"), ("7", "0.5"), ("8", "0.0"), ("12", "200"),
+            ("13", "5"), ("14", "500"),
+        ]);
+        let r = map_command("DrawSprite", &c, &GameConfig::default());
+        assert!(matches!(r, Some(ScriptCmd::DrawSprite { ref id, ref file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode })
+            if id == "fx_01" && file == "sparkle" && x == 400.0 && y == 300.0 && z == 10
+            && alpha == 200 && priority == 5 && time == 500
+            && rotation == 45.0 && anchor_x == 0.5 && anchor_y == 0.0 && blend_mode == 1));
+    }
+    }
+
+    #[test]
+    fn test_fade_sprite() {
+        let c = cmd("FadeSprite", vec![("0", "01"), ("1", "500")]);
+        let r = map_command("FadeSprite", &c, &GameConfig::default());
+        assert!(matches!(r, Some(ScriptCmd::FadeSprite { ref id, time })
+            if id == "01" && time == 500));
+    }
+
+    #[test]
+    fn test_move_sprite() {
+        let c = cmd("MoveSprite", vec![
+            ("0", "01"), ("1", "300"), ("2", "400"), ("3", "0"),
+            ("5", "128"), ("8", "1000"), ("9", "TRUE"),
+        ]);
+        let r = map_command("MoveSprite", &c, &GameConfig::default());
+        assert!(matches!(r, Some(ScriptCmd::MoveSprite { ref id, x, y, z, alpha, time, wait })
+            if id == "01" && x == 300.0 && y == 400.0 && z == 0 && alpha == 128 && time == 1000 && wait));
     }
 
     #[test]

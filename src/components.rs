@@ -111,3 +111,54 @@ pub struct TransitionOverlay;
 
 #[derive(Component)]
 pub struct FacePortrait;
+
+#[derive(Component)]
+pub struct SpriteOverlay {
+    pub id: String,
+    #[allow(dead_code)]
+    pub blend_mode: SpriteBlendMode,
+}
+
+#[derive(Component, Clone, Copy, PartialEq, Debug)]
+pub enum SpriteBlendMode {
+    Normal,
+    Add,
+    Multiply,
+    Screen,
+}
+
+impl Default for SpriteBlendMode {
+    fn default() -> Self { Self::Normal }
+}
+
+impl SpriteBlendMode {
+    #[allow(dead_code)]
+    pub fn from_attr(s: &str) -> Self {
+        match s {
+            "1" | "add" => Self::Add,
+            "2" | "mul" | "multiply" => Self::Multiply,
+            "3" | "screen" => Self::Screen,
+            _ => Self::Normal,
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct SpriteTween {
+    pub timer: Timer,
+    pub start_x: f32,
+    pub end_x: f32,
+    pub start_y: f32,
+    pub end_y: f32,
+    pub start_alpha: f32,
+    pub end_alpha: f32,
+    pub start_scale: f32,
+    pub end_scale: f32,
+    pub kind: TweenKind,
+}
+
+pub enum TweenKind {
+    FadeOut,
+    FadeIn,
+    Move,
+}

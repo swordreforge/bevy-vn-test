@@ -223,6 +223,11 @@ pub struct TextureCache {
     pub cache: HashMap<String, Handle<Image>>,
 }
 
+#[derive(Resource, Default)]
+pub struct SpriteOverlayManager {
+    pub sprites: HashMap<String, Entity>,
+}
+
 pub struct PendingBgmLoad {
     pub id: String,
     pub handle_a: Handle<AudioSource>,

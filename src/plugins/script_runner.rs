@@ -12,6 +12,7 @@ use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage,
     ShowFaceMessage, HideFaceMessage,
     ShowCgMessage, HideCgMessage,
+    DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage,
 };
 
 pub struct ScriptRunnerPlugin;
@@ -44,6 +45,9 @@ pub struct ProcessAdvanceParams<'w, 's> {
     hide_face_writer: MessageWriter<'w, HideFaceMessage>,
     show_cg_writer: MessageWriter<'w, ShowCgMessage>,
     hide_cg_writer: MessageWriter<'w, HideCgMessage>,
+    draw_sprite_writer: MessageWriter<'w, DrawSpriteMessage>,
+    fade_sprite_writer: MessageWriter<'w, FadeSpriteMessage>,
+    move_sprite_writer: MessageWriter<'w, MoveSpriteMessage>,
     choice_ev: MessageReader<'w, 's, ChoiceSelectedMessage>,
     choice_state: ResMut<'w, ChoiceState>,
     play_bgm_writer: MessageWriter<'w, PlayBgmMessage>,
@@ -131,6 +135,9 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
         ref mut hide_face_writer,
         ref mut show_cg_writer,
         ref mut hide_cg_writer,
+        ref mut draw_sprite_writer,
+        ref mut fade_sprite_writer,
+        ref mut move_sprite_writer,
         ref mut choice_ev,
         ref mut choice_state,
         ref mut play_bgm_writer,
@@ -296,6 +303,15 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                     Some(ScriptCmd::HideCg { .. }) => {
                         hide_cg_writer.write(HideCgMessage { transition: None, duration: None });
                     }
+                    Some(ScriptCmd::DrawSprite { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode }) => {
+                        draw_sprite_writer.write(DrawSpriteMessage { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode });
+                    }
+                    Some(ScriptCmd::FadeSprite { id, time }) => {
+                        fade_sprite_writer.write(FadeSpriteMessage { id, time });
+                    }
+                    Some(ScriptCmd::MoveSprite { id, x, y, z, alpha, time, wait }) => {
+                        move_sprite_writer.write(MoveSpriteMessage { id, x, y, z, alpha, time, wait });
+                    }
                     Some(ScriptCmd::PlayBgm { id, volume, fade_in }) => {
                         if !intro.0 {
                             play_bgm_writer.write(PlayBgmMessage { id, volume, fade_in });
@@ -433,6 +449,15 @@ fn process_advance(mut params: ProcessAdvanceParams<'_, '_>) {
                 }
                 Some(ScriptCmd::HideCg { transition }) => {
                     hide_cg_writer.write(HideCgMessage { transition, duration: None });
+                }
+                Some(ScriptCmd::DrawSprite { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode }) => {
+                    draw_sprite_writer.write(DrawSpriteMessage { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode });
+                }
+                Some(ScriptCmd::FadeSprite { id, time }) => {
+                    fade_sprite_writer.write(FadeSpriteMessage { id, time });
+                }
+                Some(ScriptCmd::MoveSprite { id, x, y, z, alpha, time, wait }) => {
+                    move_sprite_writer.write(MoveSpriteMessage { id, x, y, z, alpha, time, wait });
                 }
                 Some(ScriptCmd::PlayBgm { id, volume, fade_in }) => {
                     if !intro.0 {

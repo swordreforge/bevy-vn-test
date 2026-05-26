@@ -106,6 +106,33 @@ pub enum ScriptCmd {
     Wait {
         duration: u64,
     },
+    DrawSprite {
+        id: String,
+        file: String,
+        x: f32,
+        y: f32,
+        z: i32,
+        alpha: i32,
+        priority: i32,
+        time: u64,
+        rotation: f32,
+        anchor_x: f32,
+        anchor_y: f32,
+        blend_mode: i32,
+    },
+    FadeSprite {
+        id: String,
+        time: u64,
+    },
+    MoveSprite {
+        id: String,
+        x: f32,
+        y: f32,
+        z: i32,
+        alpha: i32,
+        time: u64,
+        wait: bool,
+    },
     PlayMovie {
         file: String,
     },

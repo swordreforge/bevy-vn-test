@@ -1,11 +1,12 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, SpriteManager, SpriteFade, SpriteFadeKind, TextureCache};
-use crate::script::{FgPosition, Transition};
 use crate::state::AppState;
+use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
+use crate::script::{FgPosition, Transition};
 use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowFaceMessage, HideFaceMessage,
     ShowCgMessage, HideCgMessage,
+    DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage,
 };
 
 fn char_dir(char_id: &str) -> Option<&'static str> {
@@ -51,10 +52,14 @@ impl Plugin for RenderingPlugin {
             .add_message::<HideFaceMessage>()
             .add_message::<ShowCgMessage>()
             .add_message::<HideCgMessage>()
+            .add_message::<DrawSpriteMessage>()
+            .add_message::<FadeSpriteMessage>()
+            .add_message::<MoveSpriteMessage>()
             .init_resource::<BgState>()
             .init_resource::<SpriteManager>()
             .init_resource::<CgState>()
             .init_resource::<TextureCache>()
+            .init_resource::<SpriteOverlayManager>()
             .init_resource::<RenderingInitialized>()
             .add_systems(OnEnter(AppState::Gameplay), setup_rendering)
             .add_systems(OnEnter(AppState::Title), cleanup_rendering)
@@ -71,6 +76,10 @@ impl Plugin for RenderingPlugin {
                 handle_hide_face,
                 handle_show_cg,
                 handle_hide_cg,
+                handle_draw_sprite,
+                handle_fade_sprite,
+                handle_move_sprite,
+                update_sprite_tweens,
             ).chain().run_if(in_state(AppState::Gameplay)));
     }
 }
@@ -159,10 +168,11 @@ fn setup_rendering(
 
 fn cleanup_rendering(
     mut commands: Commands,
-    query: Query<Entity, Or<(With<BackgroundRoot>, With<SpriteSlotMarker>, With<CgRoot>)>>,
+    query: Query<Entity, Or<(With<BackgroundRoot>, With<SpriteSlotMarker>, With<CgRoot>, With<SpriteOverlay>)>>,
     mut bg_state: ResMut<BgState>,
     mut sprite_mgr: ResMut<SpriteManager>,
     mut cg_state: ResMut<CgState>,
+    mut overlay_mgr: ResMut<SpriteOverlayManager>,
     mut cache: ResMut<TextureCache>,
     mut initialized: ResMut<RenderingInitialized>,
 ) {
@@ -172,6 +182,7 @@ fn cleanup_rendering(
     *bg_state = BgState::default();
     *sprite_mgr = SpriteManager::default();
     *cg_state = CgState::default();
+    overlay_mgr.sprites.clear();
     cache.cache.clear();
     initialized.0 = false;
 }
@@ -552,5 +563,174 @@ fn update_cg_fade(
 
     if finished {
         cg_state.fade = None;
+    }
+}
+
+fn sprite_depth_scale(z: i32) -> f32 {
+    if z == 0 { 1.0 }
+    else { 1.0 / (1.0 + z.abs() as f32 * 0.001) }
+}
+
+fn handle_draw_sprite(
+    mut msg: MessageReader<DrawSpriteMessage>,
+    mut overlay_mgr: ResMut<SpriteOverlayManager>,
+    mut cache: ResMut<TextureCache>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+) {
+    for msg in msg.read() {
+        let path = if msg.file.contains('.') {
+            msg.file.clone()
+        } else {
+            format!("{}.png", msg.file)
+        };
+        let full_path = format!("images/obj/{}", path);
+        let handle = cache.cache.entry(full_path.clone()).or_insert_with(|| {
+            asset_server.load(&full_path)
+        }).clone();
+
+        let alpha = (msg.alpha as f32 / 255.0).clamp(0.0, 1.0);
+        let scale = sprite_depth_scale(msg.z);
+        let rot_rad = msg.rotation.to_radians();
+        let has_fade_in = msg.time > 0;
+
+        if let Some(&entity) = overlay_mgr.sprites.get(&msg.id) {
+            if let Ok(mut entry) = commands.get_entity(entity) {
+                entry.insert(ImageNode::new(handle.clone()));
+                entry.insert(BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha)));
+                entry.insert(Transform::from_scale(Vec3::splat(scale)).with_rotation(Quat::from_rotation_z(rot_rad)));
+            }
+        } else {
+            let blend = match msg.blend_mode {
+                1 => SpriteBlendMode::Add,
+                2 => SpriteBlendMode::Multiply,
+                3 => SpriteBlendMode::Screen,
+                _ => SpriteBlendMode::Normal,
+            };
+            let mut spawn = commands.spawn((
+                SpriteOverlay { id: msg.id.clone(), blend_mode: blend },
+                Node {
+                    width: Val::Auto,
+                    height: Val::Auto,
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(msg.x),
+                    top: Val::Px(msg.y),
+                    ..default()
+                },
+                ImageNode::new(handle.clone()),
+                BackgroundColor(Color::srgba(1.0, 1.0, 1.0, if has_fade_in { 0.0 } else { alpha })),
+                Transform::from_scale(Vec3::splat(scale)).with_rotation(Quat::from_rotation_z(rot_rad)),
+                Visibility::Visible,
+                ZIndex(1 + msg.priority.max(0) as i32),
+            ));
+            if has_fade_in {
+                let dur = (msg.time as f32 / 1000.0).max(0.016);
+                spawn.insert(SpriteTween {
+                    timer: Timer::from_seconds(dur, TimerMode::Once),
+                    start_x: msg.x, end_x: msg.x,
+                    start_y: msg.y, end_y: msg.y,
+                    start_alpha: 0.0, end_alpha: alpha,
+                    start_scale: scale, end_scale: scale,
+                    kind: TweenKind::FadeIn,
+                });
+            }
+            let entity = spawn.id();
+            overlay_mgr.sprites.insert(msg.id.clone(), entity);
+        }
+    }
+}
+
+fn handle_fade_sprite(
+    mut msg: MessageReader<FadeSpriteMessage>,
+    overlay_mgr: Res<SpriteOverlayManager>,
+    mut commands: Commands,
+) {
+    for msg in msg.read() {
+        if let Some(&entity) = overlay_mgr.sprites.get(&msg.id) {
+            let dur = (msg.time as f32 / 1000.0).max(0.016);
+            commands.entity(entity).insert(SpriteTween {
+                timer: Timer::from_seconds(dur, TimerMode::Once),
+                start_x: 0.0,
+                end_x: 0.0,
+                start_y: 0.0,
+                end_y: 0.0,
+                start_alpha: 1.0,
+                end_alpha: 0.0,
+                start_scale: 1.0,
+                end_scale: 1.0,
+                kind: TweenKind::FadeOut,
+            });
+        }
+    }
+}
+
+fn handle_move_sprite(
+    mut msg: MessageReader<MoveSpriteMessage>,
+    overlay_mgr: Res<SpriteOverlayManager>,
+    mut commands: Commands,
+    query: Query<(&Node, Option<&Transform>), With<SpriteOverlay>>,
+) {
+    for msg in msg.read() {
+        if let Some(&entity) = overlay_mgr.sprites.get(&msg.id) {
+            let dur = (msg.time as f32 / 1000.0).max(0.016);
+            let (start_x, start_y, start_alpha, start_scale) = query.get(entity).map(|(node, tf)| {
+                let x = match node.left { Val::Px(v) => v, _ => 0.0 };
+                let y = match node.top { Val::Px(v) => v, _ => 0.0 };
+                let s = tf.and_then(|t| Some(t.scale.x)).unwrap_or(1.0);
+                (x, y, 1.0, s)
+            }).unwrap_or((0.0, 0.0, 1.0, 1.0));
+            let target_alpha = (msg.alpha as f32 / 255.0).clamp(0.0, 1.0);
+            let end_scale = sprite_depth_scale(msg.z);
+            commands.entity(entity).insert(SpriteTween {
+                timer: Timer::from_seconds(dur, TimerMode::Once),
+                start_x,
+                end_x: msg.x,
+                start_y,
+                end_y: msg.y,
+                start_alpha,
+                end_alpha: target_alpha,
+                start_scale,
+                end_scale,
+                kind: TweenKind::Move,
+            });
+        }
+    }
+}
+
+fn update_sprite_tweens(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut overlay_mgr: ResMut<SpriteOverlayManager>,
+    mut query: Query<(Entity, &mut SpriteTween, &mut Node, &mut BackgroundColor, &mut Transform, Option<&SpriteOverlay>)>,
+) {
+    for (entity, mut tween, mut node, mut bg, mut tf, overlay) in &mut query {
+        tween.timer.tick(time.delta());
+        let t = tween.timer.fraction();
+        let eased = 1.0 - (1.0 - t) * (1.0 - t); // ease-out quad
+
+        node.left = Val::Px(tween.start_x + (tween.end_x - tween.start_x) * eased);
+        node.top = Val::Px(tween.start_y + (tween.end_y - tween.start_y) * eased);
+        let alpha = tween.start_alpha + (tween.end_alpha - tween.start_alpha) * eased;
+        bg.0 = Color::srgba(1.0, 1.0, 1.0, alpha);
+        let s = tween.start_scale + (tween.end_scale - tween.start_scale) * eased;
+        tf.scale = Vec3::splat(s);
+
+        if tween.timer.just_finished() {
+            match tween.kind {
+                TweenKind::FadeOut => {
+                    if let Some(overlay) = overlay {
+                        overlay_mgr.sprites.remove(&overlay.id);
+                    }
+                    commands.entity(entity).despawn();
+                }
+                TweenKind::FadeIn | TweenKind::Move => {
+                    node.left = Val::Px(tween.end_x);
+                    node.top = Val::Px(tween.end_y);
+                    bg.0 = Color::srgba(1.0, 1.0, 1.0, tween.end_alpha);
+                    tf.scale = Vec3::splat(tween.end_scale);
+                    commands.entity(entity).remove::<SpriteTween>();
+                }
+            }
+        }
     }
 }
