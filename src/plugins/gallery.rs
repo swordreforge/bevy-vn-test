@@ -17,6 +17,7 @@ impl Plugin for GalleryPlugin {
                 handle_back_button,
                 handle_fullscreen_click,
                 handle_gallery_escape,
+                update_gallery_scrollbar,
             ).run_if(in_state(AppState::Gallery)))
             .add_systems(OnExit(AppState::Gallery), cleanup_gallery);
     }
@@ -83,56 +84,134 @@ fn setup_gallery(
         parent.spawn((
             Node {
                 width: Val::Percent(90.0),
-                height: Val::Auto,
+                flex_grow: 1.0,
                 flex_direction: FlexDirection::Row,
-                flex_wrap: FlexWrap::Wrap,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::FlexStart,
-                column_gap: Val::Px(12.0),
-                row_gap: Val::Px(12.0),
-                margin: UiRect::top(Val::Px(20.0)),
                 ..default()
             },
-        )).with_children(|grid| {
-            for file in &cg_files.0 {
-                if unlock_state.cg_unlocked.contains(file) {
-                    let path = format!("images/ev/{}", file);
-                    let handle = cache.cache.entry(path.clone())
-                        .or_insert_with(|| asset_server.load(&path))
-                        .clone();
-                    grid.spawn((
-                        GalleryThumbnail(file.clone()),
-                        Button,
-                        Node {
-                            width: Val::Px(360.0),
-                            height: Val::Px(200.0),
-                            ..default()
-                        },
-                        ImageNode::new(handle),
-                        ZIndex(5),
-                    ));
-                } else {
-                    grid.spawn((
-                        GalleryThumbnail(file.clone()),
-                        GalleryLocked,
-                        Node {
-                            width: Val::Px(360.0),
-                            height: Val::Px(200.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
-                        ZIndex(5),
-                    )).with_child((
-                        Text::new("🔒"),
-                        TextFont { font: game_font.0.clone(), font_size: 32.0, ..default() },
-                        TextColor(Color::srgb(0.3, 0.3, 0.4)),
-                    ));
+        )).with_children(|row| {
+            row.spawn((
+                GalleryScrollArea,
+                Node {
+                    flex_grow: 1.0,
+                    height: Val::Percent(100.0),
+                    overflow: Overflow::scroll_y(),
+                    ..default()
+                },
+            )).with_children(|scroll| {
+                scroll.spawn((
+                    GalleryGridContent,
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Auto,
+                        flex_direction: FlexDirection::Row,
+                        flex_wrap: FlexWrap::Wrap,
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::FlexStart,
+                        column_gap: Val::Px(12.0),
+                        row_gap: Val::Px(12.0),
+                        ..default()
+                    },
+                )).with_children(|grid| {
+                for file in &cg_files.0 {
+                    if unlock_state.cg_unlocked.contains(file) {
+                        let path = format!("images/ev/{}", file);
+                        let handle = cache.cache.entry(path.clone())
+                            .or_insert_with(|| asset_server.load(&path))
+                            .clone();
+                        grid.spawn((
+                            GalleryThumbnail(file.clone()),
+                            Button,
+                            Node {
+                                width: Val::Px(360.0),
+                                height: Val::Px(200.0),
+                                ..default()
+                            },
+                            ImageNode::new(handle),
+                            ZIndex(5),
+                        ));
+                    } else {
+                        grid.spawn((
+                            GalleryThumbnail(file.clone()),
+                            GalleryLocked,
+                            Node {
+                                width: Val::Px(360.0),
+                                height: Val::Px(200.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
+                            ZIndex(5),
+                        )).with_child((
+                            Text::new("[ LOCKED ]"),
+                            TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
+                            TextColor(Color::srgb(0.3, 0.3, 0.4)),
+                        ));
+                    }
                 }
-            }
+            });
+            });
+
+            row.spawn((
+                GalleryScrollbar,
+                Node {
+                    width: Val::Px(8.0),
+                    height: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.15, 0.15, 0.18, 1.0)),
+            )).with_children(|track| {
+                track.spawn((
+                    GalleryScrollThumb,
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(50.0),
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.45, 0.45, 0.5, 1.0)),
+                ));
+            });
         });
     });
+}
+
+fn update_gallery_scrollbar(
+    scroll_area: Query<(&ScrollPosition, &ComputedNode), With<GalleryScrollArea>>,
+    grid_content: Query<&ComputedNode, (With<GalleryGridContent>, Without<GalleryScrollArea>)>,
+    scrollbar: Query<&ComputedNode, (With<GalleryScrollbar>, Without<GalleryScrollThumb>)>,
+    mut thumb: Query<(&mut Node, &mut BackgroundColor), With<GalleryScrollThumb>>,
+) {
+    let Ok((scroll_pos, container_node)) = scroll_area.single() else { return };
+    let Ok(content_node) = grid_content.single() else { return };
+    let Ok(track_node) = scrollbar.single() else { return };
+    let Ok((mut thumb_node, _)) = thumb.single_mut() else { return };
+
+    let visible_height = container_node.size().y;
+    let content_height = content_node.size().y;
+
+    if content_height <= visible_height || visible_height <= 0.0 {
+        thumb_node.display = Display::None;
+        return;
+    }
+
+    thumb_node.display = Display::Flex;
+    let track_height = track_node.size().y;
+    if track_height <= 0.0 {
+        return;
+    }
+
+    let scrollable = content_height - visible_height;
+    let ratio = visible_height / content_height;
+    let thumb_height = (track_height * ratio).max(16.0);
+    let max_top = (track_height - thumb_height).max(0.0);
+    let thumb_top = max_top * (scroll_pos.0.y / scrollable);
+
+    thumb_node.height = Val::Px(thumb_height);
+    thumb_node.top = Val::Px(thumb_top);
 }
 
 fn handle_thumbnail_click(

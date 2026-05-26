@@ -58,6 +58,18 @@ pub struct GalleryFullscreen;
 #[derive(Component)]
 pub struct GalleryBackButton;
 
+#[derive(Component)]
+pub struct GalleryScrollArea;
+
+#[derive(Component)]
+pub struct GalleryScrollbar;
+
+#[derive(Component)]
+pub struct GalleryScrollThumb;
+
+#[derive(Component)]
+pub struct GalleryGridContent;
+
 // === Settings UI Components ===
 #[derive(Component)]
 pub struct SettingsBackButton;
