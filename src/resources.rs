@@ -227,6 +227,11 @@ pub struct BgmManager {
 }
 
 #[derive(Resource, Default)]
+pub struct VoiceManager {
+    pub entity: Option<Entity>,
+}
+
+#[derive(Resource, Default)]
 pub struct ChoiceState {
     pub active: bool,
     pub options: Vec<crate::script::ChoiceOption>,

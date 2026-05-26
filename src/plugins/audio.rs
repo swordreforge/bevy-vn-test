@@ -1,7 +1,7 @@
 use bevy::{audio::Volume, prelude::*};
 use crate::audio_messages::*;
 use crate::components::AudioType;
-use crate::resources::{BgmManager, PendingBgm, PendingBgmLoad, Settings};
+use crate::resources::{BgmManager, PendingBgm, PendingBgmLoad, Settings, VoiceManager};
 use rodio::{self, Source};
 use std::io::Cursor;
 use std::sync::Arc;
@@ -12,6 +12,7 @@ impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<BgmManager>()
+            .init_resource::<VoiceManager>()
             .init_resource::<PendingBgm>()
             .add_message::<PlayBgmMessage>()
             .add_message::<StopBgmMessage>()
@@ -176,15 +177,20 @@ fn handle_play_voice(
     mut reader: MessageReader<PlayVoiceMessage>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
+    mut voice: ResMut<VoiceManager>,
 ) {
     for msg in reader.read() {
+        if let Some(entity) = voice.entity.take() {
+            commands.entity(entity).despawn();
+        }
         let path = format!("audio/voice/{}.ogg", msg.file);
         let handle: Handle<AudioSource> = asset_server.load(&path);
-        commands.spawn((
+        let entity = commands.spawn((
             AudioPlayer(handle),
             PlaybackSettings::DESPAWN,
             AudioType::Voice,
-        ));
+        )).id();
+        voice.entity = Some(entity);
     }
 }
 
