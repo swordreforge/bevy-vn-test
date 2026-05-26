@@ -34,8 +34,9 @@
 | 项目 | 内容 |
 |------|------|
 | **状态** | ✅ 已实现 |
-| **改动** | `DrawSprite`/`DrawSpriteWithFiltering`/`FadeSprite`/`FadeSpriteWithFiltering`/`MoveSprite` 映射到对应 `ScriptCmd`；精灵以独立 UI 节点实体管理，支持 ID 复用、alpha、Z 排序、fade-out 渐隐、move tween |
+| **改动** | `DrawSprite`/`DrawSpriteWithFiltering`/`FadeSprite`/`FadeSpriteWithFiltering`/`MoveSprite` 映射到对应 `ScriptCmd`；精灵以独立 UI 节点实体管理，支持 ID 复用、alpha、Z 排序、深度缩放、旋转、fade-out 渐隐、move tween |
 | **资源** | `root/image/obj/`、`root/image/anime/`（81 帧动画）等 |
+| **提交** | `5d9f0cc` — 深度缩放 + 旋转 + fade-in + MoveSprite z-tween
 
 **需要实现的功能**：
 - ~~任意位置（x,y）放置精灵~~ ✅
@@ -45,26 +46,26 @@
 - 锚点（anchorx, anchory） ⏳ 数据已从 ASB 映射并传至 `DrawSpriteMessage`，但 Bevy 0.18 的 UI 节点无双 `TransformOrigin` 组件，定位默认以节点中心为原点。需要等 Bevy 升级或自行计算偏移量
 - 混合模式：normal / add / multiply / screen ⏳ `SpriteBlendMode` 枚举已定义，`SpriteOverlay::blend_mode` 已存储，但需要自定义 `UiMaterial` 实现不同 blend state。目前仅 `Normal` 有效，其余 fallback 到 normal
 - Mask 遮罩 ⏳ 暂未实现（需要 stencil buffer 或 clipping parent wrapper）
-- ~~精灵间 Tween 动画（alpha/位置）~~ ✅
+- ~~精灵间 Tween 动画（alpha/位置/深度缩放）~~ ✅
 - 多关键帧移动（`move_sprite_ex`） ⏳ 暂未映射
 
-### P0-3 全屏过渡效果（Fadeout / Whiteout / Blackout）
+### P0-3 ~~全屏过渡效果（Fadeout / Whiteout / Blackout）~~ ✅ 已完成
 
 | 项目 | 内容 |
 |------|------|
+| **状态** | ✅ 已实现 |
 | **标签** | `Fadeout`, `WhiteoutBySA`, `Blackout` |
-| **使用量** | 序章 Fadeout 8 次。全篇各脚本 1~8 次 |
-| **影响** | 场景切换时无渐黑/渐白过渡，画面突兀跳变 |
-| **原版 Lua** | `trans()` 在 `grph.lua` — 支持 time + rule 图像 + type 的过渡系统 |
+| **改动** | `Fadeout` 在映射层拆分为 `ScreenOverlay → Wait → SetBg → ClearOverlay` 序列；持久 `ScreenOverlayRoot` UI 节点控制全屏遮罩 alpha tween；`Blackout`/`WhiteoutBySA` 直接映射为 `ScreenOverlay` |
+| **提交** | `61f0109`
 
-### P0-4 消息窗口控制（Window / DisableWindow / ChangeWindowColor）
+### P0-4 ~~消息窗口控制（Window / DisableWindow / ChangeWindowColor）~~ ✅ 已完成
 
 | 项目 | 内容 |
 |------|------|
+| **状态** | ✅ 已实现 |
 | **标签** | `Window`, `DisableWindow`, `ChangeWindowColor`, `ChangeWindowDesign` |
-| **使用量** | 序章 Window 13 次，DisableWindow 3 次，ChangeWindowColor 4 次。全篇 Window 约 145 次 |
-| **影响** | 全屏 CG/Event 场景需要 `DisableWindow` 隐藏消息框，`ChangeWindowColor` 适配不同场景氛围。缺失导致全屏场景时对话框错误显示 |
-| **原版 Lua** | `msgon()` / `msgoff()` 在 `grph.lua` — 控制图层 `1.80` 的 alpha 和位置 tween |
+| **改动** | `Window`/`DisableWindow`/`EnableWindow` → `ScriptCmd::Window` 控制 `DialogueUiRoot` 显隐 + `WindowOverride` 阻止自动覆盖；`ChangeWindowColor`（0=默认,1=蓝,2=绿,3=红）和 `ChangeWindowDesign`（0=normal,1=small）通过 `apply_window_appearance` 系统实时应用 |
+| **提交** | `61f0109`
 
 ---
 
@@ -230,8 +231,16 @@ Phase 1 (P0) — 核心修复
 ├── ✅ Face 头像系统（重新映射，对话框内子节点定位）
 ├── ✅ 精灵系统 DrawSprite（位置+alpha+图片 + FadeSprite/MoveSprite tween）  
 │   └── 深度缩放 ✅ | 旋转 ✅ | 锚点 ⏳ | 混合模式 ⏳ | Mask ⏳
+├── ✅ P0-3 全屏过渡 Fadeout / Whiteout / Blackout
+├── ✅ P0-4 窗口控制 Window / DisableWindow / ChangeWindowColor
+```
+Phase 1 (P0) — 核心修复
+├── ✅ Face 头像系统（重新映射，对话框内子节点定位）
+├── ✅ 精灵系统 DrawSprite（位置+alpha+图片 + FadeSprite/MoveSprite tween）  
+│   └── 深度缩放 ✅ | 旋转 ✅ | 锚点 ⏳ | 混合模式 ⏳ | Mask ⏳
 ├── 窗口控制 Window / DisableWindow
-└── 全屏过渡 Fadeout / Whiteout / Blackout
+├── ✅ 全屏过渡 Fadeout / Whiteout / Blackout
+├── ✅ 窗口控制 Window / DisableWindow
 
 Phase 2 (P1) — 常规体验
 ├── 画面震动 Quake / StartShaking
