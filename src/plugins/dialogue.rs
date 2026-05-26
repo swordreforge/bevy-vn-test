@@ -111,7 +111,15 @@ fn update_dialogue(
     state: Res<DialogueState>,
     mut text_query: Query<&mut Text, (With<DialogueTextDisplay>, Without<SpeakerNameDisplay>)>,
     mut speaker_query: Query<&mut Text, (With<SpeakerNameDisplay>, Without<DialogueTextDisplay>)>,
+    mut root_query: Query<&mut Visibility, (With<DialogueUiRoot>, Without<DialogueTextDisplay>)>,
 ) {
+    if let Ok(mut root_vis) = root_query.single_mut() {
+        *root_vis = if state.current_text.is_empty() {
+            Visibility::Hidden
+        } else {
+            Visibility::Visible
+        };
+    }
     if let Ok(mut text) = text_query.single_mut() {
         let visible_count = state.text_progress.min(state.current_text.chars().count());
         text.0 = state.current_text.chars().take(visible_count).collect();
