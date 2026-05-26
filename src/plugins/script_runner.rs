@@ -56,7 +56,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     stop_bgm_writer: MessageWriter<'w, StopBgmMessage>,
     play_se_writer: MessageWriter<'w, PlaySeMessage>,
     play_voice_writer: MessageWriter<'w, PlayVoiceMessage>,
-    settings: ResMut<'w, Settings>,
+    settings: Res<'w, Settings>,
     auto_skip: ResMut<'w, AutoSkipTimer>,
     intro: ResMut<'w, IntroPhase>,
 }
@@ -362,10 +362,16 @@ fn process_advance(
                         window_override.0 = !show;
                     }
                     Some(ScriptCmd::ChangeWindowColor { color_idx }) => {
-                        settings.window_color_idx = color_idx;
+                        commands.queue(move |world: &mut World| {
+                            let mut settings = world.resource_mut::<Settings>();
+                            settings.window_color_idx = color_idx;
+                        });
                     }
                     Some(ScriptCmd::ChangeWindowDesign { design }) => {
-                        settings.window_design = design;
+                        commands.queue(move |world: &mut World| {
+                            let mut settings = world.resource_mut::<Settings>();
+                            settings.window_design = design;
+                        });
                     }
                     Some(cmd) => {
                         info!("Script cmd (no-op): {:?}", cmd);
@@ -562,10 +568,16 @@ fn process_advance(
                     window_override.0 = !show;
                 }
                 Some(ScriptCmd::ChangeWindowColor { color_idx }) => {
-                    settings.window_color_idx = color_idx;
+                    commands.queue(move |world: &mut World| {
+                        let mut settings = world.resource_mut::<Settings>();
+                        settings.window_color_idx = color_idx;
+                    });
                 }
                 Some(ScriptCmd::ChangeWindowDesign { design }) => {
-                    settings.window_design = design;
+                    commands.queue(move |world: &mut World| {
+                        let mut settings = world.resource_mut::<Settings>();
+                        settings.window_design = design;
+                    });
                 }
                 Some(cmd) => {
                     info!("Script cmd (no-op): {:?}", cmd);
