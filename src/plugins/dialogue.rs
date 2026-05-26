@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::{DialogueState, GameFont, NarrationOverlay, Settings};
+use crate::resources::{DialogueState, GameFont, NarrationOverlay, Settings, WindowOverride};
 use crate::script::ScriptEngine;
 use crate::state::AppState;
 
@@ -18,7 +18,7 @@ impl Plugin for DialoguePlugin {
             .add_systems(Update, (
                 handle_narration_overlay,
                 update_dialogue,
-                apply_message_opacity,
+                apply_window_appearance,
             ).chain().run_if(in_state(AppState::Gameplay)))
             .add_systems(OnExit(AppState::Gameplay), hide_dialogue)
             .add_systems(OnEnter(AppState::Title), cleanup_dialogue);
@@ -141,16 +141,19 @@ fn cleanup_dialogue(
 fn update_dialogue(
     state: Res<DialogueState>,
     overlay: Res<NarrationOverlay>,
+    window_override: Res<WindowOverride>,
     mut text_query: Query<&mut Text, (With<DialogueTextDisplay>, Without<SpeakerNameDisplay>)>,
     mut speaker_query: Query<&mut Text, (With<SpeakerNameDisplay>, Without<DialogueTextDisplay>)>,
     mut root_query: Query<&mut Visibility, (With<DialogueUiRoot>, Without<DialogueTextDisplay>)>,
 ) {
     if let Ok(mut root_vis) = root_query.single_mut() {
-        *root_vis = if state.current_text.is_empty() || overlay.active {
-            Visibility::Hidden
-        } else {
-            Visibility::Visible
-        };
+        if !window_override.0 {
+            *root_vis = if state.current_text.is_empty() || overlay.active {
+                Visibility::Hidden
+            } else {
+                Visibility::Visible
+            };
+        }
     }
     if let Ok(mut text) = text_query.single_mut() {
         let visible_count = state.text_progress.min(state.current_text.chars().count());
@@ -161,13 +164,28 @@ fn update_dialogue(
     }
 }
 
-fn apply_message_opacity(
+fn apply_window_appearance(
     settings: Res<Settings>,
-    mut query: Query<&mut BackgroundColor, With<DialogueBox>>,
+    mut bg_query: Query<&mut BackgroundColor, With<DialogueBox>>,
+    mut node_query: Query<&mut Node, With<DialogueUiRoot>>,
 ) {
     let alpha = (settings.message_window_opacity as f32) / 100.0;
-    for mut bg in query.iter_mut() {
-        *bg = BackgroundColor(Color::srgba(0.0, 0.0, 0.0, alpha));
+    let tint = match settings.window_color_idx {
+        1 => Color::srgba(0.2, 0.3, 0.6, alpha),
+        2 => Color::srgba(0.2, 0.5, 0.3, alpha),
+        3 => Color::srgba(0.5, 0.2, 0.2, alpha),
+        _ => Color::srgba(0.0, 0.0, 0.0, alpha),
+    };
+    for mut bg in bg_query.iter_mut() {
+        *bg = BackgroundColor(tint);
+    }
+    let is_small = settings.window_design == 1;
+    for mut node in node_query.iter_mut() {
+        if is_small {
+            node.padding = UiRect::new(Val::Px(20.0), Val::Px(20.0), Val::Px(6.0), Val::Px(6.0));
+        } else {
+            node.padding = UiRect::new(Val::Px(40.0), Val::Px(40.0), Val::Px(12.0), Val::Px(12.0));
+        }
     }
 }
 
