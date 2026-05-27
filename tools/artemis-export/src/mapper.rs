@@ -288,6 +288,16 @@ fn map_calllua(cmd: &AsbCommand, _config: &crate::lua_config::GameConfig) -> Opt
                 duration: None,
             }])
         }
+        s if s.contains("ScrollBGenq") || s.contains("scroll_bg") => {
+            let file = cmd.attrs.get("file").or_else(|| cmd.attrs.get("0")).cloned().unwrap_or_default();
+            let x1 = cmd.attrs.get("1").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let y1 = cmd.attrs.get("2").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let x2 = cmd.attrs.get("4").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let y2 = cmd.attrs.get("5").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            let fade = cmd.attrs.get("9").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let wait = cmd.attrs.get("10").map(|s| s == "TRUE").unwrap_or(false);
+            Some(vec![ScriptCmd::ScrollBg { file, x1, y1, x2, y2, fade, wait }])
+        }
         s if s.contains("ChangeVolumeOfBGM") || s.contains("bgm_fade") => {
             let channel = cmd.attrs.get("0").and_then(|s| s.parse().ok()).unwrap_or(0);
             let vol_val = cmd.attrs.get("1").and_then(|s| s.parse::<u32>().ok()).unwrap_or(80);
