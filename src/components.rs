@@ -200,3 +200,12 @@ pub struct SpriteAnchor {
     pub target_x: f32,
     pub target_y: f32,
 }
+
+#[derive(Component)]
+pub struct BgScroll {
+    pub timer: Timer,
+    pub start_x: f32,
+    pub end_x: f32,
+    pub start_y: f32,
+    pub end_y: f32,
+}
