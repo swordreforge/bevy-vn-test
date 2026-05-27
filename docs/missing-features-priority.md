@@ -13,7 +13,7 @@
 | 画面特效 | Quake, StartShakingOfAllObjects, Flash, Fadeout, WhiteoutBySA | 多数脚本 |
 | 消息窗口控制 | Window, DisableWindow, ChangeWindowColor | 多数脚本 |
 | 音频增强 | LoopSE, StopStreamingSE, BgmVol, BgmX | 多数脚本 |
-| 背景系统 | ScrollBG, DrawBG | 部分脚本 |
+| 背景系统 | ScrollBG ✅, DrawBG | 部分脚本 |
 | 动画系统 | AnimateSprite | 部分脚本 |
 | 其他 | PlayMovie, RegisterTextToHistory, ChangeWindowDesign | 少量脚本 |
 
@@ -89,7 +89,7 @@
 | **改动** | `LoopSE` → `ScriptCmd::LoopSe { file, volume, channel }` → `handle_loop_se` 用 `PlaybackMode::Loop` 播放，`SeManager` 通过 `HashMap<u32, Entity>` 追踪每个 channel 的实体；`StopStreamingSE` → `ScriptCmd::StopStreamingSe { channel }` → `handle_stop_streaming_se` 查找 channel 并 despawn；calllua `se_stop` 也映射到此命令 |
 | **音频路径** | `audio/se/loop/` — 118 个循环 SE 文件 |
 
-### P1-3 BGM 精细控制（BgmVol / BgmX）
+### P1-3 BGM 精细控制（BgmVol / BgmX）✅ 已完成
 
 | 项目 | 内容 |
 |------|------|
@@ -110,7 +110,7 @@
 | **改动** | `Flash` 标签 → `ScriptCmd::Flash { color, time, alpha }` → 复用 `ScreenOverlayRoot` + `OverlayTween`，从指定透明度 `alpha/255` 渐出到 0，完成后自动隐藏 |
 | **备注** | 目前单次闪烁。原版 Lua 支持多次闪烁（rep），暂未实现 |
 
-### P1-5 背景滚动（ScrollBG）
+### P1-5 ~~背景滚动（ScrollBG）~~ ✅ 已完成
 
 | 项目 | 内容 |
 |------|------|
@@ -118,6 +118,8 @@
 | **使用量** | aiy50010 2 次（Tia 线，重要场景） |
 | **影响** | 全景/移动背景（如火车窗景、移动的观景）无法实现 |
 | **原版 Lua** | `bg_scroll()` 在 `grph.lua` — 通过 x1/x2/y1/y2 + time 参数实现背景偏移动画 |
+| **实现** | `ScriptCmd::ScrollBg { file, x1, y1, x2, y2, fade, wait }` → `ScrollBgMessage` → `handle_scroll_bg` 加载图片并设为自然像素尺寸 → `BgScroll` 组件驱动 ease-out 二次插值 left/top。`wait` 通过 `auto_skip.auto_timer` 阻塞。`handle_set_bg` 重置节点大小并取消滚动。ASB 映射 `ScrollBGenq` / `scroll_bg` → `ScriptCmd::ScrollBg` |
+| **提交** | `5a0f9e7f` (mapper), `e5f322bb` (dead_code fix), `6fde3f66` (rendering), `ed38f639` (runner), `15dfaa98` (component), `4e48fe0a` (message), `58161e14` (script) |
 
 ---
 
@@ -191,7 +193,7 @@
 | **影响** | 我们已经通过 Dialogue 命令自动捕获到 backlog，此标签可能用于非 Dialogue 文本 |
 | **备注** | 现有 backlog 系统已覆盖大部分需求，但需要确认此标签注册的内容是否不同 |
 
-### P3-3 BgmX 交叉淡入淡出
+### P3-3 ~~BgmX 交叉淡入淡出~~ ✅ 已实现
 
 | 项目 | 内容 |
 |------|------|
@@ -216,7 +218,7 @@
 | aiy20010 | 74 | 12 | 9 | 8 | 4 | 0 | 5 | 5 | 0 | 0 |
 | aiy30010 | 112 | 25 | 1 | 1 | 0 | 0 | 3 | 3 | 1 | 0 |
 | aiy40010 | 115 | 6 | 2 | 0 | 0 | 0 | 5 | 5 | 0 | 0 |
-| aiy50010 | 107 | 9 | 3 | 1 | 0 | 1 | 4 | 5 | 3 | 2 |
+| aiy50010 | 107 | 9 | 3 | 1 | 0 | 1 | 4 | 5 | 3 | 2 ✅ |
 | aiy70110 | 66 | 2 | 2 | 0 | 0 | 0 | 8 | 10 | 3 | 0 |
 | aiy80010 | 120 | 6 | 1 | 0 | 0 | 1 | 4 | 7 | 0 | 0 |
 | aiy81010 | 25 | 4 | 9 | 7 | 4 | 2 | 2 | 2 | 1 | 0 |
@@ -247,9 +249,9 @@ Phase 2 (P1) — 常规体验
 ├── ✅ 画面震动 Quake / StartShaking
 ├── ✅ 循环 SE LoopSE / StopStreamingSE
 ├── ✅ BGM 控制 BgmVol
-├── BgmX
+├── ✅ BgmX + 交叉淡入淡出
 ├── ✅ Flash 闪光
-└── 背景滚动 ScrollBG
+├── ✅ 背景滚动 ScrollBG
 
 Phase 3 (P2) — 视觉增强
 ├── 帧动画 AnimateSprite
@@ -260,8 +262,8 @@ Phase 3 (P2) — 视觉增强
 └── 事件/标记系统
 
 Phase 4 (P3) — 打磨
-├── ChangeWindowDesign
+├── ✅ ChangeWindowDesign
 ├── RegisterTextToHistory
-├── BgmX 交叉淡入淡出
+├── ✅ BgmX 交叉淡入淡出
 └── DrawBG 多层背景
 ```

@@ -6,7 +6,7 @@
 
 ## 当前状态 (2026-05-27)
 
-**Phase 0-7 核心引擎就绪 ✅** — 脚本驱动全流程：对话/立绘/背景/CG/精灵覆盖层/转场/BGM+BGMX/SE/语音/选项/Wait 时序均可用，画廊 + Debug 键
+**Phase 0-7 核心引擎就绪 ✅** — 脚本驱动全流程：对话/立绘/背景/CG/精灵覆盖层/转场/BGM+BGMX/SE/语音/选项/Wait 时序均可用，背景滚动 ScrollBG 已实装，画廊 + Debug 键
 
 ---
 
@@ -170,6 +170,7 @@ bevy-vn/
 - [x] LoopSE / StopStreamingSE — 循环SE系统（SeManager 追踪 channel→Entity，LOOP 模式播放，定向停止）
 - [x] BgmX — 第二 BGM 层（BgmXManager + AudioType::BgmX，独立音轨 `audio/bgm/bgmx_{id}.ogg`）
 - [x] 交叉淡入淡出 — BgmFade 组件驱动音量渐变，PlayBgm/StopBgm 的 fade_in/fade_out 参数已实装，支持跨层交叉淡入淡出
+- [x] 背景滚动 ScrollBG — `ScriptCmd::ScrollBg { file, x1, y1, x2, y2, fade, wait }`，BgScroll 组件驱动 ease-out 二次缓动 left/top 插值，wait 阻塞通过 auto_timer 实现，支持等待
 - [ ] Android 适配 (deferred to sub-phase)
 - [ ] .asb 二进制解析器
 - [ ] Lua 配置提取器
