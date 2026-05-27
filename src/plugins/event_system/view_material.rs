@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::render_resource::*;
 use bevy::shader::ShaderRef;
-use bevy::ui_render::prelude::*;
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct ViewMaskMaterial {
