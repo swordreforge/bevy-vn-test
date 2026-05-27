@@ -4,9 +4,9 @@
 
 ---
 
-## 当前状态 (2026-05-24)
+## 当前状态 (2026-05-26)
 
-**Phase 3 已完成 ✅** — 背景/立绘/CG 渲染系统全部就位，窗口 1280x720，AssetServer 按需加载 + TextureCache 缓存
+**Phase 0-4 核心引擎就绪 ✅** — 脚本驱动全流程：对话/立绘/背景/CG/精灵覆盖层/转场/BGM/选项/Wait 时序均可用，画廊 + Debug 键
 
 ---
 
@@ -118,15 +118,22 @@ bevy-vn/
 - [x] 用户点击推进到下一句
 - [x] 示例脚本数据驱动测试
 
-### Phase 3: 对话 + 立绘 + 背景 ✅
+### Phase 3: 对话 + 立绘 + 背景 + 精灵覆盖层 + 转场 ✅
 - [x] 立绘系统（显示/隐藏/切换/表情/位置）— 3 slot pooled entities, on-demand AssetServer loading
-- [x] 背景系统（图片切换/双缓冲）— dual-buffer for future cross-fade
+- [x] 背景系统（图片切换/双缓冲）— dual-buffer for cross-fade
 - [x] CG 全屏显示 — overlay entity (ZIndex 2), auto-cleanup on hide
-- [ ] 过渡动画（淡入淡出）— deferred to Phase 7
+- [x] 全屏转场（Fadeout/Blackout/WhiteoutBySA）— ScreenOverlayRoot + OverlayTween (ease-out-quad)
+- [x] 精灵覆盖层系统（DrawSprite/FadeSprite/MoveSprite）— ZIndex capped at 2, alpha via ImageNode.color
+- [x] 旁白覆盖层 — 改为走 DrawSprite（_tx 触发 narration_wait），删除了 NarrationOverlay 资源
+- [x] 旁白自动推进 — DrawSprite _tx → Wait 自动设 timer 推进
+- [x] 精灵居中 — SpriteAnchor + Assets<Image> 纹理尺寸驱动，同步 SpriteTween
 - [x] 角色立绘精灵加载 — on-demand + TextureCache
+- [x] ObjFileIndex — 扫描 root/image/obj/ → RON 文件，运行时 O(1) HashMap 查询
 
 ### Phase 4: 音频 + 选项 ✅
 - [x] BGM 播放/停止（PlaybackSettings::LOOP, AudioSink volume control）
+- [x] BGM 拼接（_a + _b.ogg → rodio PCM 拼接 → WAV 循环）
+- [x] BGM 执行顺序修复（handle_play_bgm → process_pending_bgm 同帧有序，`.chain()` 保证）
 - [x] SE 播放（PlaybackSettings::DESPAWN, auto-cleanup）
 - [x] 语音播放（flat file path, DESPAWN mode）
 - [ ] 音量控制（Settings 已定义字段, UI deferred to Phase 7）
@@ -137,23 +144,25 @@ bevy-vn/
 - [x] 存档文件 I/O（JSON 序列化到 saves/ 目录）
 - [x] 存档/读档 UI 界面（15 槽网格，ZIndex 5，确认对话框）
 - [x] Menu 状态（Escape 切换，Save/Load/Settings/Gallery/Title 按钮）
+- [x] 存档缩略图（CG 原图裁剪 256×144 PNG，通过 image crate 实时处理）
 - [ ] 自动存档/快速存档（deferred）
-- [ ] 存档缩略图（placeholder, capture deferred）
 
 ### Phase 6: 好感度 + 画廊 ✅
 - [x] AffectionCondition 脚本命令（基于 AffectionMap 分支）
 - [x] UnlockCg 脚本命令（显式解锁 CG）
 - [x] ShowCg 自动解锁 CG
-- [x] 画廊界面（3 列网格，ZIndex 5，缩略图/锁定占位符）
+- [x] 画廊界面（3×3 网格，ZIndex 5，缩略图/锁定占位符）
 - [x] 全屏 CG 查看（点击/Escape 关闭）
-- [x] Back 按钮返回 Menu
+- [x] 分页导航（左右箭头，Page x/Total 文字）
+- [x] Debug 解锁键（Gallery 界面按 U 解锁全部 357 张 CG）
 
 ### Phase 7: 设置 + 打磨 ✅
 - [x] Settings interactivity (sliders + toggles wired to runtime)
 - [x] 过渡动画系统 (BG cross-fade, FG/CG fade, state fade-to-black)
+- [x] 窗口控制（Window/DisableWindow/EnableWindow/ChangeWindowColor/ChangeWindowDesign）
+- [x] 对话框 ZIndex 3，菜单 ZIndex 5，精灵覆盖层 ZIndex 2（正确层级）
+- [x] Wait 命令时序修复：非 skip 模式下都会暂停指定时长（不再只作用于 auto/narration）
 - [ ] Android 适配 (deferred to sub-phase)
-
-### Phase 8: artemis-export 转换工具
 - [ ] .asb 二进制解析器
 - [ ] Lua 配置提取器
 - [ ] 批量转换 pipeline
