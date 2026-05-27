@@ -12,7 +12,7 @@ mod choice_messages;
 mod script;
 
 use state::AppState;
-use resources::GameFont;
+use resources::{GameFont, ObjFileIndex};
 use script::ScriptEngine;
 use plugins::audio::AudioPlugin;
 use plugins::title::TitlePlugin;
@@ -61,7 +61,8 @@ fn main() {
         .add_plugins(ScreenTransitionPlugin)
         .add_plugins(BacklogPlugin)
         .add_plugins(ScrollbarPlugin)
-        .add_systems(Startup, startup)
+        .init_resource::<ObjFileIndex>()
+        .add_systems(Startup, (startup, load_obj_index))
         .run();
 }
 
@@ -73,4 +74,22 @@ fn startup(
     commands.spawn(Camera2d);
     commands.insert_resource(GameFont(asset_server.load("fonts/sourcehansans-medium.otf")));
     next_state.set(AppState::Splash);
+}
+
+fn load_obj_index(mut index: ResMut<ObjFileIndex>) {
+    let path = std::path::Path::new("assets/scripts/obj_index.ron");
+    if path.exists() {
+        match std::fs::read_to_string(path) {
+            Ok(content) => match ron::from_str::<std::collections::HashMap<String, String>>(&content) {
+                Ok(map) => {
+                    index.0 = map;
+                    info!("Loaded obj_index.ron with {} entries", index.0.len());
+                }
+                Err(e) => warn!("Failed to parse obj_index.ron: {}", e),
+            },
+            Err(e) => warn!("Failed to read obj_index.ron: {}", e),
+        }
+    } else {
+        info!("obj_index.ron not found, using fallback path construction");
+    }
 }

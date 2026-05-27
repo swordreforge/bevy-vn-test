@@ -264,6 +264,9 @@ pub struct NarrationOverlay {
 pub struct WindowOverride(pub bool);
 
 #[derive(Resource, Default)]
+pub struct ObjFileIndex(pub std::collections::HashMap<String, String>);
+
+#[derive(Resource, Default)]
 pub struct ChoiceState {
     pub active: bool,
     pub options: Vec<crate::script::ChoiceOption>,

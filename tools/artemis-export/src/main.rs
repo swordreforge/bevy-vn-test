@@ -2,6 +2,7 @@ mod asb;
 mod lua_config;
 mod mapper;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -80,10 +81,61 @@ fn main() -> Result<()> {
         converted += 1;
     }
 
+    eprintln!("[3/4] Building obj file index...");
+    write_obj_index(&input_root, &output_dir)
+        .context("Failed to write obj_index.ron")?;
+
     eprintln!(
-        "[3/3] Done: {} converted, {} skipped",
+        "[4/4] Done: {} converted, {} skipped",
         converted, skipped
     );
+    Ok(())
+}
+
+fn build_obj_index(input_root: &Path) -> HashMap<String, String> {
+    let mut entries = Vec::new();
+    let obj_dir = input_root.join("image/obj");
+    if !obj_dir.exists() {
+        eprintln!("  [warn] obj directory not found: {:?}", obj_dir);
+        return HashMap::new();
+    }
+    scan_obj_dir(&obj_dir, input_root, &mut entries);
+    entries.sort();
+    let mut map: HashMap<String, String> = HashMap::new();
+    for (stem, rel) in entries {
+        map.entry(stem).or_insert(rel);
+    }
+    map
+}
+
+fn scan_obj_dir(dir: &Path, input_root: &Path, entries: &mut Vec<(String, String)>) {
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for entry in rd.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                scan_obj_dir(&path, input_root, entries);
+            } else if path.is_file() {
+                let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else { continue };
+                let rel_path = path.strip_prefix(input_root).unwrap_or(&path);
+                let rel = rel_path.to_string_lossy().replace('\\', "/");
+                entries.push((stem.to_string(), rel));
+            }
+        }
+    }
+}
+
+fn write_obj_index(input_root: &Path, output_dir: &Path) -> Result<()> {
+    let map = build_obj_index(input_root);
+    if map.is_empty() {
+        eprintln!("  [skip] obj_index.ron (0 entries)");
+        return Ok(());
+    }
+    let ron_str = ron::ser::to_string_pretty(&map, ron::ser::PrettyConfig::default())
+        .context("RON serialization of obj index failed")?;
+    let output_path = output_dir.join("scripts/obj_index.ron");
+    std::fs::write(&output_path, &ron_str)
+        .with_context(|| format!("Failed to write obj_index.ron: {:?}", output_path))?;
+    eprintln!("  -> obj_index.ron with {} entries", map.len());
     Ok(())
 }
 

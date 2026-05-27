@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::components::*;
 use crate::state::AppState;
-use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
+use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, ObjFileIndex, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
 use crate::script::{FgPosition, Transition};
 use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowFaceMessage, HideFaceMessage,
@@ -593,14 +593,18 @@ fn handle_draw_sprite(
     mut cache: ResMut<TextureCache>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
+    obj_index: Res<ObjFileIndex>,
 ) {
     for msg in msg.read() {
-        let path = if msg.file.contains('.') {
-            msg.file.clone()
-        } else {
-            format!("{}.png", msg.file)
-        };
-        let full_path = format!("images/obj/{}", path);
+        let stem = msg.file.trim_end_matches(".png").trim_end_matches(".jpg");
+        let full_path = obj_index.0.get(stem).cloned().unwrap_or_else(|| {
+            let path = if msg.file.contains('.') {
+                msg.file.clone()
+            } else {
+                format!("{}.png", msg.file)
+            };
+            format!("images/obj/{}", path)
+        });
         let handle = cache.cache.entry(full_path.clone()).or_insert_with(|| {
             asset_server.load(&full_path)
         }).clone();
