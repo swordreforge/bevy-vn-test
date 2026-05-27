@@ -762,6 +762,7 @@ fn process_advance(
                             step_idx: 0,
                             pen_entity: None,
                             name_entity: None,
+                            mask_material: None,
                             scene_entities: Vec::new(),
                             entry,
                             tween_entry,
