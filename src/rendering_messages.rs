@@ -94,3 +94,22 @@ pub struct MoveSpriteMessage {
     #[allow(dead_code)]
     pub wait: bool,
 }
+
+#[derive(Message)]
+pub struct AnimateSpriteMessage {
+    pub id: String,
+    pub file: String,
+    pub max: u32,
+    pub frame_time: u64,
+    pub style: u32,
+    pub x: f32,
+    pub y: f32,
+    pub z: i32,
+    pub anchor_x: f32,
+    pub anchor_y: f32,
+    pub rotation: f32,
+    pub draw: u32,
+    pub alpha: i32,
+    pub priority: i32,
+    pub wait: bool,
+}

@@ -209,3 +209,12 @@ pub struct BgScroll {
     pub start_y: f32,
     pub end_y: f32,
 }
+
+#[derive(Component)]
+pub struct AnimatedSprite {
+    pub frames: Vec<Handle<Image>>,
+    pub current_frame: usize,
+    pub timer: Timer,
+    pub max_frames: usize,
+    pub finished: bool,
+}
