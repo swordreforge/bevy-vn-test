@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::ui::widget::ImageNodeSize;
 use crate::components::*;
 use crate::state::AppState;
 use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, ObjFileIndex, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
@@ -80,6 +81,7 @@ impl Plugin for RenderingPlugin {
                 handle_fade_sprite,
                 handle_move_sprite,
                 update_sprite_tweens,
+                center_sprite_overlays,
                 update_overlay_tween,
             ).chain().run_if(in_state(AppState::Gameplay)));
     }
@@ -614,11 +616,26 @@ fn handle_draw_sprite(
         let rot_rad = msg.rotation.to_radians();
         let has_fade_in = msg.time > 0;
 
+        if msg.file.contains("_tx") {
+            for (_, entity) in overlay_mgr.sprites.drain() {
+                commands.entity(entity).despawn();
+            }
+        }
+
         if let Some(&entity) = overlay_mgr.sprites.get(&msg.id) {
             if let Ok(mut entry) = commands.get_entity(entity) {
-                entry.insert(ImageNode::new(handle.clone()));
-                entry.insert(BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha)));
+                entry.insert(ImageNode {
+                    image: handle.clone(),
+                    color: Color::srgba(1.0, 1.0, 1.0, alpha),
+                    ..default()
+                });
                 entry.insert(Transform::from_scale(Vec3::splat(scale)).with_rotation(Quat::from_rotation_z(rot_rad)));
+                entry.insert(SpriteAnchor {
+                    anchor_x: msg.anchor_x,
+                    anchor_y: msg.anchor_y,
+                    target_x: msg.x,
+                    target_y: msg.y,
+                });
             }
         } else {
             let blend = match msg.blend_mode {
@@ -637,11 +654,20 @@ fn handle_draw_sprite(
                     top: Val::Px(msg.y),
                     ..default()
                 },
-                ImageNode::new(handle.clone()),
-                BackgroundColor(Color::srgba(1.0, 1.0, 1.0, if has_fade_in { 0.0 } else { alpha })),
+                ImageNode {
+                    image: handle.clone(),
+                    color: Color::srgba(1.0, 1.0, 1.0, alpha),
+                    ..default()
+                },
+                SpriteAnchor {
+                    anchor_x: msg.anchor_x,
+                    anchor_y: msg.anchor_y,
+                    target_x: msg.x,
+                    target_y: msg.y,
+                },
                 Transform::from_scale(Vec3::splat(scale)).with_rotation(Quat::from_rotation_z(rot_rad)),
                 Visibility::Visible,
-                ZIndex(1 + msg.priority.max(0) as i32),
+                ZIndex((1 + msg.priority.max(0) as i32).min(2)),
             ));
             if has_fade_in {
                 let dur = (msg.time as f32 / 1000.0).max(0.016);
@@ -649,7 +675,7 @@ fn handle_draw_sprite(
                     timer: Timer::from_seconds(dur, TimerMode::Once),
                     start_x: msg.x, end_x: msg.x,
                     start_y: msg.y, end_y: msg.y,
-                    start_alpha: 0.0, end_alpha: alpha,
+                    start_alpha: alpha, end_alpha: 1.0,
                     start_scale: scale, end_scale: scale,
                     kind: TweenKind::FadeIn,
                 });
@@ -688,16 +714,17 @@ fn handle_move_sprite(
     mut msg: MessageReader<MoveSpriteMessage>,
     overlay_mgr: Res<SpriteOverlayManager>,
     mut commands: Commands,
-    query: Query<(&Node, Option<&Transform>), With<SpriteOverlay>>,
+    query: Query<(&Node, &ImageNode, Option<&Transform>), With<SpriteOverlay>>,
 ) {
     for msg in msg.read() {
         if let Some(&entity) = overlay_mgr.sprites.get(&msg.id) {
             let dur = (msg.time as f32 / 1000.0).max(0.016);
-            let (start_x, start_y, start_alpha, start_scale) = query.get(entity).map(|(node, tf)| {
+            let (start_x, start_y, start_alpha, start_scale) = query.get(entity).map(|(node, image, tf)| {
                 let x = match node.left { Val::Px(v) => v, _ => 0.0 };
                 let y = match node.top { Val::Px(v) => v, _ => 0.0 };
+                let a = image.color.alpha();
                 let s = tf.and_then(|t| Some(t.scale.x)).unwrap_or(1.0);
-                (x, y, 1.0, s)
+                (x, y, a, s)
             }).unwrap_or((0.0, 0.0, 1.0, 1.0));
             let target_alpha = (msg.alpha as f32 / 255.0).clamp(0.0, 1.0);
             let end_scale = sprite_depth_scale(msg.z);
@@ -721,9 +748,9 @@ fn update_sprite_tweens(
     time: Res<Time>,
     mut commands: Commands,
     mut overlay_mgr: ResMut<SpriteOverlayManager>,
-    mut query: Query<(Entity, &mut SpriteTween, &mut Node, &mut BackgroundColor, &mut Transform, Option<&SpriteOverlay>)>,
+    mut query: Query<(Entity, &mut SpriteTween, &mut Node, &mut ImageNode, &mut Transform, Option<&SpriteOverlay>)>,
 ) {
-    for (entity, mut tween, mut node, mut bg, mut tf, overlay) in &mut query {
+    for (entity, mut tween, mut node, mut image, mut tf, overlay) in &mut query {
         tween.timer.tick(time.delta());
         let t = tween.timer.fraction();
         let eased = 1.0 - (1.0 - t) * (1.0 - t); // ease-out quad
@@ -731,7 +758,7 @@ fn update_sprite_tweens(
         node.left = Val::Px(tween.start_x + (tween.end_x - tween.start_x) * eased);
         node.top = Val::Px(tween.start_y + (tween.end_y - tween.start_y) * eased);
         let alpha = tween.start_alpha + (tween.end_alpha - tween.start_alpha) * eased;
-        bg.0 = Color::srgba(1.0, 1.0, 1.0, alpha);
+        image.color.set_alpha(alpha);
         let s = tween.start_scale + (tween.end_scale - tween.start_scale) * eased;
         tf.scale = Vec3::splat(s);
 
@@ -746,11 +773,26 @@ fn update_sprite_tweens(
                 TweenKind::FadeIn | TweenKind::Move => {
                     node.left = Val::Px(tween.end_x);
                     node.top = Val::Px(tween.end_y);
-                    bg.0 = Color::srgba(1.0, 1.0, 1.0, tween.end_alpha);
+                    image.color.set_alpha(tween.end_alpha);
                     tf.scale = Vec3::splat(tween.end_scale);
                     commands.entity(entity).remove::<SpriteTween>();
                 }
             }
+        }
+    }
+}
+
+fn center_sprite_overlays(
+    mut query: Query<(Entity, &mut Node, &SpriteAnchor, &ImageNodeSize)>,
+    mut commands: Commands,
+) {
+    for (entity, mut node, anchor, size) in &mut query {
+        let w = size.size().x as f32;
+        let h = size.size().y as f32;
+        if w > 0.0 && h > 0.0 {
+            node.left = Val::Px(anchor.target_x - anchor.anchor_x * w);
+            node.top = Val::Px(anchor.target_y - anchor.anchor_y * h);
+            commands.entity(entity).remove::<SpriteAnchor>();
         }
     }
 }

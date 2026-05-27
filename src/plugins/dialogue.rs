@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use crate::components::*;
-use crate::resources::{DialogueState, GameFont, NarrationOverlay, Settings, WindowOverride};
-use crate::script::ScriptEngine;
+use crate::resources::{DialogueState, GameFont, Settings, WindowOverride};
 use crate::state::AppState;
 
 #[derive(Resource, Default)]
@@ -13,10 +12,8 @@ impl Plugin for DialoguePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DialogueState>()
             .init_resource::<DialogueInitialized>()
-            .init_resource::<NarrationOverlay>()
             .add_systems(OnEnter(AppState::Gameplay), setup_dialogue_ui)
             .add_systems(Update, (
-                handle_narration_overlay,
                 update_dialogue,
                 apply_window_appearance,
             ).chain().run_if(in_state(AppState::Gameplay)))
@@ -108,19 +105,10 @@ fn setup_dialogue_ui(
 
 fn hide_dialogue(
     mut hide_query: Query<&mut Visibility, With<DialogueUiRoot>>,
-    mut overlay: ResMut<NarrationOverlay>,
-    mut commands: Commands,
 ) {
     for mut vis in hide_query.iter_mut() {
         *vis = Visibility::Hidden;
     }
-    if let Some(entity) = overlay.entity.take() {
-        if let Ok(mut cmd) = commands.get_entity(entity) {
-            cmd.despawn();
-        }
-    }
-    overlay.current_file = None;
-    overlay.active = false;
 }
 
 fn cleanup_dialogue(
@@ -140,7 +128,6 @@ fn cleanup_dialogue(
 
 fn update_dialogue(
     state: Res<DialogueState>,
-    overlay: Res<NarrationOverlay>,
     window_override: Res<WindowOverride>,
     mut text_query: Query<&mut Text, (With<DialogueTextDisplay>, Without<SpeakerNameDisplay>)>,
     mut speaker_query: Query<&mut Text, (With<SpeakerNameDisplay>, Without<DialogueTextDisplay>)>,
@@ -148,7 +135,7 @@ fn update_dialogue(
 ) {
     if let Ok(mut root_vis) = root_query.single_mut() {
         if !window_override.0 {
-            *root_vis = if state.current_text.is_empty() || overlay.active {
+            *root_vis = if state.current_text.is_empty() {
                 Visibility::Hidden
             } else {
                 Visibility::Visible
@@ -189,56 +176,4 @@ fn apply_window_appearance(
     }
 }
 
-fn handle_narration_overlay(
-    state: Res<DialogueState>,
-    engine: Res<ScriptEngine>,
-    mut overlay: ResMut<NarrationOverlay>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
-    let is_narration = state.current_speaker.is_none() && !state.current_text.is_empty();
 
-    let target_file = if is_narration {
-        let script_num = engine.current_script.strip_prefix("aiy").unwrap_or(&engine.current_script);
-        let file = format!("images/obj/dic/aiy{}_tx{:02}.png", script_num, engine.dialogue_idx);
-        let path = format!("assets/{}", file);
-        if std::path::Path::new(&path).exists() { Some(file) } else { None }
-    } else {
-        None
-    };
-
-    if overlay.current_file.as_deref() == target_file.as_deref() {
-        return;
-    }
-
-    if let Some(entity) = overlay.entity.take() {
-        if let Ok(mut cmd) = commands.get_entity(entity) {
-            cmd.despawn();
-        }
-    }
-    overlay.current_file = None;
-    overlay.active = false;
-
-    if let Some(file) = target_file {
-        let handle = asset_server.load(&file);
-        let entity = commands.spawn((
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                position_type: PositionType::Absolute,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            ZIndex(4),
-        )).with_children(|parent| {
-            parent.spawn((
-                ImageNode::new(handle),
-                Node::default(),
-            ));
-        }).id();
-        overlay.entity = Some(entity);
-        overlay.current_file = Some(file);
-        overlay.active = true;
-    }
-}

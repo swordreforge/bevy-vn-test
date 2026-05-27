@@ -172,3 +172,11 @@ pub enum TweenKind {
     FadeIn,
     Move,
 }
+
+#[derive(Component)]
+pub struct SpriteAnchor {
+    pub anchor_x: f32,
+    pub anchor_y: f32,
+    pub target_x: f32,
+    pub target_y: f32,
+}

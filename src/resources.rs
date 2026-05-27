@@ -254,13 +254,6 @@ pub struct VoiceManager {
 }
 
 #[derive(Resource, Default)]
-pub struct NarrationOverlay {
-    pub entity: Option<Entity>,
-    pub current_file: Option<String>,
-    pub active: bool,
-}
-
-#[derive(Resource, Default)]
 pub struct WindowOverride(pub bool);
 
 #[derive(Resource, Default)]
