@@ -206,6 +206,34 @@ pub enum ScriptCmd {
         fade: u64,
         wait: bool,
     },
+    AnimateSprite {
+        id: String,
+        file: String,
+        max: u32,
+        frame_time: u64,
+        style: u32,
+        x: f32,
+        y: f32,
+        z: i32,
+        anchor_x: f32,
+        anchor_y: f32,
+        rotation: f32,
+        draw: u32,
+        alpha: i32,
+        priority: i32,
+        wait: bool,
+    },
+    View {
+        char_id: String,
+    },
+    SetGlobalFlag {
+        index: u32,
+        value: i32,
+    },
+    RouteFlag,
+    GameMode {
+        mode: u32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -239,6 +267,7 @@ pub struct ScriptEngine {
     pub current_line: usize,
     pub call_stack: Vec<(String, usize)>,
     pub flags: HashMap<String, i32>,
+    pub global_flags: HashMap<u32, i32>,
     pub scripts: HashMap<String, Vec<ScriptCmd>>,
     pub dialogue_idx: usize,
 }
