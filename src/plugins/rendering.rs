@@ -953,8 +953,8 @@ fn handle_animate_sprite(
 
         let blend = match msg.draw {
             1 => SpriteBlendMode::Add,
-            3 => SpriteBlendMode::Multiply,
-            4 => SpriteBlendMode::Screen,
+            2 => SpriteBlendMode::Multiply,
+            3 => SpriteBlendMode::Screen,
             _ => SpriteBlendMode::Normal,
         };
 
