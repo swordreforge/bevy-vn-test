@@ -53,6 +53,7 @@ pub struct ScrollBgMessage {
     pub x2: f32,
     pub y2: f32,
     pub fade: u64,
+    #[allow(dead_code)]
     pub wait: bool,
 }
 
