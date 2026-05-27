@@ -46,6 +46,17 @@ pub struct HideCgMessage {
 }
 
 #[derive(Message)]
+pub struct ScrollBgMessage {
+    pub file: String,
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32,
+    pub fade: u64,
+    pub wait: bool,
+}
+
+#[derive(Message)]
 pub struct DrawSpriteMessage {
     pub id: String,
     pub file: String,
