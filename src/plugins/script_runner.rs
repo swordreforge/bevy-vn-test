@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
-use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase, Settings, SpriteOverlayManager, UnlockState};
+use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase, QuakeState, Settings, SpriteOverlayManager, UnlockState};
 use crate::audio_messages::{
     PlayBgmMessage, StopBgmMessage, PlaySeMessage, PlayVoiceMessage,
 };
@@ -325,6 +325,34 @@ fn process_advance(
                             stop_bgm_writer.write(StopBgmMessage { id, fade_out });
                         }
                     }
+                    Some(ScriptCmd::BgmVol { channel: _, volume }) => {
+                        let vol = match volume.as_str() {
+                            "MIN" => 0.0,
+                            "LOW" => 30.0 / 128.0,
+                            "NORM" => 80.0 / 128.0,
+                            _ => 1.0,
+                        };
+                        commands.queue(move |world: &mut World| {
+                            let mut settings = world.resource_mut::<Settings>();
+                            settings.bgm_volume = vol;
+                        });
+                    }
+                    Some(ScriptCmd::Flash { color, time, alpha }) => {
+                        for (entity, mut bg, mut vis) in overlay_query.iter_mut() {
+                            let base = match color {
+                                OverlayColor::Black => Color::srgba(0.0, 0.0, 0.0, 1.0),
+                                OverlayColor::White => Color::srgba(1.0, 1.0, 1.0, 1.0),
+                            };
+                            *bg = BackgroundColor(base);
+                            *vis = Visibility::Visible;
+                            let start = alpha as f32 / 255.0;
+                            commands.entity(entity).insert(OverlayTween {
+                                timer: Timer::from_seconds(time as f32 / 1000.0, TimerMode::Once),
+                                start_alpha: start,
+                                end_alpha: 0.0,
+                            });
+                        }
+                    }
                     Some(ScriptCmd::PlaySe { file, volume }) => {
                         play_se_writer.write(PlaySeMessage { file, volume });
                     }
@@ -518,6 +546,40 @@ fn process_advance(
                 Some(ScriptCmd::PlayVoice { file }) => {
                     pending_voice = Some(file.clone());
                     play_voice_writer.write(PlayVoiceMessage { file, volume: None });
+                }
+                Some(ScriptCmd::BgmVol { channel: _, volume }) => {
+                    let vol = match volume.as_str() {
+                        "MIN" => 0.0,
+                        "LOW" => 30.0 / 128.0,
+                        "NORM" => 80.0 / 128.0,
+                        _ => 1.0,
+                    };
+                    commands.queue(move |world: &mut World| {
+                        let mut settings = world.resource_mut::<Settings>();
+                        settings.bgm_volume = vol;
+                    });
+                }
+                Some(ScriptCmd::Flash { color, time, alpha }) => {
+                    for (entity, mut bg, mut vis) in overlay_query.iter_mut() {
+                        let base = match color {
+                            OverlayColor::Black => Color::srgba(0.0, 0.0, 0.0, 1.0),
+                            OverlayColor::White => Color::srgba(1.0, 1.0, 1.0, 1.0),
+                        };
+                        *bg = BackgroundColor(base);
+                        *vis = Visibility::Visible;
+                        let start = alpha as f32 / 255.0;
+                        commands.entity(entity).insert(OverlayTween {
+                            timer: Timer::from_seconds(time as f32 / 1000.0, TimerMode::Once),
+                            start_alpha: start,
+                            end_alpha: 0.0,
+                        });
+                    }
+                }
+                Some(ScriptCmd::Quake { power, time }) => {
+                    commands.insert_resource(QuakeState {
+                        timer: Some(Timer::from_seconds(time as f32 / 1000.0, TimerMode::Once)),
+                        intensity: power,
+                    });
                 }
                 Some(ScriptCmd::Choice { options }) => {
                     choice_state.active = true;

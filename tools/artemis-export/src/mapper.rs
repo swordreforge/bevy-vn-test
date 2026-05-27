@@ -168,6 +168,11 @@ fn map_command(
             };
             Some(vec![ScriptCmd::StopBgm { id: None, fade_out }])
         }
+        "BgmVol" => {
+            let channel = cmd.attrs.get("0").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let volume = cmd.attrs.get("1").cloned().unwrap_or("HIGH".into());
+            Some(vec![ScriptCmd::BgmVol { channel, volume }])
+        }
         "SEPlay" => {
             let file = cmd.attrs.get("0")?;
             Some(vec![ScriptCmd::PlaySe {
@@ -243,6 +248,18 @@ fn map_command(
             let design = cmd.attrs.get("0").and_then(|s| s.parse().ok()).unwrap_or(0);
             Some(vec![ScriptCmd::ChangeWindowDesign { design }])
         }
+        "Quake" => {
+            let power = cmd.attrs.get("0").and_then(|s| s.parse().ok()).unwrap_or(5.0);
+            let time = cmd.attrs.get("1").and_then(|s| s.parse().ok()).unwrap_or(500);
+            Some(vec![ScriptCmd::Quake { power, time }])
+        }
+        "Flash" => {
+            let color_val = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let color = if color_val == 0 { OverlayColor::White } else { OverlayColor::Black };
+            let time = cmd.attrs.get("1").and_then(|s| s.parse().ok()).unwrap_or(500);
+            let alpha = cmd.attrs.get("2").and_then(|s| s.parse().ok()).unwrap_or(128);
+            Some(vec![ScriptCmd::Flash { color, time, alpha }])
+        }
         _ => None,
     }
 }
@@ -257,6 +274,17 @@ fn map_calllua(cmd: &AsbCommand, _config: &crate::lua_config::GameConfig) -> Opt
                 transition: None,
                 duration: None,
             }])
+        }
+        s if s.contains("ChangeVolumeOfBGM") || s.contains("bgm_fade") => {
+            let channel = cmd.attrs.get("0").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let vol_val = cmd.attrs.get("1").and_then(|s| s.parse::<u32>().ok()).unwrap_or(80);
+            let volume = match vol_val {
+                0 => "MIN",
+                30 => "LOW",
+                80 => "NORM",
+                _ => "HIGH",
+            }.to_string();
+            Some(vec![ScriptCmd::BgmVol { channel, volume }])
         }
         s if s.contains("bgm_play") => {
             let id = cmd.attrs.get("file")?;

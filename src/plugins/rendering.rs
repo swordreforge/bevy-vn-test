@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::components::*;
 use crate::state::AppState;
-use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, ObjFileIndex, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
+use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, ObjFileIndex, QuakeState, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
 use crate::script::{FgPosition, Transition};
 use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowFaceMessage, HideFaceMessage,
@@ -61,6 +61,7 @@ impl Plugin for RenderingPlugin {
             .init_resource::<TextureCache>()
             .init_resource::<SpriteOverlayManager>()
             .init_resource::<RenderingInitialized>()
+            .init_resource::<QuakeState>()
             .add_systems(OnEnter(AppState::Gameplay), setup_rendering)
             .add_systems(OnEnter(AppState::Title), cleanup_rendering)
             .add_systems(Update, (
@@ -82,6 +83,7 @@ impl Plugin for RenderingPlugin {
                 update_sprite_tweens,
                 center_sprite_overlays,
                 update_overlay_tween,
+                quake_update,
             ).chain().run_if(in_state(AppState::Gameplay)));
     }
 }
@@ -831,6 +833,33 @@ fn update_overlay_tween(
                 commands.entity(entity).insert(Visibility::Hidden);
             }
             commands.entity(entity).remove::<OverlayTween>();
+        }
+    }
+}
+
+fn quake_update(
+    time: Res<Time>,
+    mut quake: ResMut<QuakeState>,
+    mut camera_query: Query<&mut Transform, With<Camera2d>>,
+) {
+    let Some(ref mut timer) = quake.timer else {
+        return;
+    };
+    timer.tick(time.delta());
+    let progress = timer.fraction();
+    let decay = 1.0 - progress;
+    let intensity = quake.intensity * decay;
+
+    if let Ok(mut transform) = camera_query.single_mut() {
+        if intensity > 0.5 {
+            let offset_x = (rand::random::<f32>() - 0.5) * 2.0 * intensity;
+            let offset_y = (rand::random::<f32>() - 0.5) * 2.0 * intensity;
+            transform.translation.x = offset_x;
+            transform.translation.y = offset_y;
+        } else {
+            transform.translation.x = 0.0;
+            transform.translation.y = 0.0;
+            quake.timer = None;
         }
     }
 }

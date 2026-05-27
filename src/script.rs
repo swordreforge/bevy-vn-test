@@ -167,6 +167,19 @@ pub enum ScriptCmd {
     ChangeWindowDesign {
         design: i32,
     },
+    BgmVol {
+        channel: u32,
+        volume: String,
+    },
+    Quake {
+        power: f32,
+        time: u64,
+    },
+    Flash {
+        color: OverlayColor,
+        time: u64,
+        alpha: u8,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

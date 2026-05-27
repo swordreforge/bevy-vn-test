@@ -269,6 +269,12 @@ pub struct ChoiceState {
 pub struct IntroPhase(pub bool);
 
 #[derive(Resource, Default)]
+pub struct QuakeState {
+    pub timer: Option<Timer>,
+    pub intensity: f32,
+}
+
+#[derive(Resource, Default)]
 pub struct SaveLoadMode(pub bool); // true = Save, false = Load
 
 #[derive(Resource, Default)]

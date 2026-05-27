@@ -236,7 +236,7 @@ fn setup_gallery(
                 },
                 BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
             )).with_child((
-                Text::new(if safe_mode.0 { "[☑] Safe Mode" } else { "[☐] Safe Mode" }),
+                Text::new(if safe_mode.0 { "[x] Safe Mode" } else { "[ ] Safe Mode" }),
                 TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
                 TextColor(Color::srgb(0.7, 0.7, 0.8)),
                 SafeModeLabel,
@@ -520,7 +520,7 @@ fn handle_safe_mode_toggle(
     }
 
     for mut text in &mut label_query {
-        text.0 = if safe_mode.0 { "[☑] Safe Mode".to_string() } else { "[☐] Safe Mode".to_string() };
+        text.0 = if safe_mode.0 { "[x] Safe Mode".to_string() } else { "[ ] Safe Mode".to_string() };
     }
 }
 
