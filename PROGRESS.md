@@ -164,6 +164,10 @@ bevy-vn/
 - [x] 窗口控制（Window/DisableWindow/EnableWindow/ChangeWindowColor/ChangeWindowDesign）
 - [x] 对话框 ZIndex 3，菜单 ZIndex 5，精灵覆盖层 ZIndex 2（正确层级）
 - [x] Wait 命令时序修复：非 skip 模式下都会暂停指定时长（不再只作用于 auto/narration）
+- [x] BgmVol — BGM 音量实时控制（MIN/LOW/NORM/HIGH 映射到 0~1）
+- [x] Quake — 屏幕震动（Camera2d 随机偏移，强度随时间衰减）
+- [x] Flash — 全屏闪光（复用 ScreenOverlayRoot + OverlayTween，支持颜色/透明度/时长）
+- [x] LoopSE / StopStreamingSE — 循环SE系统（SeManager 追踪 channel→Entity，LOOP 模式播放，定向停止）
 - [ ] Android 适配 (deferred to sub-phase)
 - [ ] .asb 二进制解析器
 - [ ] Lua 配置提取器

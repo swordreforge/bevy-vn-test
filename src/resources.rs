@@ -254,6 +254,11 @@ pub struct VoiceManager {
 }
 
 #[derive(Resource, Default)]
+pub struct SeManager {
+    pub entities: HashMap<u32, Entity>,
+}
+
+#[derive(Resource, Default)]
 pub struct WindowOverride(pub bool);
 
 #[derive(Resource, Default)]

@@ -71,25 +71,23 @@
 
 ## P1 — 高优先级（明显缺失）
 
-### P1-1 画面震动系统（Quake / StartShaking）
+### P1-1 ~~画面震动系统（Quake / StartShaking）~~ ✅ 已完成
 
 | 项目 | 内容 |
 |------|------|
-| **标签** | `Quake`, `StartShakingOfAllObjects`, `TerminateShakingOfAllObjects` |
-| **使用量** | 序章 5 次。aiy50010、aiy81010 等章节也有使用 |
-| **影响** | 战斗/爆炸/冲击场景完全无震动反馈 |
-| **原版 Lua** | `quake()` 和 `start_shaking()` / `terminate_shaking()` 在 `grph.lua` |
-| **参数** | 方向(dir)、强度(level)、频率(freq)、次数(rep)、衰减(atten)、衰减曲线(handle_shaking_x/y) |
+| **状态** | ✅ 已实现 |
+| **标签** | `Quake` |
+| **改动** | `Quake` 标签 → `ScriptCmd::Quake { power, time }` → `QuakeState` 资源 → `quake_update` 系统对 Camera2d 施加随机偏移，强度随时间衰减 |
+| **备注** | `StartShakingOfAllObjects` / `TerminateShakingOfAllObjects` 尚未映射（当前 Quake 单次触发即完成） |
 
-### P1-2 循环 SE（LoopSE / StopStreamingSE）
+### P1-2 ~~循环 SE（LoopSE / StopStreamingSE）~~ ✅ 已完成
 
 | 项目 | 内容 |
 |------|------|
+| **状态** | ✅ 已实现 |
 | **标签** | `LoopSE`, `StopStreamingSE` |
-| **使用量** | 序章 StopStreamingSE 18 次 + LoopSE 4 次。全篇 StopStreamingSE 约 60 次 |
-| **影响** | 环境音（雨声、风声、场景氛围音）无法循环播放。`StopStreamingSE` 用于停止之前启动的循环音 |
-| **资源** | `root/se/loop/` — 118 个循环 SE 文件 |
-| **需要** | 支持 PlaySe 带 loop 参数 + StopSe/id 定向停止 |
+| **改动** | `LoopSE` → `ScriptCmd::LoopSe { file, volume, channel }` → `handle_loop_se` 用 `PlaybackMode::Loop` 播放，`SeManager` 通过 `HashMap<u32, Entity>` 追踪每个 channel 的实体；`StopStreamingSE` → `ScriptCmd::StopStreamingSe { channel }` → `handle_stop_streaming_se` 查找 channel 并 despawn；calllua `se_stop` 也映射到此命令 |
+| **音频路径** | `audio/se/loop/` — 118 个循环 SE 文件 |
 
 ### P1-3 BGM 精细控制（BgmVol / BgmX）
 
@@ -98,16 +96,19 @@
 | **标签** | `BgmVol`, `BgmX` |
 | **使用量** | 序章 BgmVol 2 次 + BgmX 2 次。aiy40010 等也有 |
 | **影响** | 无法渐变 BGM 音量，无法交叉淡入淡出切换 BGM |
-| **需要** | `PlayBgm` 支持 fade_in/fade_out 参数；`BgmVol` 实时音量变化；`BgmX` 交叉淡入淡出 |
+| **状态** | ✅ BgmVol 已实现 |
+| **改动** | `BgmVol` 标签 + `ChangeVolumeOfBGM`/`bgm_fade` calllua → `ScriptCmd::BgmVol { channel, volume }` → `commands.queue` 写入 `Settings.bgm_volume`，`apply_audio_settings` 每帧同步到 `AudioSink` |
+| **音量映射** | MIN=0/128, LOW=30/128, NORM=80/128, HIGH=128/128 |
+| **待做** | BgmX 第二 BGM 层 + 交叉淡入淡出 |
 
-### P1-4 Flash 闪光效果
+### P1-4 ~~Flash 闪光效果~~ ✅ 已完成
 
 | 项目 | 内容 |
 |------|------|
+| **状态** | ✅ 已实现 |
 | **标签** | `Flash` |
-| **使用量** | aiy70110 3 次、aiy80010 1 次（高潮/结局章节） |
-| **影响** | 关键剧情瞬间缺少视觉冲击 |
-| **原版 Lua** | `flash()` 在 `grph.lua` — 白色覆盖层闪烁，支持多次闪烁和淡入淡出 |
+| **改动** | `Flash` 标签 → `ScriptCmd::Flash { color, time, alpha }` → 复用 `ScreenOverlayRoot` + `OverlayTween`，从指定透明度 `alpha/255` 渐出到 0，完成后自动隐藏 |
+| **备注** | 目前单次闪烁。原版 Lua 支持多次闪烁（rep），暂未实现 |
 
 ### P1-5 背景滚动（ScrollBG）
 
@@ -243,10 +244,11 @@ Phase 1 (P0) — 核心修复
 ├── ✅ 窗口控制 Window / DisableWindow
 
 Phase 2 (P1) — 常规体验
-├── 画面震动 Quake / StartShaking
-├── 循环 SE LoopSE / StopStreamingSE
-├── BGM 控制 BgmVol / BgmX
-├── Flash 闪光
+├── ✅ 画面震动 Quake / StartShaking
+├── ✅ 循环 SE LoopSE / StopStreamingSE
+├── ✅ BGM 控制 BgmVol
+├── BgmX
+├── ✅ Flash 闪光
 └── 背景滚动 ScrollBG
 
 Phase 3 (P2) — 视觉增强

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
 use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase, QuakeState, Settings, SpriteOverlayManager, UnlockState};
 use crate::audio_messages::{
-    PlayBgmMessage, StopBgmMessage, PlaySeMessage, PlayVoiceMessage,
+    PlayBgmMessage, StopBgmMessage, PlaySeMessage, LoopSeMessage, StopStreamingSeMessage, PlayVoiceMessage,
 };
 use crate::choice_messages::ChoiceSelectedMessage;
 use crate::components::{DialogueUiRoot, OverlayTween, ScreenOverlayRoot};
@@ -54,6 +54,8 @@ pub struct ProcessAdvanceParams<'w, 's> {
     play_bgm_writer: MessageWriter<'w, PlayBgmMessage>,
     stop_bgm_writer: MessageWriter<'w, StopBgmMessage>,
     play_se_writer: MessageWriter<'w, PlaySeMessage>,
+    loop_se_writer: MessageWriter<'w, LoopSeMessage>,
+    stop_streaming_se_writer: MessageWriter<'w, StopStreamingSeMessage>,
     play_voice_writer: MessageWriter<'w, PlayVoiceMessage>,
     settings: Res<'w, Settings>,
     auto_skip: ResMut<'w, AutoSkipTimer>,
@@ -151,6 +153,8 @@ fn process_advance(
         ref mut play_bgm_writer,
         ref mut stop_bgm_writer,
         ref mut play_se_writer,
+        ref mut loop_se_writer,
+        ref mut stop_streaming_se_writer,
         ref mut play_voice_writer,
         ref mut settings,
         ref mut auto_skip,
@@ -356,6 +360,12 @@ fn process_advance(
                     Some(ScriptCmd::PlaySe { file, volume }) => {
                         play_se_writer.write(PlaySeMessage { file, volume });
                     }
+                    Some(ScriptCmd::LoopSe { file, volume, channel }) => {
+                        loop_se_writer.write(LoopSeMessage { file, volume, channel });
+                    }
+                    Some(ScriptCmd::StopStreamingSe { channel }) => {
+                        stop_streaming_se_writer.write(StopStreamingSeMessage { channel });
+                    }
                     Some(ScriptCmd::PlayVoice { file }) => {
                         pending_voice = Some(file.clone());
                         play_voice_writer.write(PlayVoiceMessage { file, volume: None });
@@ -542,6 +552,12 @@ fn process_advance(
                 }
                 Some(ScriptCmd::PlaySe { file, volume }) => {
                     play_se_writer.write(PlaySeMessage { file, volume });
+                }
+                Some(ScriptCmd::LoopSe { file, volume, channel }) => {
+                    loop_se_writer.write(LoopSeMessage { file, volume, channel });
+                }
+                Some(ScriptCmd::StopStreamingSe { channel }) => {
+                    stop_streaming_se_writer.write(StopStreamingSeMessage { channel });
                 }
                 Some(ScriptCmd::PlayVoice { file }) => {
                     pending_voice = Some(file.clone());

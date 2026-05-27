@@ -180,6 +180,19 @@ fn map_command(
                 volume: None,
             }])
         }
+        "LoopSE" => {
+            let channel = cmd.attrs.get("0").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let file = cmd.attrs.get("1")?;
+            Some(vec![ScriptCmd::LoopSe {
+                file: file.to_string(),
+                volume: None,
+                channel,
+            }])
+        }
+        "StopStreamingSE" => {
+            let channel = cmd.attrs.get("0").and_then(|s| s.parse().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::StopStreamingSe { channel }])
+        }
         "FadeFilm" => {
             let duration = cmd.attrs.get("0").and_then(|s| s.parse::<u64>().ok()).unwrap_or(500);
             Some(vec![ScriptCmd::ClearOverlay { time: duration }])
@@ -303,10 +316,24 @@ fn map_calllua(cmd: &AsbCommand, _config: &crate::lua_config::GameConfig) -> Opt
         }
         s if s.contains("se_play") => {
             let file = cmd.attrs.get("file")?;
-            Some(vec![ScriptCmd::PlaySe {
-                file: file.to_string(),
-                volume: None,
-            }])
+            let has_loop = cmd.attrs.get("loop").and_then(|v| v.parse::<u32>().ok()).unwrap_or(0) != 0;
+            if has_loop {
+                let channel = cmd.attrs.get("id").and_then(|s| s.parse().ok()).unwrap_or(0);
+                Some(vec![ScriptCmd::LoopSe {
+                    file: file.to_string(),
+                    volume: None,
+                    channel,
+                }])
+            } else {
+                Some(vec![ScriptCmd::PlaySe {
+                    file: file.to_string(),
+                    volume: None,
+                }])
+            }
+        }
+        s if s.contains("se_stop") => {
+            let channel = cmd.attrs.get("id").and_then(|s| s.parse().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::StopStreamingSe { channel }])
         }
         s if s.contains("voice_play") => {
             let file = cmd.attrs.get("file")?;

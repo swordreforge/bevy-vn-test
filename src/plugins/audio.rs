@@ -1,7 +1,7 @@
 use bevy::{audio::Volume, prelude::*};
 use crate::audio_messages::*;
 use crate::components::AudioType;
-use crate::resources::{BgmManager, PendingBgm, PendingBgmLoad, Settings, VoiceManager};
+use crate::resources::{BgmManager, PendingBgm, PendingBgmLoad, SeManager, Settings, VoiceManager};
 use rodio::{self, Source};
 use std::io::Cursor;
 use std::sync::Arc;
@@ -13,16 +13,21 @@ impl Plugin for AudioPlugin {
         app
             .init_resource::<BgmManager>()
             .init_resource::<VoiceManager>()
+            .init_resource::<SeManager>()
             .init_resource::<PendingBgm>()
             .add_message::<PlayBgmMessage>()
             .add_message::<StopBgmMessage>()
             .add_message::<PlaySeMessage>()
+            .add_message::<LoopSeMessage>()
+            .add_message::<StopStreamingSeMessage>()
             .add_message::<PlayVoiceMessage>()
             .add_systems(Update, (
                 handle_stop_bgm,
                 handle_play_bgm,
                 process_pending_bgm,
                 handle_play_se,
+                handle_loop_se,
+                handle_stop_streaming_se,
                 handle_play_voice,
                 apply_audio_settings,
             ).chain());
@@ -173,6 +178,48 @@ fn handle_play_se(
             PlaybackSettings::DESPAWN,
             AudioType::Se,
         ));
+    }
+}
+
+fn handle_loop_se(
+    mut reader: MessageReader<LoopSeMessage>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+    mut se: ResMut<SeManager>,
+) {
+    for msg in reader.read() {
+        if let Some(old) = se.entities.remove(&msg.channel) {
+            if let Ok(mut cmd) = commands.get_entity(old) {
+                cmd.despawn();
+            }
+        }
+        let vol = msg.volume.unwrap_or(1.0);
+        let path = format!("audio/se/{}.ogg", msg.file);
+        let handle: Handle<AudioSource> = asset_server.load(&path);
+        let entity = commands.spawn((
+            AudioPlayer(handle),
+            PlaybackSettings {
+                mode: bevy::audio::PlaybackMode::Loop,
+                volume: Volume::Linear(vol),
+                ..default()
+            },
+            AudioType::Se,
+        )).id();
+        se.entities.insert(msg.channel, entity);
+    }
+}
+
+fn handle_stop_streaming_se(
+    mut reader: MessageReader<StopStreamingSeMessage>,
+    mut commands: Commands,
+    mut se: ResMut<SeManager>,
+) {
+    for msg in reader.read() {
+        if let Some(entity) = se.entities.remove(&msg.channel) {
+            if let Ok(mut cmd) = commands.get_entity(entity) {
+                cmd.despawn();
+            }
+        }
     }
 }
 

@@ -24,6 +24,19 @@ pub struct PlaySeMessage {
 }
 
 #[derive(Message)]
+pub struct LoopSeMessage {
+    pub file: String,
+    #[allow(dead_code)]
+    pub volume: Option<f32>,
+    pub channel: u32,
+}
+
+#[derive(Message)]
+pub struct StopStreamingSeMessage {
+    pub channel: u32,
+}
+
+#[derive(Message)]
 pub struct PlayVoiceMessage {
     pub file: String,
     #[allow(dead_code)]

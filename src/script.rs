@@ -68,6 +68,14 @@ pub enum ScriptCmd {
         file: String,
         volume: Option<f32>,
     },
+    LoopSe {
+        file: String,
+        volume: Option<f32>,
+        channel: u32,
+    },
+    StopStreamingSe {
+        channel: u32,
+    },
     PlayVoice {
         file: String,
     },
