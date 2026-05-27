@@ -25,7 +25,7 @@ impl Plugin for AudioPlugin {
                 handle_play_se,
                 handle_play_voice,
                 apply_audio_settings,
-            ));
+            ).chain());
     }
 }
 
@@ -37,6 +37,7 @@ fn handle_play_bgm(
     mut pending: ResMut<PendingBgm>,
 ) {
     for msg in reader.read() {
+        info!("handle_play_bgm: id={}, volume={:?}, fade_in={:?}", msg.id, msg.volume, msg.fade_in);
         if let Some(entity) = bgm.entity.take() {
             if let Ok(mut cmd) = commands.get_entity(entity) {
                 cmd.despawn();
@@ -50,10 +51,12 @@ fn handle_play_bgm(
         let path_b = format!("audio/bgm/bgm_{}_b.ogg", msg.id);
 
         if std::path::Path::new(&format!("assets/{}", path_b)).exists() {
+            info!("handle_play_bgm: _b exists, setting up concat for {}", msg.id);
             let handle_a: Handle<AudioSource> = asset_server.load(&path_a);
             let handle_b: Handle<AudioSource> = asset_server.load(&path_b);
             pending.0 = Some(PendingBgmLoad { id: msg.id.clone(), handle_a, handle_b, volume });
         } else {
+            info!("handle_play_bgm: no _b, direct play for {}", msg.id);
             let handle: Handle<AudioSource> = asset_server.load(&path_a);
             let entity = commands.spawn((
                 AudioPlayer(handle),
@@ -76,12 +79,17 @@ fn process_pending_bgm(
     mut bgm: ResMut<BgmManager>,
 ) {
     let Some(ref p) = pending.0 else { return };
+    info!("process_pending_bgm: waiting for {} (handle_a loaded={}, handle_b loaded={})",
+        p.id,
+        assets.get(&p.handle_a).is_some(),
+        assets.get(&p.handle_b).is_some());
     let Some(ref source_a) = assets.get(&p.handle_a) else { return };
     let Some(ref source_b) = assets.get(&p.handle_b) else { return };
 
     let id = p.id.clone();
     let volume = p.volume;
 
+    info!("process_pending_bgm: both loaded, concatenating {}", id);
     let combined = concat_ogg_bytes(&source_a.bytes, &source_b.bytes);
     let combined_source = AudioSource { bytes: Arc::from(combined) };
     let handle = assets.add(combined_source);
@@ -97,7 +105,7 @@ fn process_pending_bgm(
     )).id();
     bgm.entity = Some(entity);
     pending.0 = None;
-    info!("BGM {}: concatenated _a + _b", id);
+    info!("process_pending_bgm: BGM {} concatenated and playing", id);
 }
 
 fn concat_ogg_bytes(a: &[u8], b: &[u8]) -> Vec<u8> {
@@ -150,7 +158,8 @@ fn handle_stop_bgm(
     mut bgm: ResMut<BgmManager>,
     mut pending: ResMut<PendingBgm>,
 ) {
-    for _ in reader.read() {
+    for msg in reader.read() {
+        info!("handle_stop_bgm: id={:?}, clearing pending and bgm entity", msg.id);
         pending.0 = None;
         if let Some(entity) = bgm.entity.take() {
             if let Ok(mut cmd) = commands.get_entity(entity) {

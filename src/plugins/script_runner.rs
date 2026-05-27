@@ -95,18 +95,24 @@ fn start_intro_bgm(
     mut play_bgm: MessageWriter<PlayBgmMessage>,
     mut intro: ResMut<IntroPhase>,
 ) {
+    info!("start_intro_bgm: current_line={}, current_script={}, scripts_keys={:?}",
+        engine.current_line, engine.current_script,
+        engine.scripts.keys().collect::<Vec<_>>());
     if engine.current_line != 0 {
         return;
     }
     let is_start = engine.current_script == "main"
         || engine.current_script == "aiy00010";
     if is_start {
+        info!("start_intro_bgm: writing PlayBgmMessage for 0304");
         play_bgm.write(PlayBgmMessage {
             id: "0304".to_string(),
             volume: None,
             fade_in: None,
         });
         intro.0 = true;
+    } else {
+        info!("start_intro_bgm: skipped, is_start=false");
     }
 }
 
