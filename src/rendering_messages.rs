@@ -101,6 +101,7 @@ pub struct AnimateSpriteMessage {
     pub file: String,
     pub max: u32,
     pub frame_time: u64,
+    #[allow(dead_code)]
     pub style: u32,
     pub x: f32,
     pub y: f32,
@@ -111,5 +112,6 @@ pub struct AnimateSpriteMessage {
     pub draw: u32,
     pub alpha: i32,
     pub priority: i32,
+    #[allow(dead_code)]
     pub wait: bool,
 }
