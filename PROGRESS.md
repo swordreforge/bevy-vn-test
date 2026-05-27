@@ -154,6 +154,8 @@ bevy-vn/
 - [x] 画廊界面（3×3 网格，ZIndex 5，缩略图/锁定占位符）
 - [x] 全屏 CG 查看（点击/Escape 关闭）
 - [x] 分页导航（左右箭头，Page x/Total 文字）
+- [x] Gallery UI 重构：提取 `populate_gallery_grid` 辅助函数，消除三份重复网格构建代码
+- [x] Safe Mode 勾选框 — 开启后自动隐藏 `hcg***` 开头的 NSFW 图片（267/357 张被屏蔽）
 - [x] Debug 解锁键（Gallery 界面按 U 解锁全部 357 张 CG）
 
 ### Phase 7: 设置 + 打磨 ✅

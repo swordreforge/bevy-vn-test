@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use crate::state::AppState;
-use crate::resources::{GameFont, GalleryState, TextureCache, UnlockState, AllCgFiles};
+use crate::resources::{GameFont, GalleryState, TextureCache, UnlockState, AllCgFiles, SafeMode};
 use crate::components::*;
 
 pub struct GalleryPlugin;
@@ -11,6 +11,7 @@ impl Plugin for GalleryPlugin {
             .init_resource::<GalleryState>()
             .init_resource::<TextureCache>()
             .init_resource::<AllCgFiles>()
+            .init_resource::<SafeMode>()
             .add_systems(OnEnter(AppState::Gallery), setup_gallery)
             .add_systems(Update, (
                 handle_thumbnail_click,
@@ -19,6 +20,7 @@ impl Plugin for GalleryPlugin {
                 handle_gallery_escape,
                 handle_gallery_page_nav,
                 handle_debug_unlock_all,
+                handle_safe_mode_toggle,
             ).run_if(in_state(AppState::Gallery)))
             .add_systems(OnExit(AppState::Gallery), cleanup_gallery);
     }
@@ -38,6 +40,71 @@ struct GalleryPageRightBtn;
 
 const CGS_PER_PAGE: usize = 9;
 
+fn filtered_cg_files<'a>(cg_files: &'a [String], safe_mode: bool) -> Vec<&'a String> {
+    if safe_mode {
+        cg_files.iter().filter(|f| !f.starts_with("hcg")).collect()
+    } else {
+        cg_files.iter().collect()
+    }
+}
+
+fn safe_total_pages(filtered_count: usize) -> usize {
+    (filtered_count + CGS_PER_PAGE - 1) / CGS_PER_PAGE
+}
+
+fn populate_gallery_grid(
+    grid: &mut ChildSpawnerCommands,
+    page: usize,
+    cg_files: &[String],
+    unlock_state: &UnlockState,
+    safe_mode: bool,
+    asset_server: &AssetServer,
+    cache: &mut TextureCache,
+    game_font: &GameFont,
+) {
+    let filtered = filtered_cg_files(cg_files, safe_mode);
+    let start = page * CGS_PER_PAGE;
+    let end = (start + CGS_PER_PAGE).min(filtered.len());
+    for i in start..end {
+        let file = filtered[i];
+        if unlock_state.cg_unlocked.contains(file.as_str()) {
+            let path = format!("images/ev/{}", file);
+            let handle = cache.cache.entry(path.clone())
+                .or_insert_with(|| asset_server.load(&path))
+                .clone();
+            grid.spawn((
+                GalleryThumbnail(file.clone()),
+                Button,
+                Node {
+                    width: Val::Px(360.0),
+                    height: Val::Px(200.0),
+                    ..default()
+                },
+                ImageNode::new(handle),
+                ZIndex(5),
+            ));
+        } else {
+            grid.spawn((
+                GalleryThumbnail(file.clone()),
+                GalleryLocked,
+                Node {
+                    width: Val::Px(360.0),
+                    height: Val::Px(200.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
+                ZIndex(5),
+            )).with_child((
+                Text::new("[ LOCKED ]"),
+                TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
+                TextColor(Color::srgb(0.3, 0.3, 0.4)),
+            ));
+        }
+    }
+}
+
 fn setup_gallery(
     mut commands: Commands,
     unlock_state: Res<UnlockState>,
@@ -46,8 +113,10 @@ fn setup_gallery(
     mut cache: ResMut<TextureCache>,
     game_font: Res<GameFont>,
     cg_files: Res<AllCgFiles>,
+    safe_mode: Res<SafeMode>,
 ) {
-    let total_pages = ((cg_files.0.len() + CGS_PER_PAGE - 1) / CGS_PER_PAGE).max(1);
+    let filtered_count = filtered_cg_files(&cg_files.0, safe_mode.0).len();
+    let total_pages = safe_total_pages(filtered_count);
 
     commands.spawn((
         GalleryRoot,
@@ -148,6 +217,33 @@ fn setup_gallery(
         });
 
         root.spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::Center,
+                margin: UiRect::bottom(Val::Px(4.0)),
+                ..default()
+            },
+        )).with_children(|row| {
+            row.spawn((
+                GallerySafeModeBtn,
+                Button,
+                Node {
+                    width: Val::Px(140.0),
+                    height: Val::Px(30.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+            )).with_child((
+                Text::new(if safe_mode.0 { "[☑] Safe Mode" } else { "[☐] Safe Mode" }),
+                TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
+                TextColor(Color::srgb(0.7, 0.7, 0.8)),
+                SafeModeLabel,
+            ));
+        });
+
+        root.spawn((
             GalleryGridContent,
             Node {
                 width: Val::Percent(90.0),
@@ -162,46 +258,7 @@ fn setup_gallery(
                 ..default()
             },
         )).with_children(|grid| {
-            let start = gallery_state.page * CGS_PER_PAGE;
-            let end = (start + CGS_PER_PAGE).min(cg_files.0.len());
-            for i in start..end {
-                let file = &cg_files.0[i];
-                if unlock_state.cg_unlocked.contains(file) {
-                    let path = format!("images/ev/{}", file);
-                    let handle = cache.cache.entry(path.clone())
-                        .or_insert_with(|| asset_server.load(&path))
-                        .clone();
-                    grid.spawn((
-                        GalleryThumbnail(file.clone()),
-                        Button,
-                        Node {
-                            width: Val::Px(360.0),
-                            height: Val::Px(200.0),
-                            ..default()
-                        },
-                        ImageNode::new(handle),
-                        ZIndex(5),
-                    ));
-                } else {
-                    grid.spawn((
-                        GalleryThumbnail(file.clone()),
-                        GalleryLocked,
-                        Node {
-                            width: Val::Px(360.0),
-                            height: Val::Px(200.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
-                        ZIndex(5),
-                    )).with_child((
-                        Text::new("[ LOCKED ]"),
-                        TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
-                        TextColor(Color::srgb(0.3, 0.3, 0.4)),
-                    ));
-                }
-            }
+            populate_gallery_grid(grid, gallery_state.page, &cg_files.0, &*unlock_state, safe_mode.0, &*asset_server, &mut *cache, &*game_font);
         });
     });
 }
@@ -293,29 +350,31 @@ fn handle_gallery_page_nav(
     mut cache: ResMut<TextureCache>,
     cg_files: Res<AllCgFiles>,
     game_font: Res<GameFont>,
+    safe_mode: Res<SafeMode>,
 ) {
     if gallery_state.fullscreen.is_some() {
         return;
     }
 
-    let total_pages = ((cg_files.0.len() + CGS_PER_PAGE - 1) / CGS_PER_PAGE).max(1);
+    let filtered = filtered_cg_files(&cg_files.0, safe_mode.0);
+    let total_pages = safe_total_pages(filtered.len());
     let old_page = gallery_state.page;
 
     if keys.just_pressed(KeyCode::ArrowLeft) || keys.just_pressed(KeyCode::ArrowUp) {
         gallery_state.page = if gallery_state.page == 0 {
-            total_pages - 1
+            total_pages.saturating_sub(1)
         } else {
             gallery_state.page - 1
         };
     }
     if keys.just_pressed(KeyCode::ArrowRight) || keys.just_pressed(KeyCode::ArrowDown) {
-        gallery_state.page = (gallery_state.page + 1) % total_pages;
+        gallery_state.page = (gallery_state.page + 1) % total_pages.max(1);
     }
 
     for interaction in &left_btn_query {
         if *interaction == Interaction::Pressed {
             gallery_state.page = if gallery_state.page == 0 {
-                total_pages - 1
+                total_pages.saturating_sub(1)
             } else {
                 gallery_state.page - 1
             };
@@ -323,7 +382,7 @@ fn handle_gallery_page_nav(
     }
     for interaction in &right_btn_query {
         if *interaction == Interaction::Pressed {
-            gallery_state.page = (gallery_state.page + 1) % total_pages;
+            gallery_state.page = (gallery_state.page + 1) % total_pages.max(1);
         }
     }
 
@@ -336,46 +395,7 @@ fn handle_gallery_page_nav(
 
         for entity in &grid_query {
             commands.entity(entity).with_children(|grid| {
-                let start = gallery_state.page * CGS_PER_PAGE;
-                let end = (start + CGS_PER_PAGE).min(cg_files.0.len());
-                for i in start..end {
-                    let file = &cg_files.0[i];
-                    if unlock_state.cg_unlocked.contains(file) {
-                        let path = format!("images/ev/{}", file);
-                        let handle = cache.cache.entry(path.clone())
-                            .or_insert_with(|| asset_server.load(&path))
-                            .clone();
-                        grid.spawn((
-                            GalleryThumbnail(file.clone()),
-                            Button,
-                            Node {
-                                width: Val::Px(360.0),
-                                height: Val::Px(200.0),
-                                ..default()
-                            },
-                            ImageNode::new(handle),
-                            ZIndex(5),
-                        ));
-                    } else {
-                        grid.spawn((
-                            GalleryThumbnail(file.clone()),
-                            GalleryLocked,
-                            Node {
-                                width: Val::Px(360.0),
-                                height: Val::Px(200.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
-                            ZIndex(5),
-                        )).with_child((
-                            Text::new("[ LOCKED ]"),
-                            TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
-                            TextColor(Color::srgb(0.3, 0.3, 0.4)),
-                        ));
-                    }
-                }
+                populate_gallery_grid(grid, gallery_state.page, &cg_files.0, &*unlock_state, safe_mode.0, &*asset_server, &mut *cache, &*game_font);
             });
         }
 
@@ -410,7 +430,7 @@ fn handle_debug_unlock_all(
     keys: Res<ButtonInput<KeyCode>>,
     mut unlock_state: ResMut<UnlockState>,
     cg_files: Res<AllCgFiles>,
-    gallery_state: Res<GalleryState>,
+    mut gallery_state: ResMut<GalleryState>,
     grid_query: Query<Entity, With<GalleryGridContent>>,
     children_query: Query<&Children, With<GalleryGridContent>>,
     page_text_query: Query<Entity, With<GalleryPageText>>,
@@ -418,6 +438,7 @@ fn handle_debug_unlock_all(
     asset_server: Res<AssetServer>,
     mut cache: ResMut<TextureCache>,
     game_font: Res<GameFont>,
+    safe_mode: Res<SafeMode>,
 ) {
     if !keys.just_pressed(KeyCode::KeyU) {
         return;
@@ -426,7 +447,14 @@ fn handle_debug_unlock_all(
     for file in &cg_files.0 {
         unlock_state.cg_unlocked.insert(file.clone());
     }
-    let new_count = unlock_state.cg_unlocked.len();
+
+    let filtered = filtered_cg_files(&cg_files.0, safe_mode.0);
+    let total_pages = safe_total_pages(filtered.len());
+
+    // Clamp page to valid range after unlock
+    if gallery_state.page >= total_pages && total_pages > 0 {
+        gallery_state.page = total_pages - 1;
+    }
 
     for children in &children_query {
         for child in children.iter() {
@@ -434,57 +462,65 @@ fn handle_debug_unlock_all(
         }
     }
 
-    let total_pages = ((cg_files.0.len() + CGS_PER_PAGE - 1) / CGS_PER_PAGE).max(1);
-
     for entity in &grid_query {
         commands.entity(entity).with_children(|grid| {
-            let start = gallery_state.page * CGS_PER_PAGE;
-            let end = (start + CGS_PER_PAGE).min(cg_files.0.len());
-            for i in start..end {
-                let file = &cg_files.0[i];
-                if unlock_state.cg_unlocked.contains(file) {
-                    let path = format!("images/ev/{}", file);
-                    let handle = cache.cache.entry(path.clone())
-                        .or_insert_with(|| asset_server.load(&path))
-                        .clone();
-                    grid.spawn((
-                        GalleryThumbnail(file.clone()),
-                        Button,
-                        Node {
-                            width: Val::Px(360.0),
-                            height: Val::Px(200.0),
-                            ..default()
-                        },
-                        ImageNode::new(handle),
-                        ZIndex(5),
-                    ));
-                } else {
-                    grid.spawn((
-                        GalleryThumbnail(file.clone()),
-                        GalleryLocked,
-                        Node {
-                            width: Val::Px(360.0),
-                            height: Val::Px(200.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
-                        ZIndex(5),
-                    )).with_child((
-                        Text::new("[ LOCKED ]"),
-                        TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
-                        TextColor(Color::srgb(0.3, 0.3, 0.4)),
-                    ));
-                }
-            }
+            populate_gallery_grid(grid, gallery_state.page, &cg_files.0, &*unlock_state, safe_mode.0, &*asset_server, &mut *cache, &*game_font);
         });
     }
 
     for entity in &page_text_query {
         commands.entity(entity).insert(Text::new(
-            format!("Page {}/{} (Unlocked: {}/{})", gallery_state.page + 1, total_pages, new_count, cg_files.0.len()),
+            format!("Page {}/{}", gallery_state.page + 1, total_pages),
         ));
+    }
+}
+
+fn handle_safe_mode_toggle(
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<GallerySafeModeBtn>)>,
+    mut safe_mode: ResMut<SafeMode>,
+    mut gallery_state: ResMut<GalleryState>,
+    grid_query: Query<Entity, With<GalleryGridContent>>,
+    children_query: Query<&Children, With<GalleryGridContent>>,
+    page_text_query: Query<Entity, With<GalleryPageText>>,
+    mut label_query: Query<&mut Text, With<SafeModeLabel>>,
+    mut commands: Commands,
+    unlock_state: Res<UnlockState>,
+    asset_server: Res<AssetServer>,
+    mut cache: ResMut<TextureCache>,
+    cg_files: Res<AllCgFiles>,
+    game_font: Res<GameFont>,
+) {
+    let toggled = interaction_query.iter().any(|i| *i == Interaction::Pressed);
+    if !toggled {
+        return;
+    }
+
+    safe_mode.0 = !safe_mode.0;
+    gallery_state.page = 0;
+
+    let filtered = filtered_cg_files(&cg_files.0, safe_mode.0);
+    let total_pages = safe_total_pages(filtered.len());
+
+    for children in &children_query {
+        for child in children.iter() {
+            commands.entity(child).despawn();
+        }
+    }
+
+    for entity in &grid_query {
+        commands.entity(entity).with_children(|grid| {
+            populate_gallery_grid(grid, gallery_state.page, &cg_files.0, &*unlock_state, safe_mode.0, &*asset_server, &mut *cache, &*game_font);
+        });
+    }
+
+    for entity in &page_text_query {
+        commands.entity(entity).insert(Text::new(
+            format!("Page {}/{}", gallery_state.page + 1, total_pages),
+        ));
+    }
+
+    for mut text in &mut label_query {
+        text.0 = if safe_mode.0 { "[☑] Safe Mode".to_string() } else { "[☐] Safe Mode".to_string() };
     }
 }
 

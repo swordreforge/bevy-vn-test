@@ -281,6 +281,15 @@ pub struct GalleryState {
 }
 
 #[derive(Resource)]
+pub struct SafeMode(pub bool);
+
+impl Default for SafeMode {
+    fn default() -> Self {
+        Self(true)
+    }
+}
+
+#[derive(Resource)]
 pub struct GameFont(pub Handle<bevy::text::Font>);
 
 #[derive(Resource, Default)]
