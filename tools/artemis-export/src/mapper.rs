@@ -1,5 +1,5 @@
 use crate::asb::{AsbCommand, AsbScript};
-use bevy_vn::script::{ChoiceOption, FgPosition, OverlayColor, Script, ScriptCmd};
+use bevy_vn::script::{ChoiceOption, FgPosition, OverlayColor, Script, ScriptCmd, Transition};
 
 pub fn map_script(
     asb: &AsbScript,
@@ -134,6 +134,24 @@ fn map_command(
             let time = cmd.attrs.get("8").and_then(|s| s.parse().ok()).unwrap_or(0);
             let wait = cmd.attrs.get("9").map(|s| s == "TRUE").unwrap_or(false);
             Some(vec![ScriptCmd::MoveSprite { id, x, y, z, alpha, time, wait }])
+        }
+        "AnimateSprite" => {
+            let id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let file = cmd.attrs.get("1").cloned().unwrap_or_default();
+            let max: u32 = cmd.attrs.get("2").and_then(|v| v.parse().ok()).unwrap_or(1);
+            let frame_time: u64 = cmd.attrs.get("3").and_then(|v| v.parse().ok()).unwrap_or(200);
+            let style: u32 = cmd.attrs.get("4").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let x: f32 = cmd.attrs.get("6").and_then(|v| v.parse().ok()).unwrap_or(0.0);
+            let y: f32 = cmd.attrs.get("7").and_then(|v| v.parse().ok()).unwrap_or(0.0);
+            let z: i32 = cmd.attrs.get("8").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let anchor_x: f32 = cmd.attrs.get("9").and_then(|v| v.parse().ok()).unwrap_or(0.0);
+            let anchor_y: f32 = cmd.attrs.get("10").and_then(|v| v.parse().ok()).unwrap_or(0.0);
+            let rotation: f32 = cmd.attrs.get("11").and_then(|v| v.parse().ok()).unwrap_or(0.0);
+            let draw: u32 = cmd.attrs.get("14").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let alpha: i32 = cmd.attrs.get("15").and_then(|v| v.parse().ok()).unwrap_or(255);
+            let priority: i32 = cmd.attrs.get("16").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let wait: bool = cmd.attrs.get("18").map_or(false, |v| v == "1");
+            Some(vec![ScriptCmd::AnimateSprite { id, file, max, frame_time, style, x, y, z, anchor_x, anchor_y, rotation, draw, alpha, priority, wait }])
         }
         "ClrTati" => {
             Some(vec![ScriptCmd::HideFg {
@@ -273,6 +291,78 @@ fn map_command(
             let alpha = cmd.attrs.get("2").and_then(|s| s.parse().ok()).unwrap_or(128);
             Some(vec![ScriptCmd::Flash { color, time, alpha }])
         }
+        "View" => {
+            let char_id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            Some(vec![ScriptCmd::View { char_id }])
+        }
+        "ViewEnd" => {
+            Some(vec![ScriptCmd::View { char_id: "ViewEnd".into() }])
+        }
+        "Event" => {
+            let file = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let file = format!("eve_{}", file);
+            let transition = map_event_transition(cmd.attrs.get("1"));
+            Some(vec![
+                ScriptCmd::Window { show: false, time: None },
+                ScriptCmd::HideFg { char_id: "all".into(), transition: None },
+                ScriptCmd::ShowCg { file, transition },
+            ])
+        }
+        "EventMN" => {
+            let file = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let file = format!("mon_{}", file);
+            let transition = map_event_transition(cmd.attrs.get("1"));
+            Some(vec![
+                ScriptCmd::Window { show: false, time: None },
+                ScriptCmd::HideFg { char_id: "all".into(), transition: None },
+                ScriptCmd::ShowCg { file, transition },
+            ])
+        }
+        "EventCut" => {
+            let file = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let file = format!("cut_{}", file);
+            let transition = map_event_transition(cmd.attrs.get("1"));
+            Some(vec![
+                ScriptCmd::Window { show: false, time: None },
+                ScriptCmd::HideFg { char_id: "all".into(), transition: None },
+                ScriptCmd::ShowCg { file, transition },
+            ])
+        }
+        "DrawScene" => {
+            let file = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let prefix = cmd.attrs.get("2").cloned().unwrap_or_default();
+            let file = format!("{}{}", prefix, file);
+            let transition = map_event_transition(cmd.attrs.get("1"));
+            Some(vec![
+                ScriptCmd::Window { show: false, time: None },
+                ScriptCmd::HideFg { char_id: "all".into(), transition: None },
+                ScriptCmd::ShowCg { file, transition },
+            ])
+        }
+        "SetGlobalFlag" => {
+            let index = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let value = cmd.attrs.get("1").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::SetGlobalFlag { index, value }])
+        }
+        "GetGlobalFlag" => None,
+        "RouteFlag" => {
+            Some(vec![ScriptCmd::RouteFlag])
+        }
+        "GameMode" => {
+            let mode = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::GameMode { mode }])
+        }
+        _ => None,
+    }
+}
+
+fn map_event_transition(attr: Option<&String>) -> Option<Transition> {
+    match attr.map(|s| s.as_str()) {
+        Some("SUDDEN") | Some("0") => None,
+        Some("FAST") | Some("1") => Some(Transition::Fade),
+        Some("FADE") | Some("2") => Some(Transition::Fade),
+        Some("CROSS") | Some("3") => Some(Transition::Fade),
+        Some("DISSOLVE") | Some("4") => Some(Transition::Dissolve),
         _ => None,
     }
 }
