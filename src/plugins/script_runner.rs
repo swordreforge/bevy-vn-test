@@ -15,7 +15,7 @@ use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage,
     ShowFaceMessage, HideFaceMessage,
     ShowCgMessage, HideCgMessage,
-    DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage,
+    DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage, ScrollBgMessage,
 };
 
 pub struct ScriptRunnerPlugin;
@@ -60,6 +60,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     loop_se_writer: MessageWriter<'w, LoopSeMessage>,
     stop_streaming_se_writer: MessageWriter<'w, StopStreamingSeMessage>,
     play_voice_writer: MessageWriter<'w, PlayVoiceMessage>,
+    scroll_bg_writer: MessageWriter<'w, ScrollBgMessage>,
     settings: Res<'w, Settings>,
     auto_skip: ResMut<'w, AutoSkipTimer>,
     intro: ResMut<'w, IntroPhase>,
@@ -161,6 +162,7 @@ fn process_advance(
         ref mut loop_se_writer,
         ref mut stop_streaming_se_writer,
         ref mut play_voice_writer,
+        ref mut scroll_bg_writer,
         ref mut settings,
         ref mut auto_skip,
         ref mut intro,
@@ -385,6 +387,9 @@ fn process_advance(
                         pending_voice = Some(file.clone());
                         play_voice_writer.write(PlayVoiceMessage { file, volume: None });
                     }
+                    Some(ScriptCmd::ScrollBg { file, x1, y1, x2, y2, .. }) => {
+                        scroll_bg_writer.write(ScrollBgMessage { file, x1, y1, x2, y2, fade: 0, wait: false });
+                    }
                     Some(ScriptCmd::Wait { .. }) => {}
                     Some(ScriptCmd::ScreenOverlay { color, .. }) => {
                         for (_, mut bg, mut vis) in overlay_query.iter_mut() {
@@ -587,6 +592,13 @@ fn process_advance(
                 Some(ScriptCmd::PlayVoice { file }) => {
                     pending_voice = Some(file.clone());
                     play_voice_writer.write(PlayVoiceMessage { file, volume: None });
+                }
+                Some(ScriptCmd::ScrollBg { file, x1, y1, x2, y2, fade, wait }) => {
+                    scroll_bg_writer.write(ScrollBgMessage { file, x1, y1, x2, y2, fade, wait });
+                    if wait {
+                        auto_skip.auto_timer = Some(Timer::from_seconds(fade as f32 / 1000.0, TimerMode::Once));
+                        break;
+                    }
                 }
                 Some(ScriptCmd::BgmVol { channel: _, volume }) => {
                     let vol = match volume.as_str() {
