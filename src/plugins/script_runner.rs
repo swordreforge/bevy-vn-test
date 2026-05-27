@@ -7,7 +7,9 @@ use crate::audio_messages::{
 };
 use crate::choice_messages::ChoiceSelectedMessage;
 use crate::components::{DialogueUiRoot, OverlayTween, ScreenOverlayRoot};
-use crate::resources::WindowOverride;
+use crate::resources::{WindowOverride, ViewBlocking};
+use crate::plugins::event_system::view_data;
+use crate::plugins::event_system::{ViewPhase, ViewState};
 use crate::script::{ConditionOp, OverlayColor, ScriptCmd, ScriptEngine};
 use crate::state::AppState;
 use crate::plugins::inputs::AdvanceEvent;
@@ -15,7 +17,7 @@ use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage,
     ShowFaceMessage, HideFaceMessage,
     ShowCgMessage, HideCgMessage,
-    DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage, ScrollBgMessage,
+    AnimateSpriteMessage, DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage, ScrollBgMessage,
 };
 
 pub struct ScriptRunnerPlugin;
@@ -61,6 +63,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     stop_streaming_se_writer: MessageWriter<'w, StopStreamingSeMessage>,
     play_voice_writer: MessageWriter<'w, PlayVoiceMessage>,
     scroll_bg_writer: MessageWriter<'w, ScrollBgMessage>,
+    animate_sprite_writer: MessageWriter<'w, AnimateSpriteMessage>,
     settings: Res<'w, Settings>,
     auto_skip: ResMut<'w, AutoSkipTimer>,
     intro: ResMut<'w, IntroPhase>,
@@ -134,6 +137,7 @@ fn process_advance(
     mut overlay_query: Query<(Entity, &mut BackgroundColor, &mut Visibility), With<ScreenOverlayRoot>>,
     mut window_query: Query<&mut Visibility, (With<DialogueUiRoot>, Without<ScreenOverlayRoot>)>,
     mut window_override: ResMut<WindowOverride>,
+    view_blocking: Res<ViewBlocking>,
 ) {
     let ProcessAdvanceParams {
         ref mut advance_ev,
@@ -163,6 +167,7 @@ fn process_advance(
         ref mut stop_streaming_se_writer,
         ref mut play_voice_writer,
         ref mut scroll_bg_writer,
+        ref mut animate_sprite_writer,
         ref mut settings,
         ref mut auto_skip,
         ref mut intro,
@@ -173,6 +178,11 @@ fn process_advance(
         // Reset auto/skip timers on manual advance
         auto_skip.auto_timer = None;
         auto_skip.skip_timer = None;
+
+        // If View is active, block script execution
+        if view_blocking.0 {
+            continue;
+        }
 
         // If choice is active, check if user made a selection
         if choice_state.active {
@@ -390,6 +400,9 @@ fn process_advance(
                     Some(ScriptCmd::ScrollBg { file, x1, y1, x2, y2, .. }) => {
                         scroll_bg_writer.write(ScrollBgMessage { file, x1, y1, x2, y2, fade: 0, wait: false });
                     }
+                    Some(ScriptCmd::AnimateSprite { id, file, max, frame_time, style, x, y, z, anchor_x, anchor_y, rotation, draw, alpha, priority, .. }) => {
+                        animate_sprite_writer.write(AnimateSpriteMessage { id, file, max, frame_time, style, x, y, z, anchor_x, anchor_y, rotation, draw, alpha, priority, wait: false });
+                    }
                     Some(ScriptCmd::Wait { .. }) => {}
                     Some(ScriptCmd::ScreenOverlay { color, .. }) => {
                         for (_, mut bg, mut vis) in overlay_query.iter_mut() {
@@ -423,6 +436,41 @@ fn process_advance(
                         commands.queue(move |world: &mut World| {
                             let mut settings = world.resource_mut::<Settings>();
                             settings.window_design = design;
+                        });
+                    }
+                    Some(ScriptCmd::View { ref char_id }) => {
+                        if let Some(entry) = view_data::lookup_view_entry(char_id) {
+                            commands.queue(move |world: &mut World| {
+                                let mut settings = world.resource_mut::<Settings>();
+                                settings.window_color_idx = entry.window_color as i32;
+                            });
+                        }
+                    }
+                    Some(ScriptCmd::SetGlobalFlag { index, value }) => {
+                        engine.global_flags.insert(index, value);
+                    }
+                    Some(ScriptCmd::RouteFlag) => {
+                        let hero_routes = [103, 105, 107, 108, 110, 111];
+                        if engine.global_flags.get(&113) != Some(&1) {
+                            let count = hero_routes.iter()
+                                .filter(|&f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1)
+                                .count();
+                            if count == hero_routes.len() {
+                                engine.global_flags.insert(113, 1);
+                            }
+                        }
+                        if engine.global_flags.get(&114) != Some(&1) {
+                            let all_clear = (151..=167).chain(std::iter::once(113))
+                                .all(|f| engine.global_flags.get(&f).copied().unwrap_or(0) >= 1);
+                            if all_clear {
+                                engine.global_flags.insert(114, 1);
+                            }
+                        }
+                    }
+                    Some(ScriptCmd::GameMode { mode }) => {
+                        commands.queue(move |world: &mut World| {
+                            let mut settings = world.resource_mut::<Settings>();
+                            settings.click_to_advance = mode == 2;
                         });
                     }
                     Some(cmd) => {
@@ -600,6 +648,14 @@ fn process_advance(
                         break;
                     }
                 }
+                Some(ScriptCmd::AnimateSprite { id, file, max, frame_time, style, x, y, z, anchor_x, anchor_y, rotation, draw, alpha, priority, wait }) => {
+                    animate_sprite_writer.write(AnimateSpriteMessage { id, file, max, frame_time, style, x, y, z, anchor_x, anchor_y, rotation, draw, alpha, priority, wait });
+                    if wait {
+                        let total_ms = max as u64 * frame_time;
+                        auto_skip.auto_timer = Some(Timer::from_seconds(total_ms as f32 / 1000.0, TimerMode::Once));
+                        break;
+                    }
+                }
                 Some(ScriptCmd::BgmVol { channel: _, volume }) => {
                     let vol = match volume.as_str() {
                         "MIN" => 0.0,
@@ -693,6 +749,52 @@ fn process_advance(
                     commands.queue(move |world: &mut World| {
                         let mut settings = world.resource_mut::<Settings>();
                         settings.window_design = design;
+                    });
+                }
+                Some(ScriptCmd::View { ref char_id }) => {
+                    if let Some(entry) = view_data::lookup_view_entry(char_id) {
+                        let tween_entry = view_data::lookup_tween_entry(entry.pen_type)
+                            .unwrap_or_else(|| view_data::lookup_tween_entry(2).unwrap());
+                        commands.spawn(ViewState {
+                            char_id: char_id.clone(),
+                            phase: ViewPhase::FadeOut,
+                            timer: Timer::from_seconds(1.0, TimerMode::Once),
+                            step_idx: 0,
+                            pen_entity: None,
+                            name_entity: None,
+                            scene_entities: Vec::new(),
+                            entry,
+                            tween_entry,
+                        });
+                        break;
+                    }
+                }
+                Some(ScriptCmd::SetGlobalFlag { index, value }) => {
+                    engine.global_flags.insert(index, value);
+                }
+                Some(ScriptCmd::RouteFlag) => {
+                    let hero_routes = [103, 105, 107, 108, 110, 111];
+                    if engine.global_flags.get(&113) != Some(&1) {
+                        let count = hero_routes.iter()
+                            .filter(|&f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1)
+                            .count();
+                        if count == hero_routes.len() {
+                            engine.global_flags.insert(113, 1);
+                        }
+                    }
+                    if engine.global_flags.get(&114) != Some(&1) {
+                        let complete: Vec<u32> = (151..=167).collect();
+                        let all_clear = std::iter::once(&113u32).chain(complete.iter())
+                            .all(|f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1);
+                        if all_clear {
+                            engine.global_flags.insert(114, 1);
+                        }
+                    }
+                }
+                Some(ScriptCmd::GameMode { mode }) => {
+                    commands.queue(move |world: &mut World| {
+                        let mut settings = world.resource_mut::<Settings>();
+                        settings.click_to_advance = mode == 2;
                     });
                 }
                 Some(cmd) => {
