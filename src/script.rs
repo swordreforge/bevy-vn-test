@@ -64,6 +64,15 @@ pub enum ScriptCmd {
         id: Option<String>,
         fade_out: Option<u64>,
     },
+    PlayBgmX {
+        id: String,
+        volume: Option<f32>,
+        fade_in: Option<u64>,
+    },
+    StopBgmX {
+        id: Option<String>,
+        fade_out: Option<u64>,
+    },
     PlaySe {
         file: String,
         volume: Option<f32>,

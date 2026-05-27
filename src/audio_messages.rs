@@ -4,7 +4,6 @@ use bevy::prelude::*;
 pub struct PlayBgmMessage {
     pub id: String,
     pub volume: Option<f32>,
-    #[allow(dead_code)]
     pub fade_in: Option<u64>,
 }
 
@@ -12,7 +11,20 @@ pub struct PlayBgmMessage {
 pub struct StopBgmMessage {
     #[allow(dead_code)]
     pub id: Option<String>,
+    pub fade_out: Option<u64>,
+}
+
+#[derive(Message)]
+pub struct PlayBgmXMessage {
+    pub id: String,
+    pub volume: Option<f32>,
+    pub fade_in: Option<u64>,
+}
+
+#[derive(Message)]
+pub struct StopBgmXMessage {
     #[allow(dead_code)]
+    pub id: Option<String>,
     pub fade_out: Option<u64>,
 }
 

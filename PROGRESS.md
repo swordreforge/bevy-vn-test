@@ -4,9 +4,9 @@
 
 ---
 
-## 当前状态 (2026-05-26)
+## 当前状态 (2026-05-27)
 
-**Phase 0-4 核心引擎就绪 ✅** — 脚本驱动全流程：对话/立绘/背景/CG/精灵覆盖层/转场/BGM/选项/Wait 时序均可用，画廊 + Debug 键
+**Phase 0-7 核心引擎就绪 ✅** — 脚本驱动全流程：对话/立绘/背景/CG/精灵覆盖层/转场/BGM+BGMX/SE/语音/选项/Wait 时序均可用，画廊 + Debug 键
 
 ---
 
@@ -38,9 +38,9 @@
 - [x] Gameplay 退出时自动清理 UI
 
 ### 脚本系统 (src/script.rs)
-- [x] ScriptCmd enum（18 种指令类型）
+- [x] ScriptCmd enum（20 种指令类型）
   - dialogue, choice, set_bg, show_fg/hide_fg, show_cg/hide_cg
-  - play_bgm/stop_bgm, play_se, play_voice
+  - play_bgm/stop_bgm, play_bgmx/stop_bgmx, play_se, play_voice
   - affection_change, jump, call/return, condition
   - save_point, clear_text, wait, play_movie, label
 - [x] ChoiceOption, ConditionOp 等辅助类型
@@ -168,6 +168,8 @@ bevy-vn/
 - [x] Quake — 屏幕震动（Camera2d 随机偏移，强度随时间衰减）
 - [x] Flash — 全屏闪光（复用 ScreenOverlayRoot + OverlayTween，支持颜色/透明度/时长）
 - [x] LoopSE / StopStreamingSE — 循环SE系统（SeManager 追踪 channel→Entity，LOOP 模式播放，定向停止）
+- [x] BgmX — 第二 BGM 层（BgmXManager + AudioType::BgmX，独立音轨 `audio/bgm/bgmx_{id}.ogg`）
+- [x] 交叉淡入淡出 — BgmFade 组件驱动音量渐变，PlayBgm/StopBgm 的 fade_in/fade_out 参数已实装，支持跨层交叉淡入淡出
 - [ ] Android 适配 (deferred to sub-phase)
 - [ ] .asb 二进制解析器
 - [ ] Lua 配置提取器

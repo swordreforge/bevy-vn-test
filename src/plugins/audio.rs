@@ -1,7 +1,7 @@
 use bevy::{audio::Volume, prelude::*};
 use crate::audio_messages::*;
-use crate::components::AudioType;
-use crate::resources::{BgmManager, PendingBgm, PendingBgmLoad, SeManager, Settings, VoiceManager};
+use crate::components::{AudioType, BgmFade, BgmFadeLayer};
+use crate::resources::{BgmManager, BgmXManager, PendingBgm, PendingBgmLoad, SeManager, Settings, VoiceManager};
 use rodio::{self, Source};
 use std::io::Cursor;
 use std::sync::Arc;
@@ -12,11 +12,14 @@ impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<BgmManager>()
+            .init_resource::<BgmXManager>()
             .init_resource::<VoiceManager>()
             .init_resource::<SeManager>()
             .init_resource::<PendingBgm>()
             .add_message::<PlayBgmMessage>()
             .add_message::<StopBgmMessage>()
+            .add_message::<PlayBgmXMessage>()
+            .add_message::<StopBgmXMessage>()
             .add_message::<PlaySeMessage>()
             .add_message::<LoopSeMessage>()
             .add_message::<StopStreamingSeMessage>()
@@ -25,11 +28,14 @@ impl Plugin for AudioPlugin {
                 handle_stop_bgm,
                 handle_play_bgm,
                 process_pending_bgm,
+                handle_stop_bgmx,
+                handle_play_bgmx,
                 handle_play_se,
                 handle_loop_se,
                 handle_stop_streaming_se,
                 handle_play_voice,
                 apply_audio_settings,
+                update_bgm_fade,
             ).chain());
     }
 }
@@ -42,13 +48,29 @@ fn handle_play_bgm(
     mut pending: ResMut<PendingBgm>,
 ) {
     for msg in reader.read() {
-        if let Some(entity) = bgm.entity.take() {
-            if let Ok(mut cmd) = commands.get_entity(entity) {
-                cmd.despawn();
-            }
-        }
+        let fade_in_ms = msg.fade_in.unwrap_or(0);
+        let has_fade = fade_in_ms > 0;
+        let fade_in_sec = fade_in_ms as f32 / 1000.0;
+
         pending.0 = None;
         bgm.current_id = Some(msg.id.clone());
+
+        if let Some(old_entity) = bgm.entity.take() {
+            if has_fade {
+                if let Ok(mut cmd) = commands.get_entity(old_entity) {
+                    cmd.insert(BgmFade {
+                        timer: Timer::from_seconds(fade_in_sec, TimerMode::Once),
+                        start_mult: 1.0,
+                        end_mult: 0.0,
+                        layer: BgmFadeLayer::Bgm,
+                    });
+                }
+            } else {
+                if let Ok(mut cmd) = commands.get_entity(old_entity) {
+                    cmd.despawn();
+                }
+            }
+        }
 
         let volume = msg.volume.unwrap_or(1.0);
         let path_a = format!("audio/bgm/bgm_{}_a.ogg", msg.id);
@@ -60,17 +82,56 @@ fn handle_play_bgm(
             pending.0 = Some(PendingBgmLoad { id: msg.id.clone(), handle_a, handle_b, volume });
         } else {
             let handle: Handle<AudioSource> = asset_server.load(&path_a);
-            let entity = commands.spawn((
+            let mut spawn_cmd = commands.spawn((
                 AudioPlayer(handle),
                 PlaybackSettings {
                     mode: bevy::audio::PlaybackMode::Loop,
-                    volume: Volume::Linear(volume),
+                    volume: Volume::Linear(if has_fade { 0.0 } else { volume }),
                     ..default()
                 },
                 AudioType::Bgm,
-            )).id();
-            bgm.entity = Some(entity);
+            ));
+
+            if has_fade {
+                spawn_cmd.insert(BgmFade {
+                    timer: Timer::from_seconds(fade_in_sec, TimerMode::Once),
+                    start_mult: 0.0,
+                    end_mult: 1.0,
+                    layer: BgmFadeLayer::Bgm,
+                });
+            }
+
+            bgm.entity = Some(spawn_cmd.id());
         }
+    }
+}
+
+fn handle_stop_bgm(
+    mut reader: MessageReader<StopBgmMessage>,
+    mut commands: Commands,
+    mut bgm: ResMut<BgmManager>,
+    mut pending: ResMut<PendingBgm>,
+) {
+    for msg in reader.read() {
+        pending.0 = None;
+        if let Some(entity) = bgm.entity.take() {
+            let fade_out_ms = msg.fade_out.unwrap_or(0);
+            if fade_out_ms > 0 {
+                if let Ok(mut cmd) = commands.get_entity(entity) {
+                    cmd.insert(BgmFade {
+                        timer: Timer::from_seconds(fade_out_ms as f32 / 1000.0, TimerMode::Once),
+                        start_mult: 1.0,
+                        end_mult: 0.0,
+                        layer: BgmFadeLayer::Bgm,
+                    });
+                }
+            } else {
+                if let Ok(mut cmd) = commands.get_entity(entity) {
+                    cmd.despawn();
+                }
+            }
+        }
+        bgm.current_id = None;
     }
 }
 
@@ -102,6 +163,89 @@ fn process_pending_bgm(
     bgm.entity = Some(entity);
     pending.0 = None;
     info!("BGM concat: {} complete", id);
+}
+
+fn handle_play_bgmx(
+    mut reader: MessageReader<PlayBgmXMessage>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+    mut bgmx: ResMut<BgmXManager>,
+) {
+    for msg in reader.read() {
+        let fade_in_ms = msg.fade_in.unwrap_or(0);
+        let has_fade = fade_in_ms > 0;
+        let fade_in_sec = fade_in_ms as f32 / 1000.0;
+
+        bgmx.current_id = Some(msg.id.clone());
+
+        if let Some(old_entity) = bgmx.entity.take() {
+            if has_fade {
+                if let Ok(mut cmd) = commands.get_entity(old_entity) {
+                    cmd.insert(BgmFade {
+                        timer: Timer::from_seconds(fade_in_sec, TimerMode::Once),
+                        start_mult: 1.0,
+                        end_mult: 0.0,
+                        layer: BgmFadeLayer::BgmX,
+                    });
+                }
+            } else {
+                if let Ok(mut cmd) = commands.get_entity(old_entity) {
+                    cmd.despawn();
+                }
+            }
+        }
+
+        let volume = msg.volume.unwrap_or(1.0);
+        let path = format!("audio/bgm/bgmx_{}.ogg", msg.id);
+        let handle: Handle<AudioSource> = asset_server.load(&path);
+        let mut spawn_cmd = commands.spawn((
+            AudioPlayer(handle),
+            PlaybackSettings {
+                mode: bevy::audio::PlaybackMode::Loop,
+                volume: Volume::Linear(if has_fade { 0.0 } else { volume }),
+                ..default()
+            },
+            AudioType::BgmX,
+        ));
+
+        if has_fade {
+            spawn_cmd.insert(BgmFade {
+                timer: Timer::from_seconds(fade_in_sec, TimerMode::Once),
+                start_mult: 0.0,
+                end_mult: 1.0,
+                layer: BgmFadeLayer::BgmX,
+            });
+        }
+
+        bgmx.entity = Some(spawn_cmd.id());
+    }
+}
+
+fn handle_stop_bgmx(
+    mut reader: MessageReader<StopBgmXMessage>,
+    mut commands: Commands,
+    mut bgmx: ResMut<BgmXManager>,
+) {
+    for msg in reader.read() {
+        if let Some(entity) = bgmx.entity.take() {
+            let fade_out_ms = msg.fade_out.unwrap_or(0);
+            if fade_out_ms > 0 {
+                if let Ok(mut cmd) = commands.get_entity(entity) {
+                    cmd.insert(BgmFade {
+                        timer: Timer::from_seconds(fade_out_ms as f32 / 1000.0, TimerMode::Once),
+                        start_mult: 1.0,
+                        end_mult: 0.0,
+                        layer: BgmFadeLayer::BgmX,
+                    });
+                }
+            } else {
+                if let Ok(mut cmd) = commands.get_entity(entity) {
+                    cmd.despawn();
+                }
+            }
+        }
+        bgmx.current_id = None;
+    }
 }
 
 fn concat_ogg_bytes(a: &[u8], b: &[u8]) -> Vec<u8> {
@@ -146,23 +290,6 @@ fn concat_ogg_bytes(a: &[u8], b: &[u8]) -> Vec<u8> {
     wav.extend_from_slice(&data_size.to_le_bytes());
     wav.extend_from_slice(&pcm);
     wav
-}
-
-fn handle_stop_bgm(
-    mut reader: MessageReader<StopBgmMessage>,
-    mut commands: Commands,
-    mut bgm: ResMut<BgmManager>,
-    mut pending: ResMut<PendingBgm>,
-) {
-    for _ in reader.read() {
-        pending.0 = None;
-        if let Some(entity) = bgm.entity.take() {
-            if let Ok(mut cmd) = commands.get_entity(entity) {
-                cmd.despawn();
-            }
-        }
-        bgm.current_id = None;
-    }
 }
 
 fn handle_play_se(
@@ -248,14 +375,48 @@ fn handle_play_voice(
 
 fn apply_audio_settings(
     settings: Res<Settings>,
-    mut query: Query<(&AudioType, &mut AudioSink)>,
+    mut query: Query<(&AudioType, &mut AudioSink), Without<BgmFade>>,
 ) {
     for (audio_type, mut sink) in query.iter_mut() {
         let volume = match audio_type {
-            AudioType::Bgm => settings.bgm_volume,
+            AudioType::Bgm | AudioType::BgmX => settings.bgm_volume,
             AudioType::Se => settings.se_volume,
             AudioType::Voice => settings.voice_volume,
         };
         sink.set_volume(Volume::Linear(volume));
+    }
+}
+
+fn update_bgm_fade(
+    time: Res<Time>,
+    settings: Res<Settings>,
+    mut commands: Commands,
+    mut bgm: ResMut<BgmManager>,
+    mut bgmx: ResMut<BgmXManager>,
+    mut query: Query<(Entity, &AudioType, &mut AudioSink, &mut BgmFade)>,
+) {
+    for (entity, audio_type, mut sink, mut fade) in query.iter_mut() {
+        fade.timer.tick(time.delta());
+        let t = fade.timer.fraction().min(1.0);
+        let mult = fade.start_mult + (fade.end_mult - fade.start_mult) * t;
+
+        let base_volume = match audio_type {
+            AudioType::Bgm | AudioType::BgmX => settings.bgm_volume,
+            _ => 1.0,
+        };
+        sink.set_volume(Volume::Linear(base_volume * mult));
+
+        if fade.timer.just_finished() {
+            sink.set_volume(Volume::Linear(base_volume * fade.end_mult));
+            if fade.end_mult <= 0.0 {
+                match fade.layer {
+                    BgmFadeLayer::Bgm => bgm.entity = None,
+                    BgmFadeLayer::BgmX => bgmx.entity = None,
+                }
+                commands.entity(entity).despawn();
+            } else {
+                commands.entity(entity).remove::<BgmFade>();
+            }
+        }
     }
 }

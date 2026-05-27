@@ -108,8 +108,22 @@ pub struct ToggleOption {
 #[derive(Component, Clone, Copy, PartialEq)]
 pub enum AudioType {
     Bgm,
+    BgmX,
     Se,
     Voice,
+}
+
+#[derive(Component)]
+pub struct BgmFade {
+    pub timer: Timer,
+    pub start_mult: f32,
+    pub end_mult: f32,
+    pub layer: BgmFadeLayer,
+}
+
+pub enum BgmFadeLayer {
+    Bgm,
+    BgmX,
 }
 
 #[derive(Component)]

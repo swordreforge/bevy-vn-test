@@ -249,6 +249,12 @@ pub struct BgmManager {
 }
 
 #[derive(Resource, Default)]
+pub struct BgmXManager {
+    pub current_id: Option<String>,
+    pub entity: Option<Entity>,
+}
+
+#[derive(Resource, Default)]
 pub struct VoiceManager {
     pub entity: Option<Entity>,
 }

@@ -2,7 +2,8 @@ use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
 use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase, QuakeState, Settings, SpriteOverlayManager, UnlockState};
 use crate::audio_messages::{
-    PlayBgmMessage, StopBgmMessage, PlaySeMessage, LoopSeMessage, StopStreamingSeMessage, PlayVoiceMessage,
+    PlayBgmMessage, StopBgmMessage, PlayBgmXMessage, StopBgmXMessage,
+    PlaySeMessage, LoopSeMessage, StopStreamingSeMessage, PlayVoiceMessage,
 };
 use crate::choice_messages::ChoiceSelectedMessage;
 use crate::components::{DialogueUiRoot, OverlayTween, ScreenOverlayRoot};
@@ -53,6 +54,8 @@ pub struct ProcessAdvanceParams<'w, 's> {
     choice_state: ResMut<'w, ChoiceState>,
     play_bgm_writer: MessageWriter<'w, PlayBgmMessage>,
     stop_bgm_writer: MessageWriter<'w, StopBgmMessage>,
+    play_bgmx_writer: MessageWriter<'w, PlayBgmXMessage>,
+    stop_bgmx_writer: MessageWriter<'w, StopBgmXMessage>,
     play_se_writer: MessageWriter<'w, PlaySeMessage>,
     loop_se_writer: MessageWriter<'w, LoopSeMessage>,
     stop_streaming_se_writer: MessageWriter<'w, StopStreamingSeMessage>,
@@ -152,6 +155,8 @@ fn process_advance(
         ref mut choice_state,
         ref mut play_bgm_writer,
         ref mut stop_bgm_writer,
+        ref mut play_bgmx_writer,
+        ref mut stop_bgmx_writer,
         ref mut play_se_writer,
         ref mut loop_se_writer,
         ref mut stop_streaming_se_writer,
@@ -327,6 +332,16 @@ fn process_advance(
                     Some(ScriptCmd::StopBgm { id, fade_out }) => {
                         if !intro.0 {
                             stop_bgm_writer.write(StopBgmMessage { id, fade_out });
+                        }
+                    }
+                    Some(ScriptCmd::PlayBgmX { id, volume, fade_in }) => {
+                        if !intro.0 {
+                            play_bgmx_writer.write(PlayBgmXMessage { id, volume, fade_in });
+                        }
+                    }
+                    Some(ScriptCmd::StopBgmX { id, fade_out }) => {
+                        if !intro.0 {
+                            stop_bgmx_writer.write(StopBgmXMessage { id, fade_out });
                         }
                     }
                     Some(ScriptCmd::BgmVol { channel: _, volume }) => {
@@ -548,6 +563,16 @@ fn process_advance(
                 Some(ScriptCmd::StopBgm { id, fade_out }) => {
                     if !intro.0 {
                         stop_bgm_writer.write(StopBgmMessage { id, fade_out });
+                    }
+                }
+                Some(ScriptCmd::PlayBgmX { id, volume, fade_in }) => {
+                    if !intro.0 {
+                        play_bgmx_writer.write(PlayBgmXMessage { id, volume, fade_in });
+                    }
+                }
+                Some(ScriptCmd::StopBgmX { id, fade_out }) => {
+                    if !intro.0 {
+                        stop_bgmx_writer.write(StopBgmXMessage { id, fade_out });
                     }
                 }
                 Some(ScriptCmd::PlaySe { file, volume }) => {
