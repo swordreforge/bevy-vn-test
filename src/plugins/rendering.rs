@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy::ui::widget::ImageNodeSize;
 use crate::components::*;
 use crate::state::AppState;
 use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, ObjFileIndex, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
@@ -622,6 +621,13 @@ fn handle_draw_sprite(
             }
         }
 
+        let is_tx = msg.file.contains("_tx");
+        let (anchor_x, anchor_y, target_x, target_y, initial_left, initial_top) = if is_tx {
+            (0.5_f32, 0.5_f32, 640.0_f32, 360.0_f32, 0.0_f32, 0.0_f32)
+        } else {
+            (msg.anchor_x, msg.anchor_y, msg.x, msg.y, msg.x, msg.y)
+        };
+
         if let Some(&entity) = overlay_mgr.sprites.get(&msg.id) {
             if let Ok(mut entry) = commands.get_entity(entity) {
                 entry.insert(ImageNode {
@@ -631,10 +637,10 @@ fn handle_draw_sprite(
                 });
                 entry.insert(Transform::from_scale(Vec3::splat(scale)).with_rotation(Quat::from_rotation_z(rot_rad)));
                 entry.insert(SpriteAnchor {
-                    anchor_x: msg.anchor_x,
-                    anchor_y: msg.anchor_y,
-                    target_x: msg.x,
-                    target_y: msg.y,
+                    anchor_x,
+                    anchor_y,
+                    target_x,
+                    target_y,
                 });
             }
         } else {
@@ -650,8 +656,8 @@ fn handle_draw_sprite(
                     width: Val::Auto,
                     height: Val::Auto,
                     position_type: PositionType::Absolute,
-                    left: Val::Px(msg.x),
-                    top: Val::Px(msg.y),
+                    left: Val::Px(initial_left),
+                    top: Val::Px(initial_top),
                     ..default()
                 },
                 ImageNode {
@@ -660,10 +666,10 @@ fn handle_draw_sprite(
                     ..default()
                 },
                 SpriteAnchor {
-                    anchor_x: msg.anchor_x,
-                    anchor_y: msg.anchor_y,
-                    target_x: msg.x,
-                    target_y: msg.y,
+                    anchor_x,
+                    anchor_y,
+                    target_x,
+                    target_y,
                 },
                 Transform::from_scale(Vec3::splat(scale)).with_rotation(Quat::from_rotation_z(rot_rad)),
                 Visibility::Visible,
@@ -673,8 +679,8 @@ fn handle_draw_sprite(
                 let dur = (msg.time as f32 / 1000.0).max(0.016);
                 spawn.insert(SpriteTween {
                     timer: Timer::from_seconds(dur, TimerMode::Once),
-                    start_x: msg.x, end_x: msg.x,
-                    start_y: msg.y, end_y: msg.y,
+                    start_x: initial_left, end_x: initial_left,
+                    start_y: initial_top, end_y: initial_top,
                     start_alpha: alpha, end_alpha: 1.0,
                     start_scale: scale, end_scale: scale,
                     kind: TweenKind::FadeIn,
@@ -783,15 +789,25 @@ fn update_sprite_tweens(
 }
 
 fn center_sprite_overlays(
-    mut query: Query<(Entity, &mut Node, &SpriteAnchor, &ImageNodeSize)>,
+    mut query: Query<(Entity, &mut Node, &SpriteAnchor, &ImageNode, Option<&mut SpriteTween>)>,
+    images: Res<Assets<Image>>,
     mut commands: Commands,
 ) {
-    for (entity, mut node, anchor, size) in &mut query {
-        let w = size.size().x as f32;
-        let h = size.size().y as f32;
+    for (entity, mut node, anchor, image_node, tween) in &mut query {
+        let Some(image) = images.get(&image_node.image) else { continue; };
+        let w = image.texture_descriptor.size.width as f32;
+        let h = image.texture_descriptor.size.height as f32;
         if w > 0.0 && h > 0.0 {
-            node.left = Val::Px(anchor.target_x - anchor.anchor_x * w);
-            node.top = Val::Px(anchor.target_y - anchor.anchor_y * h);
+            let left = anchor.target_x - anchor.anchor_x * w;
+            let top = anchor.target_y - anchor.anchor_y * h;
+            node.left = Val::Px(left);
+            node.top = Val::Px(top);
+            if let Some(mut tween) = tween {
+                tween.start_x = left;
+                tween.end_x = left;
+                tween.start_y = top;
+                tween.end_y = top;
+            }
             commands.entity(entity).remove::<SpriteAnchor>();
         }
     }
