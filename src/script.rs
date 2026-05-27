@@ -197,6 +197,15 @@ pub enum ScriptCmd {
         time: u64,
         alpha: u8,
     },
+    ScrollBg {
+        file: String,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        fade: u64,
+        wait: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
