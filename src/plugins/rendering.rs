@@ -6,7 +6,7 @@ use crate::script::{FgPosition, Transition};
 use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowFaceMessage, HideFaceMessage,
     ShowCgMessage, HideCgMessage, ScrollBgMessage,
-    DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage,
+    AnimateSpriteMessage, DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage,
 };
 
 fn char_dir(char_id: &str) -> Option<&'static str> {
@@ -56,6 +56,7 @@ impl Plugin for RenderingPlugin {
             .add_message::<DrawSpriteMessage>()
             .add_message::<FadeSpriteMessage>()
             .add_message::<MoveSpriteMessage>()
+            .add_message::<AnimateSpriteMessage>()
             .init_resource::<BgState>()
             .init_resource::<SpriteManager>()
             .init_resource::<CgState>()
@@ -87,6 +88,8 @@ impl Plugin for RenderingPlugin {
                 quake_update,
                 update_bg_scroll,
                 handle_scroll_bg,
+                handle_animate_sprite,
+                advance_animated_sprites,
             ).chain().run_if(in_state(AppState::Gameplay)));
     }
 }
@@ -928,6 +931,102 @@ fn update_overlay_tween(
                 commands.entity(entity).insert(Visibility::Hidden);
             }
             commands.entity(entity).remove::<OverlayTween>();
+        }
+    }
+}
+
+fn handle_animate_sprite(
+    mut msg: MessageReader<AnimateSpriteMessage>,
+    mut overlay_mgr: ResMut<SpriteOverlayManager>,
+    mut cache: ResMut<TextureCache>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+) {
+    for msg in msg.read() {
+        if msg.max == 0 {
+            continue;
+        }
+        if let Some(&entity) = overlay_mgr.sprites.get(&msg.id) {
+            commands.entity(entity).despawn();
+            overlay_mgr.sprites.remove(&msg.id);
+        }
+
+        let blend = match msg.draw {
+            1 => SpriteBlendMode::Add,
+            3 => SpriteBlendMode::Multiply,
+            4 => SpriteBlendMode::Screen,
+            _ => SpriteBlendMode::Normal,
+        };
+
+        let alpha = (msg.alpha as f32 / 255.0).clamp(0.0, 1.0);
+        let scale = sprite_depth_scale(msg.z);
+        let rot_rad = msg.rotation.to_radians();
+
+        let mut frames = Vec::with_capacity(msg.max as usize);
+        for i in 0..msg.max {
+            let path = format!("images/anime/{}_{:02}.png", msg.file, i + 1);
+            let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
+                asset_server.load(&path)
+            }).clone();
+            frames.push(handle);
+        }
+
+        let frame_secs = (msg.frame_time as f32 / 1000.0).max(0.016);
+        let timer = Timer::from_seconds(frame_secs, TimerMode::Repeating);
+
+        let entity = commands.spawn((
+            SpriteOverlay { id: msg.id.clone(), blend_mode: blend },
+            Node {
+                width: Val::Auto,
+                height: Val::Auto,
+                position_type: PositionType::Absolute,
+                left: Val::Px(msg.x),
+                top: Val::Px(msg.y),
+                ..default()
+            },
+            ImageNode {
+                image: frames[0].clone(),
+                color: Color::srgba(1.0, 1.0, 1.0, alpha),
+                ..default()
+            },
+            SpriteAnchor {
+                anchor_x: msg.anchor_x,
+                anchor_y: msg.anchor_y,
+                target_x: msg.x,
+                target_y: msg.y,
+            },
+            Transform::from_scale(Vec3::splat(scale)).with_rotation(Quat::from_rotation_z(rot_rad)),
+            Visibility::Visible,
+            ZIndex((1 + msg.priority.max(0) as i32).min(2)),
+            AnimatedSprite {
+                frames,
+                current_frame: 0,
+                timer,
+                max_frames: msg.max as usize,
+                finished: false,
+            },
+        )).id();
+        overlay_mgr.sprites.insert(msg.id.clone(), entity);
+    }
+}
+
+fn advance_animated_sprites(
+    time: Res<Time>,
+    mut query: Query<(&mut AnimatedSprite, &mut ImageNode)>,
+) {
+    for (mut anim, mut image) in query.iter_mut() {
+        if anim.finished || anim.max_frames <= 1 {
+            continue;
+        }
+
+        anim.timer.tick(time.delta());
+        while anim.timer.just_finished() && !anim.finished {
+            anim.current_frame += 1;
+            if anim.current_frame >= anim.max_frames {
+                anim.finished = true;
+            } else {
+                image.image = anim.frames[anim.current_frame].clone();
+            }
         }
     }
 }
