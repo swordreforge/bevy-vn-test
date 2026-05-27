@@ -5,7 +5,7 @@ use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, ObjFil
 use crate::script::{FgPosition, Transition};
 use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowFaceMessage, HideFaceMessage,
-    ShowCgMessage, HideCgMessage,
+    ShowCgMessage, HideCgMessage, ScrollBgMessage,
     DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage,
 };
 
@@ -52,6 +52,7 @@ impl Plugin for RenderingPlugin {
             .add_message::<HideFaceMessage>()
             .add_message::<ShowCgMessage>()
             .add_message::<HideCgMessage>()
+            .add_message::<ScrollBgMessage>()
             .add_message::<DrawSpriteMessage>()
             .add_message::<FadeSpriteMessage>()
             .add_message::<MoveSpriteMessage>()
@@ -84,6 +85,8 @@ impl Plugin for RenderingPlugin {
                 center_sprite_overlays,
                 update_overlay_tween,
                 quake_update,
+                update_bg_scroll,
+                handle_scroll_bg,
             ).chain().run_if(in_state(AppState::Gameplay)));
     }
 }
@@ -211,16 +214,17 @@ fn handle_set_bg(
     mut bg_state: ResMut<BgState>,
     mut cache: ResMut<TextureCache>,
     asset_server: Res<AssetServer>,
-    mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor)>,
+    mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor, &mut Node)>,
+    mut commands: Commands,
 ) {
     for msg in msg.read() {
         // Complete any in-progress fade instantly
         if bg_state.fade.is_some() {
-            if let Ok((_, mut vis, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
+            if let Ok((_, mut vis, _, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
                 *vis = Visibility::Hidden;
             }
             bg_state.active_idx = 1 - bg_state.active_idx;
-            if let Ok((_, _, mut bg)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
+            if let Ok((_, _, mut bg, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
                 bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
             }
             bg_state.fade = None;
@@ -232,11 +236,19 @@ fn handle_set_bg(
             asset_server.load(&path)
         }).clone();
 
+        for &entity in &bg_state.entities {
+            commands.entity(entity).remove::<BgScroll>();
+        }
+
         let inactive_idx = 1 - bg_state.active_idx;
         let inactive_entity = bg_state.entities[inactive_idx];
 
-        if let Ok((mut image_node, mut vis, mut bg)) = query.get_mut(inactive_entity) {
+        if let Ok((mut image_node, mut vis, mut bg, mut node)) = query.get_mut(inactive_entity) {
             image_node.image = handle;
+            node.width = Val::Percent(100.0);
+            node.height = Val::Percent(100.0);
+            node.left = Val::Px(0.0);
+            node.top = Val::Px(0.0);
             match msg.transition {
                 Some(Transition::Fade) => {
                     let dur = msg.duration.unwrap_or(0.5) as f32;
@@ -249,13 +261,96 @@ fn handle_set_bg(
                 _ => {
                     *vis = Visibility::Visible;
                     bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
-                    if let Ok((_, mut old_vis, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
+                    if let Ok((_, mut old_vis, _, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
                         *old_vis = Visibility::Hidden;
                     }
                     bg_state.active_idx = inactive_idx;
                     bg_state.fade = None;
                 }
             }
+        }
+    }
+}
+
+fn handle_scroll_bg(
+    mut msg: MessageReader<ScrollBgMessage>,
+    mut bg_state: ResMut<BgState>,
+    mut cache: ResMut<TextureCache>,
+    asset_server: Res<AssetServer>,
+    images: Res<Assets<Image>>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut Node, &mut ImageNode, &mut Visibility, &mut BackgroundColor)>,
+) {
+    for msg in msg.read() {
+        let file = if msg.file.contains('.') { msg.file.clone() } else { format!("{}.jpg", msg.file) };
+        let path = format!("images/bg/{}", file);
+        let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
+            asset_server.load(&path)
+        }).clone();
+
+        for &entity in &bg_state.entities {
+            commands.entity(entity).remove::<BgScroll>();
+        }
+
+        let active_idx = bg_state.active_idx;
+        let active_entity = bg_state.entities[active_idx];
+
+        if let Ok((entity, mut node, mut image_node, mut vis, mut bg)) = query.get_mut(active_entity) {
+            image_node.image = handle.clone();
+            *vis = Visibility::Visible;
+            bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
+
+            if let Some(image) = images.get(&handle) {
+                let w = image.texture_descriptor.size.width as f32;
+                let h = image.texture_descriptor.size.height as f32;
+                if w > 0.0 && h > 0.0 {
+                    node.width = Val::Px(w);
+                    node.height = Val::Px(h);
+                }
+            }
+
+            node.left = Val::Px(msg.x1);
+            node.top = Val::Px(msg.y1);
+
+            if (msg.x1 - msg.x2).abs() > 0.5 || (msg.y1 - msg.y2).abs() > 0.5 {
+                let dur = (msg.fade as f32 / 1000.0).max(0.016);
+                commands.entity(entity).insert(BgScroll {
+                    timer: Timer::from_seconds(dur, TimerMode::Once),
+                    start_x: msg.x1,
+                    end_x: msg.x2,
+                    start_y: msg.y1,
+                    end_y: msg.y2,
+                });
+            }
+
+            if bg_state.fade.is_some() {
+                if let Ok((_, _, _, mut old_vis, _)) = query.get_mut(bg_state.entities[1 - active_idx]) {
+                    *old_vis = Visibility::Hidden;
+                }
+                bg_state.active_idx = 1 - bg_state.active_idx;
+                bg_state.fade = None;
+            }
+        }
+    }
+}
+
+fn update_bg_scroll(
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut Node, &mut BgScroll)>,
+    mut commands: Commands,
+) {
+    for (entity, mut node, mut scroll) in &mut query {
+        scroll.timer.tick(time.delta());
+        let t = scroll.timer.fraction();
+        let eased = 1.0 - (1.0 - t) * (1.0 - t);
+
+        node.left = Val::Px(scroll.start_x + (scroll.end_x - scroll.start_x) * eased);
+        node.top = Val::Px(scroll.start_y + (scroll.end_y - scroll.start_y) * eased);
+
+        if scroll.timer.just_finished() {
+            node.left = Val::Px(scroll.end_x);
+            node.top = Val::Px(scroll.end_y);
+            commands.entity(entity).remove::<BgScroll>();
         }
     }
 }
