@@ -381,7 +381,6 @@ fn process_advance(
 
         // Normal mode
         let mut pending_voice = None;
-        let mut narration_wait = false;
         while engine.has_more() {
             let cmd = engine.advance().cloned();
             match cmd {
@@ -410,28 +409,23 @@ fn process_advance(
                     break;
                 }
                 Some(ScriptCmd::ClearText) => {
-                    narration_wait = false;
                     dialogue.current_text.clear();
                     dialogue.current_speaker = None;
                     dialogue.text_progress = 0;
                     dialogue.is_displaying = false;
                 }
                 Some(ScriptCmd::Jump { target }) => {
-                    narration_wait = false;
                     if !engine.jump_to_label(&target) {
                         warn!("Jump target not found: {}", target);
                     }
                 }
                 Some(ScriptCmd::Call { target }) => {
-                    narration_wait = false;
                     engine.call_label(&target);
                 }
                 Some(ScriptCmd::CallScript { script, label }) => {
-                    narration_wait = false;
                     engine.call_script(&script, label.as_deref());
                 }
                 Some(ScriptCmd::Return) => {
-                    narration_wait = false;
                     engine.return_from_call();
                 }
                 Some(ScriptCmd::Condition { var, value, operator, goto }) => {
@@ -451,7 +445,6 @@ fn process_advance(
                     engine.flags.insert(name, value);
                 }
                 Some(ScriptCmd::Halt) => {
-                    narration_wait = false;
                     engine.call_stack.clear();
                     engine.current_script.clear();
                     engine.current_line = 0;
@@ -477,37 +470,29 @@ fn process_advance(
                     unlock_state.cg_unlocked.insert(file);
                 }
                 Some(ScriptCmd::SetBg { file, transition, duration }) => {
-                    narration_wait = false;
                     set_bg_writer.write(SetBgMessage { file, transition, duration: duration.map(|d| d as f64) });
                 }
                 Some(ScriptCmd::ShowFg { char_id, expression, position, transition }) => {
-                    narration_wait = false;
                     show_fg_writer.write(ShowFgMessage { char_id, expression, position, transition, duration: None });
                 }
                 Some(ScriptCmd::HideFg { char_id, transition }) => {
-                    narration_wait = false;
                     hide_fg_writer.write(HideFgMessage { char_id, transition, duration: None });
                 }
                 Some(ScriptCmd::ShowFace { char_id, .. }) => {
-                    narration_wait = false;
                     show_face_writer.write(ShowFaceMessage { char_id });
                 }
                 Some(ScriptCmd::HideFace { .. }) => {
-                    narration_wait = false;
                     hide_face_writer.write(HideFaceMessage);
                 }
                 Some(ScriptCmd::ShowCg { file, transition }) => {
-                    narration_wait = false;
                     show_cg_writer.write(ShowCgMessage { file: file.clone(), transition, duration: None });
                     unlock_state.cg_unlocked.insert(file);
                 }
                 Some(ScriptCmd::HideCg { transition }) => {
-                    narration_wait = false;
                     hide_cg_writer.write(HideCgMessage { transition, duration: None });
                 }
                 Some(ScriptCmd::DrawSprite { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode }) => {
                     if file.contains("_tx") {
-                        narration_wait = true;
                     }
                     draw_sprite_writer.write(DrawSpriteMessage { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode });
                 }
@@ -541,11 +526,9 @@ fn process_advance(
                 }
                 Some(ScriptCmd::Wait { duration }) => {
                     if settings.skip_mode {
-                        // skip: continue
-                    } else if settings.auto_mode || narration_wait {
-                        auto_skip.auto_timer = Some(Timer::from_seconds(duration as f32 / 1000.0, TimerMode::Once));
-                        break;
+                        // skip mode: continue without waiting
                     } else {
+                        auto_skip.auto_timer = Some(Timer::from_seconds(duration as f32 / 1000.0, TimerMode::Once));
                         break;
                     }
                 }
@@ -565,7 +548,6 @@ fn process_advance(
                     }
                 }
                 Some(ScriptCmd::ClearOverlay { time }) => {
-                    narration_wait = false;
                     for (entity, bg, mut vis) in overlay_query.iter_mut() {
                         if time > 0 {
                             let current_alpha = bg.0.alpha();
@@ -581,7 +563,6 @@ fn process_advance(
                     }
                 }
                 Some(ScriptCmd::Window { show, .. }) => {
-                    narration_wait = false;
                     for mut vis in window_query.iter_mut() {
                         *vis = if show { Visibility::Visible } else { Visibility::Hidden };
                     }
@@ -600,7 +581,6 @@ fn process_advance(
                     });
                 }
                 Some(cmd) => {
-                    narration_wait = false;
                     info!("Script cmd (no-op): {:?}", cmd);
                 }
                 None => break,
