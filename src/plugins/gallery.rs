@@ -68,7 +68,7 @@ fn populate_gallery_grid(
     for i in start..end {
         let file = filtered[i];
         if unlock_state.cg_unlocked.contains(file.as_str()) {
-            let path = format!("images/ev/{}", file);
+            let path = format!("image/ev/{}", file);
             let handle = cache.cache.entry(path.clone())
                 .or_insert_with(|| asset_server.load(&path))
                 .clone();
@@ -279,7 +279,7 @@ fn handle_thumbnail_click(
             let file = &thumbnail.0;
             if unlock_state.cg_unlocked.contains(file) {
                 gallery_state.fullscreen = Some(file.clone());
-                let path = format!("images/ev/{}", file);
+                let path = format!("image/ev/{}", file);
                 let handle = cache.cache.entry(path.clone())
                     .or_insert_with(|| asset_server.load(&path))
                     .clone();

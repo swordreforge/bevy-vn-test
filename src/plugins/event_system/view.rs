@@ -96,7 +96,7 @@ fn advance_view(
 
             let name_x = entry.name_x as f32;
             let name_texture: Handle<Image> = asset_server.load(format!("{}{}.png", prefix, entry.name_file));
-            let mask_path = format!("images/rule/{}.png", entry.mask_file);
+            let mask_path = format!("image/rule/{}.png", entry.mask_file);
             let mask_texture: Handle<Image> = asset_server.load(&mask_path);
             let mat_handle = materials.add(ViewMaskMaterial {
                 name_texture,

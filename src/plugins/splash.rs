@@ -41,7 +41,7 @@ fn setup_splash(mut commands: Commands, asset_server: Res<AssetServer>) {
             position_type: PositionType::Absolute,
             ..default()
         },
-        ImageNode::new(asset_server.load("images/logo00.png")),
+        ImageNode::new(asset_server.load("image/logo00.png")),
     ));
 }
 
@@ -74,7 +74,7 @@ fn splash_update(
                     position_type: PositionType::Absolute,
                     ..default()
                 },
-                ImageNode::new(asset_server.load("images/logo01.png")),
+                ImageNode::new(asset_server.load("image/logo01.png")),
             ));
             splash_state.phase = SplashPhase::Logo1;
             splash_state.timer.reset();

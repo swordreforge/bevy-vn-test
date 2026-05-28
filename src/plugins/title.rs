@@ -48,7 +48,7 @@ fn setup_title(
             position_type: PositionType::Absolute,
             ..default()
         },
-        ImageNode::new(asset_server.load("images/title/bg.png")),
+        ImageNode::new(asset_server.load("image/title/bg.png")),
         BackgroundColor(Color::BLACK),
         ZIndex(0),
     ));

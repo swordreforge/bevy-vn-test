@@ -134,7 +134,7 @@ pub struct AllCgFiles(pub Vec<String>);
 impl AllCgFiles {
     pub fn scan() -> Self {
         let mut files = Vec::new();
-        if let Ok(entries) = std::fs::read_dir("assets/images/ev") {
+        if let Ok(entries) = std::fs::read_dir("assets/image/ev") {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_file() {

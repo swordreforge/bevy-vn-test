@@ -234,7 +234,7 @@ fn handle_set_bg(
         }
 
         let file = if msg.file.contains('.') { msg.file.clone() } else { format!("{}.jpg", msg.file) };
-        let path = format!("images/bg/{}", file);
+        let path = format!("image/bg/{}", file);
         let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
             asset_server.load(&path)
         }).clone();
@@ -286,7 +286,7 @@ fn handle_scroll_bg(
 ) {
     for msg in msg.read() {
         let file = if msg.file.contains('.') { msg.file.clone() } else { format!("{}.jpg", msg.file) };
-        let path = format!("images/bg/{}", file);
+        let path = format!("image/bg/{}", file);
         let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
             asset_server.load(&path)
         }).clone();
@@ -372,7 +372,7 @@ fn handle_show_fg(
                 warn!("No FG mapping for char_id: {}", msg.char_id);
                 continue;
             };
-            let path = format!("images/fg/{}/tati_{}.png", dir, msg.char_id);
+            let path = format!("image/fg/{}/tati_{}.png", dir, msg.char_id);
             let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
                 asset_server.load(&path)
             }).clone();
@@ -457,7 +457,7 @@ fn handle_show_face(
     mut query: Query<(&mut ImageNode, &mut Visibility), With<FacePortrait>>,
 ) {
     for msg in msg.read() {
-        let path = format!("images/face/face_{}.png", msg.char_id);
+        let path = format!("image/face/face_{}.png", msg.char_id);
         let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
             asset_server.load(&path)
         }).clone();
@@ -493,7 +493,7 @@ fn handle_show_cg(
             commands.entity(entity).despawn();
         }
 
-        let path = format!("images/ev/{}", msg.file);
+        let path = format!("image/ev/{}", msg.file);
         let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
             asset_server.load(&path)
         }).clone();
@@ -704,7 +704,7 @@ fn handle_draw_sprite(
             } else {
                 format!("{}.png", msg.file)
             };
-            format!("images/obj/{}", path)
+            format!("image/obj/{}", path)
         });
         let handle = cache.cache.entry(full_path.clone()).or_insert_with(|| {
             asset_server.load(&full_path)
@@ -964,7 +964,7 @@ fn handle_animate_sprite(
 
         let mut frames = Vec::with_capacity(msg.max as usize);
         for i in 0..msg.max {
-            let path = format!("images/anime/{}_{:02}.png", msg.file, i + 1);
+            let path = format!("image/anime/{}_{:02}.png", msg.file, i + 1);
             let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
                 asset_server.load(&path)
             }).clone();

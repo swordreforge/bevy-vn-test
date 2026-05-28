@@ -417,7 +417,9 @@ dependencies = [
 name = "bevy-vn"
 version = "0.1.0"
 dependencies = [
+ "android-activity",
  "bevy",
+ "bevy_android",
  "bevy_scrollbar",
  "rand 0.8.6",
  "rodio",

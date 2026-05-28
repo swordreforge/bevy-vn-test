@@ -1,3 +1,4 @@
 target/
 *.pdb
 assets/scripts/*.bscript.ron
+andriod/
