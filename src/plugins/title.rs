@@ -49,6 +49,7 @@ fn setup_title(
             ..default()
         },
         ImageNode::new(asset_server.load("images/title/bg.png")),
+        BackgroundColor(Color::BLACK),
         ZIndex(0),
     ));
 

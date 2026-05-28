@@ -193,7 +193,7 @@ fn setup_rendering(
 
 fn cleanup_rendering(
     mut commands: Commands,
-    query: Query<Entity, Or<(With<BackgroundRoot>, With<SpriteSlotMarker>, With<CgRoot>, With<SpriteOverlay>)>>,
+    query: Query<Entity, Or<(With<BackgroundRoot>, With<SpriteSlotMarker>, With<CgRoot>, With<SpriteOverlay>, With<ScreenOverlayRoot>)>>,
     mut bg_state: ResMut<BgState>,
     mut sprite_mgr: ResMut<SpriteManager>,
     mut cg_state: ResMut<CgState>,

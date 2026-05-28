@@ -248,6 +248,10 @@ fn advance_view(
             view.phase = ViewPhase::Done;
         }
         ViewPhase::Done => {
+            for (_, mut bg, mut vis) in overlay_query.iter_mut() {
+                bg.0 = Color::srgba(0.0, 0.0, 0.0, 0.0);
+                *vis = Visibility::Hidden;
+            }
             view_blocking.0 = false;
             commands.entity(view_entity).despawn();
         }
