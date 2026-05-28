@@ -1,15 +1,17 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 use crate::components::*;
-use crate::resources::{GameFont, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, UnlockState};
+use crate::resources::{BgmManager, BgmXManager, GameFont, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, UnlockState};
 use crate::state::AppState;
 use crate::script::{ScriptCmd, ScriptEngine};
 use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowCgMessage, HideCgMessage,
 };
 use crate::audio_messages::{
-    PlayBgmMessage, StopBgmMessage,
+    PlayBgmMessage, PlayBgmXMessage, StopBgmMessage,
 };
+use crate::plugins::event_system::{ViewPhase, ViewState};
+use crate::plugins::event_system::view_data;
 
 pub struct SaveLoadPlugin;
 
@@ -26,7 +28,10 @@ impl Plugin for SaveLoadPlugin {
                 handle_save_load_escape,
                 handle_save_load_page_nav,
             ))
-            .add_systems(Update, process_scene_restore.run_if(in_state(AppState::Gameplay)));
+            .add_systems(Update, (
+                process_scene_restore,
+                process_load_restore,
+            ).run_if(in_state(AppState::Gameplay)));
     }
 }
 
@@ -37,6 +42,14 @@ const SLOTS_PER_PAGE: usize = 15;
 
 #[derive(Resource)]
 struct PendingSceneRestore(Vec<ScriptCmd>);
+
+#[derive(Resource)]
+struct PendingLoadRestore {
+    bgm_id: Option<String>,
+    bgmx_id: Option<String>,
+    view_char_id: Option<String>,
+    window_color_idx: i32,
+}
 
 #[derive(Resource)]
 struct ConfirmState(usize);
@@ -310,6 +323,10 @@ fn handle_confirm(
     mut unlock_state: ResMut<UnlockState>,
     mut next_state: ResMut<NextState<AppState>>,
     mut commands: Commands,
+    settings: Res<Settings>,
+    bgm: Res<BgmManager>,
+    bgmx: Res<BgmXManager>,
+    view_query: Query<&ViewState>,
 ) {
     let Some(confirm) = confirm else { return };
     let idx = confirm.0;
@@ -317,13 +334,18 @@ fn handle_confirm(
     for interaction in &yes_query {
         if *interaction == Interaction::Pressed {
             if mode.0 {
-                let data = build_save_data(&script_engine, &affection, &unlock_state);
+                let data = build_save_data(
+                    &script_engine, &affection, &unlock_state,
+                    &settings, &bgm, &bgmx,
+                    view_query.single().ok(),
+                );
                 save_mgr.save_slot(idx, data);
             } else if let Some(data) = save_mgr.load_slot_from_disk(idx) {
                 let scene_name = data.scene_name.clone();
                 let script_line = data.script_line;
                 let call_stack = data.call_stack.clone();
                 let flags = data.flags.clone();
+                let global_flags = data.global_flags.clone();
                 let unlocked = data.unlock_state.clone();
                 let aff = data.affection.clone();
 
@@ -331,8 +353,16 @@ fn handle_confirm(
                 script_engine.current_line = script_line;
                 script_engine.call_stack = call_stack;
                 script_engine.flags = flags;
+                script_engine.global_flags = global_flags;
                 *unlock_state = unlocked;
                 *affection = AffectionMap(aff);
+
+                commands.insert_resource(PendingLoadRestore {
+                    bgm_id: data.bgm_id.clone(),
+                    bgmx_id: data.bgmx_id.clone(),
+                    view_char_id: data.view_char_id.clone(),
+                    window_color_idx: data.window_color_idx,
+                });
 
                 let cmds = collect_scene_restore(&script_engine);
                 if !cmds.is_empty() {
@@ -589,6 +619,46 @@ fn process_scene_restore(
     commands.remove_resource::<PendingSceneRestore>();
 }
 
+fn process_load_restore(
+    pending: Option<Res<PendingLoadRestore>>,
+    mut commands: Commands,
+    mut play_bgm: MessageWriter<PlayBgmMessage>,
+    mut play_bgmx: MessageWriter<PlayBgmXMessage>,
+) {
+    let Some(pending) = pending else { return };
+
+    if let Some(bgm_id) = &pending.bgm_id {
+        play_bgm.write(PlayBgmMessage { id: bgm_id.clone(), volume: None, fade_in: None });
+    }
+    if let Some(bgmx_id) = &pending.bgmx_id {
+        play_bgmx.write(PlayBgmXMessage { id: bgmx_id.clone(), volume: None, fade_in: None });
+    }
+    if let Some(char_id) = &pending.view_char_id {
+        if let Some(entry) = view_data::lookup_view_entry(char_id) {
+            let tween_entry = view_data::lookup_tween_entry(entry.pen_type)
+                .unwrap_or_else(|| view_data::lookup_tween_entry(2).unwrap());
+            commands.spawn(ViewState {
+                char_id: char_id.clone(),
+                phase: ViewPhase::FadeOut,
+                timer: Timer::from_seconds(1.0, TimerMode::Once),
+                step_idx: 0,
+                pen_entity: None,
+                name_entity: None,
+                mask_material: None,
+                scene_entities: Vec::new(),
+                entry,
+                tween_entry,
+            });
+        }
+    }
+    let wc = pending.window_color_idx;
+    commands.queue(move |world: &mut World| {
+        let mut settings = world.resource_mut::<Settings>();
+        settings.window_color_idx = wc;
+    });
+    commands.remove_resource::<PendingLoadRestore>();
+}
+
 fn handle_save_load_escape(
     keyboard: Res<ButtonInput<KeyCode>>,
     state: Res<State<AppState>>,
@@ -599,22 +669,35 @@ fn handle_save_load_escape(
     }
 }
 
-fn build_save_data(engine: &ScriptEngine, affection: &AffectionMap, unlock_state: &UnlockState) -> SaveData {
+fn build_save_data(
+    engine: &ScriptEngine,
+    affection: &AffectionMap,
+    unlock_state: &UnlockState,
+    settings: &Settings,
+    bgm: &BgmManager,
+    bgmx: &BgmXManager,
+    view_state: Option<&ViewState>,
+) -> SaveData {
     use std::time::SystemTime;
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map(|d| format!("{}", d.as_secs()))
         .unwrap_or_default();
     SaveData {
-        version: 1,
+        version: 2,
         timestamp,
         scene_name: engine.current_script.clone(),
         script_path: format!("{}.bscript.ron", engine.current_script),
         script_line: engine.current_line,
         call_stack: engine.call_stack.clone(),
         flags: engine.flags.clone(),
+        global_flags: engine.global_flags.clone(),
         affection: affection.0.clone(),
         unlock_state: unlock_state.clone(),
         play_time: 0,
+        window_color_idx: settings.window_color_idx,
+        view_char_id: view_state.map(|vs| vs.char_id.clone()),
+        bgm_id: bgm.current_id.clone(),
+        bgmx_id: bgmx.current_id.clone(),
     }
 }

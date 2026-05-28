@@ -30,6 +30,7 @@ use plugins::rendering::RenderingPlugin;
 use plugins::choice::ChoicePlugin;
 use plugins::screen_transition::ScreenTransitionPlugin;
 use plugins::backlog::BacklogPlugin;
+use plugins::event_system::EventSystemPlugin;
 use bevy_scrollbar::ScrollbarPlugin;
 
 fn main() {
@@ -60,6 +61,7 @@ fn main() {
         .add_plugins(ChoicePlugin)
         .add_plugins(ScreenTransitionPlugin)
         .add_plugins(BacklogPlugin)
+        .add_plugins(EventSystemPlugin)
         .add_plugins(ScrollbarPlugin)
         .init_resource::<ObjFileIndex>()
         .add_systems(Startup, (startup, load_obj_index))

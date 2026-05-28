@@ -14,3 +14,4 @@ pub mod choice;
 pub mod screen_transition;
 pub mod splash;
 pub mod backlog;
+pub mod event_system;

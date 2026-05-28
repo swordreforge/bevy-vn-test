@@ -37,10 +37,20 @@ pub struct SaveData {
     pub script_line: usize,
     pub call_stack: Vec<(String, usize)>,
     pub flags: HashMap<String, i32>,
+    #[serde(default)]
+    pub global_flags: HashMap<u32, i32>,
     pub affection: HashMap<String, i32>,
     #[serde(default)]
     pub unlock_state: UnlockState,
     pub play_time: u64,
+    #[serde(default)]
+    pub window_color_idx: i32,
+    #[serde(default)]
+    pub view_char_id: Option<String>,
+    #[serde(default)]
+    pub bgm_id: Option<String>,
+    #[serde(default)]
+    pub bgmx_id: Option<String>,
 }
 
 #[derive(Resource, Default)]
@@ -95,6 +105,7 @@ pub struct Settings {
     pub message_window_opacity: u8,
     pub window_color_idx: i32,
     pub window_design: i32,
+    pub click_to_advance: bool,
 }
 
 impl Default for Settings {
@@ -109,9 +120,13 @@ impl Default for Settings {
             message_window_opacity: 70,
             window_color_idx: 0,
             window_design: 0,
+            click_to_advance: false,
         }
     }
 }
+
+#[derive(Resource, Default)]
+pub struct ViewBlocking(pub bool);
 
 #[derive(Resource)]
 pub struct AllCgFiles(pub Vec<String>);
