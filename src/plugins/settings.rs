@@ -1,7 +1,7 @@
-use bevy::prelude::*;
 use crate::components::*;
 use crate::resources::{GameFont, Settings};
 use crate::state::AppState;
+use bevy::prelude::*;
 
 pub struct SettingsPlugin;
 
@@ -10,13 +10,17 @@ impl Plugin for SettingsPlugin {
         app.init_resource::<Settings>()
             .add_systems(OnEnter(AppState::Settings), setup_settings_ui)
             .add_systems(OnExit(AppState::Settings), cleanup_settings)
-            .add_systems(Update, (
-                handle_slider_clicks,
-                handle_toggle_clicks,
-                handle_back_click,
-                update_slider_visuals,
-                update_toggle_visuals,
-            ).run_if(in_state(AppState::Settings)));
+            .add_systems(
+                Update,
+                (
+                    handle_slider_clicks,
+                    handle_toggle_clicks,
+                    handle_back_click,
+                    update_slider_visuals,
+                    update_toggle_visuals,
+                )
+                    .run_if(in_state(AppState::Settings)),
+            );
     }
 }
 
@@ -32,170 +36,259 @@ fn color_for_filled(filled: bool) -> Color {
 }
 
 fn setup_settings_ui(mut commands: Commands, settings: Res<Settings>, game_font: Res<GameFont>) {
-    let slider_defs: [(&str, SliderSetting, f32); 5] = [
-        ("BGM Volume", SliderSetting::BgmVolume, settings.bgm_volume * 100.0),
-        ("SE Volume", SliderSetting::SeVolume, settings.se_volume * 100.0),
-        ("Voice Volume", SliderSetting::VoiceVolume, settings.voice_volume * 100.0),
-        ("Text Speed", SliderSetting::TextSpeed, settings.text_speed as f32),
-        ("Msg Opacity", SliderSetting::MsgOpacity, settings.message_window_opacity as f32),
+    let slider_defs: [(&str, SliderSetting, f32); 6] = [
+        (
+            "BGM Volume",
+            SliderSetting::BgmVolume,
+            settings.bgm_volume * 100.0,
+        ),
+        (
+            "SE Volume",
+            SliderSetting::SeVolume,
+            settings.se_volume * 100.0,
+        ),
+        (
+            "Voice Volume",
+            SliderSetting::VoiceVolume,
+            settings.voice_volume * 100.0,
+        ),
+        (
+            "Text Speed",
+            SliderSetting::TextSpeed,
+            settings.text_speed as f32,
+        ),
+        (
+            "Msg Opacity",
+            SliderSetting::MsgOpacity,
+            settings.message_window_opacity as f32,
+        ),
+        (
+            "Auto Delay",
+            SliderSetting::AutoDelay,
+            settings.auto_delay_secs,
+        ),
     ];
 
-    commands.spawn((
-        SettingsScreen,
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            position_type: PositionType::Absolute,
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.05, 0.05, 0.15, 0.95)),
-        ZIndex(5),
-    )).with_children(|parent| {
-        // Back button
-        parent.spawn((
-            SettingsBackButton,
-            Button,
-            Text::new("← Back"),
-            TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-            TextColor(Color::srgb(0.6, 0.6, 0.8)),
+    commands
+        .spawn((
+            SettingsScreen,
             Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
                 position_type: PositionType::Absolute,
-                top: Val::Px(20.0),
-                left: Val::Px(20.0),
-                padding: UiRect::all(Val::Px(8.0)),
                 ..default()
             },
-        ));
-
-        // Title
-        parent.spawn((
-            Text::new("Settings"),
-            TextFont { font: game_font.0.clone(), font_size: 36.0, ..default() },
-            TextColor(Color::WHITE),
-            Node { margin: UiRect::bottom(Val::Px(30.0)), ..default() },
-        ));
-
-        // Sliders
-        for (label, setting, initial) in &slider_defs {
-            let initial_val = *initial;
-            let setting_copy = *setting;
+            BackgroundColor(Color::srgba(0.05, 0.05, 0.15, 0.95)),
+            ZIndex(5),
+        ))
+        .with_children(|parent| {
+            // Back button
             parent.spawn((
-                Node {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    margin: UiRect::vertical(Val::Px(6.0)),
+                SettingsBackButton,
+                Button,
+                Text::new("← Back"),
+                TextFont {
+                    font: game_font.0.clone(),
+                    font_size: 20.0,
                     ..default()
                 },
-            )).with_children(|row| {
-                // Label
-                row.spawn((
-                    Text::new(*label),
-                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                    TextColor(Color::WHITE),
-                    Node { width: Val::Px(150.0), ..default() },
-                ));
-
-                // Track with 10 segments
-                for i in 0..11 {
-                    let seg_val = (i as f32) * 10.0;
-                    let filled = seg_val <= initial_val;
-                    row.spawn((
-                        SliderSegment(i),
-                        setting_copy,
-                        Button,
-                        Node {
-                            width: Val::Px(20.0),
-                            height: Val::Px(22.0),
-                            border: UiRect::all(Val::Px(1.0)),
-                            ..default()
-                        },
-                        BackgroundColor(color_for_filled(filled)),
-                    ));
-                }
-
-                // Value text
-                row.spawn((
-                    SliderValueText,
-                    setting_copy,
-                    Text::new(format!("{:>3.0}", initial_val)),
-                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                    TextColor(Color::WHITE),
-                    Node {
-                        width: Val::Px(50.0),
-                        ..default()
-                    },
-                ));
-            });
-        }
-
-        // Spacing before toggles
-        parent.spawn((Node { height: Val::Px(20.0), ..default() },));
-
-        // Toggles
-        let toggle_defs: [(&str, &str, bool); 2] = [
-            ("Auto Mode", "auto", settings.auto_mode),
-            ("Skip Mode", "skip", settings.skip_mode),
-        ];
-
-        for (label, group, initial_val) in &toggle_defs {
-            parent.spawn((
+                TextColor(Color::srgb(0.6, 0.6, 0.8)),
                 Node {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    margin: UiRect::vertical(Val::Px(6.0)),
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(20.0),
+                    left: Val::Px(20.0),
+                    padding: UiRect::all(Val::Px(8.0)),
                     ..default()
                 },
-            )).with_children(|row| {
-                row.spawn((
-                    Text::new(*label),
-                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                    TextColor(Color::WHITE),
-                    Node { width: Val::Px(150.0), ..default() },
-                ));
+            ));
 
-                // ON button
-                let on_active = *initial_val;
-                row.spawn((
-                    ToggleOption { group: group.to_string(), value: true },
-                    Button,
-                    Text::new("ON"),
-                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                    TextColor(if on_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
-                    Node {
-                        width: Val::Px(50.0),
-                        height: Val::Px(30.0),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BackgroundColor(if on_active { Color::srgb(0.15, 0.3, 0.6) } else { Color::srgb(0.12, 0.12, 0.18) }),
-                ));
+            // Title
+            parent.spawn((
+                Text::new("Settings"),
+                TextFont {
+                    font: game_font.0.clone(),
+                    font_size: 36.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::bottom(Val::Px(30.0)),
+                    ..default()
+                },
+            ));
 
-                // OFF button
-                let off_active = !*initial_val;
-                row.spawn((
-                    ToggleOption { group: group.to_string(), value: false },
-                    Button,
-                    Text::new("OFF"),
-                    TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                    TextColor(if off_active { Color::WHITE } else { Color::srgb(0.4, 0.4, 0.5) }),
-                    Node {
-                        width: Val::Px(50.0),
-                        height: Val::Px(30.0),
-                        justify_content: JustifyContent::Center,
+            // Sliders
+            for (label, setting, initial) in &slider_defs {
+                let initial_val = *initial;
+                let setting_copy = *setting;
+                parent
+                    .spawn((Node {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Row,
                         align_items: AlignItems::Center,
+                        margin: UiRect::vertical(Val::Px(6.0)),
                         ..default()
-                    },
-                    BackgroundColor(if off_active { Color::srgb(0.3, 0.12, 0.12) } else { Color::srgb(0.12, 0.12, 0.18) }),
-                ));
-            });
-        }
-    });
+                    },))
+                    .with_children(|row| {
+                        // Label
+                        row.spawn((
+                            Text::new(*label),
+                            TextFont {
+                                font: game_font.0.clone(),
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                            Node {
+                                width: Val::Px(150.0),
+                                ..default()
+                            },
+                        ));
+
+                        // Track with 10 segments
+                        for i in 0..11 {
+                            let seg_val = (i as f32) * 10.0;
+                            let filled = seg_val <= initial_val;
+                            row.spawn((
+                                SliderSegment(i),
+                                setting_copy,
+                                Button,
+                                Node {
+                                    width: Val::Px(20.0),
+                                    height: Val::Px(22.0),
+                                    border: UiRect::all(Val::Px(1.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(color_for_filled(filled)),
+                            ));
+                        }
+
+                        // Value text
+                        row.spawn((
+                            SliderValueText,
+                            setting_copy,
+                            Text::new(format!("{:>3.0}", initial_val)),
+                            TextFont {
+                                font: game_font.0.clone(),
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                            Node {
+                                width: Val::Px(50.0),
+                                ..default()
+                            },
+                        ));
+                    });
+            }
+
+            // Spacing before toggles
+            parent.spawn((Node {
+                height: Val::Px(20.0),
+                ..default()
+            },));
+
+            // Toggles
+            let toggle_defs: [(&str, &str, bool); 2] = [
+                ("Auto Mode", "auto", settings.auto_mode),
+                ("Skip Mode", "skip", settings.skip_mode),
+            ];
+
+            for (label, group, initial_val) in &toggle_defs {
+                parent
+                    .spawn((Node {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        margin: UiRect::vertical(Val::Px(6.0)),
+                        ..default()
+                    },))
+                    .with_children(|row| {
+                        row.spawn((
+                            Text::new(*label),
+                            TextFont {
+                                font: game_font.0.clone(),
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                            Node {
+                                width: Val::Px(150.0),
+                                ..default()
+                            },
+                        ));
+
+                        // ON button
+                        let on_active = *initial_val;
+                        row.spawn((
+                            ToggleOption {
+                                group: group.to_string(),
+                                value: true,
+                            },
+                            Button,
+                            Text::new("ON"),
+                            TextFont {
+                                font: game_font.0.clone(),
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(if on_active {
+                                Color::WHITE
+                            } else {
+                                Color::srgb(0.4, 0.4, 0.5)
+                            }),
+                            Node {
+                                width: Val::Px(50.0),
+                                height: Val::Px(30.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            BackgroundColor(if on_active {
+                                Color::srgb(0.15, 0.3, 0.6)
+                            } else {
+                                Color::srgb(0.12, 0.12, 0.18)
+                            }),
+                        ));
+
+                        // OFF button
+                        let off_active = !*initial_val;
+                        row.spawn((
+                            ToggleOption {
+                                group: group.to_string(),
+                                value: false,
+                            },
+                            Button,
+                            Text::new("OFF"),
+                            TextFont {
+                                font: game_font.0.clone(),
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(if off_active {
+                                Color::WHITE
+                            } else {
+                                Color::srgb(0.4, 0.4, 0.5)
+                            }),
+                            Node {
+                                width: Val::Px(50.0),
+                                height: Val::Px(30.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            BackgroundColor(if off_active {
+                                Color::srgb(0.3, 0.12, 0.12)
+                            } else {
+                                Color::srgb(0.12, 0.12, 0.18)
+                            }),
+                        ));
+                    });
+            }
+        });
 }
 
 fn handle_slider_clicks(
@@ -211,6 +304,9 @@ fn handle_slider_clicks(
                 SliderSetting::VoiceVolume => settings.voice_volume = val / 100.0,
                 SliderSetting::TextSpeed => settings.text_speed = val as u32,
                 SliderSetting::MsgOpacity => settings.message_window_opacity = val as u8,
+                SliderSetting::AutoDelay => {
+                    settings.auto_delay_secs = (segment.0 as f32) * 0.3 + 0.5
+                }
             }
         }
     }
@@ -223,8 +319,8 @@ fn handle_toggle_clicks(
     for (option, interaction) in query.iter() {
         if *interaction == Interaction::Pressed {
             match option.group.as_str() {
-                "auto" => settings.auto_mode = option.value,
-                "skip" => settings.skip_mode = option.value,
+                "auto" => settings.set_auto_mode(option.value),
+                "skip" => settings.set_skip_mode(option.value),
                 _ => warn!("Unknown toggle group: {}", option.group),
             }
         }
@@ -260,9 +356,17 @@ fn update_slider_visuals(
             SliderSetting::VoiceVolume => settings.voice_volume * 100.0,
             SliderSetting::TextSpeed => settings.text_speed as f32,
             SliderSetting::MsgOpacity => settings.message_window_opacity as f32,
+            SliderSetting::AutoDelay => settings.auto_delay_secs,
         };
         let seg_val = (segment.0 as f32) * 10.0;
-        *bg = BackgroundColor(color_for_filled(seg_val <= current));
+        let filled = match slider_setting {
+            SliderSetting::AutoDelay => {
+                let seg_delay = (segment.0 as f32) * 0.3 + 0.5;
+                seg_delay <= settings.auto_delay_secs
+            }
+            _ => seg_val <= current,
+        };
+        *bg = BackgroundColor(color_for_filled(filled));
     }
     for (setting, mut text) in text_query.iter_mut() {
         let current = match setting {
@@ -271,8 +375,13 @@ fn update_slider_visuals(
             SliderSetting::VoiceVolume => settings.voice_volume * 100.0,
             SliderSetting::TextSpeed => settings.text_speed as f32,
             SliderSetting::MsgOpacity => settings.message_window_opacity as f32,
+            SliderSetting::AutoDelay => settings.auto_delay_secs,
         };
-        text.0 = format!("{:>3.0}", current);
+        if matches!(setting, SliderSetting::AutoDelay) {
+            text.0 = format!("{:.1}s", current);
+        } else {
+            text.0 = format!("{:>3.0}", current);
+        }
     }
 }
 
@@ -288,7 +397,11 @@ fn update_toggle_visuals(
         };
         if active {
             *text_color = TextColor(Color::WHITE);
-            *bg = BackgroundColor(if option.value { Color::srgb(0.15, 0.3, 0.6) } else { Color::srgb(0.3, 0.12, 0.12) });
+            *bg = BackgroundColor(if option.value {
+                Color::srgb(0.15, 0.3, 0.6)
+            } else {
+                Color::srgb(0.3, 0.12, 0.12)
+            });
         } else {
             *text_color = TextColor(Color::srgb(0.4, 0.4, 0.5));
             *bg = BackgroundColor(Color::srgb(0.12, 0.12, 0.18));
@@ -296,10 +409,7 @@ fn update_toggle_visuals(
     }
 }
 
-fn cleanup_settings(
-    mut commands: Commands,
-    query: Query<Entity, With<SettingsScreen>>,
-) {
+fn cleanup_settings(mut commands: Commands, query: Query<Entity, With<SettingsScreen>>) {
     for entity in &query {
         commands.entity(entity).despawn();
     }

@@ -1,24 +1,26 @@
-use bevy::prelude::*;
-use bevy::ecs::system::SystemParam;
-use crate::resources::{AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase, QuakeState, Settings, SpriteOverlayManager, UnlockState};
 use crate::audio_messages::{
-    PlayBgmMessage, StopBgmMessage, PlayBgmXMessage, StopBgmXMessage,
-    PlaySeMessage, LoopSeMessage, StopStreamingSeMessage, PlayVoiceMessage,
+    LoopSeMessage, PlayBgmMessage, PlayBgmXMessage, PlaySeMessage, PlayVoiceMessage,
+    StopBgmMessage, StopBgmXMessage, StopStreamingSeMessage,
 };
 use crate::choice_messages::ChoiceSelectedMessage;
 use crate::components::{DialogueUiRoot, OverlayTween, ScreenOverlayRoot};
-use crate::resources::{WindowOverride, ViewBlocking};
 use crate::plugins::event_system::view_data;
 use crate::plugins::event_system::{ViewPhase, ViewState};
+use crate::plugins::inputs::{AdvanceEvent, AdvanceSource};
+use crate::rendering_messages::{
+    AnimateSpriteMessage, DrawSpriteMessage, FadeSpriteMessage, HideCgMessage, HideFaceMessage,
+    HideFgMessage, MoveSpriteMessage, ScrollBgMessage, SetBgMessage, ShowCgMessage,
+    ShowFaceMessage, ShowFgMessage,
+};
+use crate::resources::{
+    AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase, QuakeState,
+    Settings, SpriteOverlayManager, UnlockState,
+};
+use crate::resources::{ViewBlocking, WindowOverride};
 use crate::script::{ConditionOp, OverlayColor, ScriptCmd, ScriptEngine};
 use crate::state::AppState;
-use crate::plugins::inputs::AdvanceEvent;
-use crate::rendering_messages::{
-    SetBgMessage, ShowFgMessage, HideFgMessage,
-    ShowFaceMessage, HideFaceMessage,
-    ShowCgMessage, HideCgMessage,
-    AnimateSpriteMessage, DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage, ScrollBgMessage,
-};
+use bevy::ecs::system::SystemParam;
+use bevy::prelude::*;
 
 pub struct ScriptRunnerPlugin;
 
@@ -30,7 +32,10 @@ pub struct AutoSkipTimer {
 
 impl Default for AutoSkipTimer {
     fn default() -> Self {
-        Self { auto_timer: None, skip_timer: None }
+        Self {
+            auto_timer: None,
+            skip_timer: None,
+        }
     }
 }
 
@@ -75,24 +80,21 @@ impl Plugin for ScriptRunnerPlugin {
         app.init_resource::<AutoSkipTimer>()
             .init_resource::<IntroPhase>()
             .init_resource::<WindowOverride>()
-            .add_systems(OnEnter(AppState::Gameplay), (start_script_execution, start_intro_bgm))
+            .add_systems(
+                OnEnter(AppState::Gameplay),
+                (start_script_execution, start_intro_bgm),
+            )
             .add_systems(OnEnter(AppState::Title), reset_engine_on_title)
             .add_systems(
                 Update,
-                (
-                    handle_auto_skip,
-                    process_advance,
-                    update_text_reveal,
-                )
+                (handle_auto_skip, process_advance, update_text_reveal)
                     .chain()
                     .run_if(in_state(AppState::Gameplay)),
             );
     }
 }
 
-fn start_script_execution(
-    mut dialogue: ResMut<DialogueState>,
-) {
+fn start_script_execution(mut dialogue: ResMut<DialogueState>) {
     dialogue.current_text.clear();
     dialogue.current_speaker = None;
     dialogue.text_progress = 0;
@@ -107,8 +109,7 @@ fn start_intro_bgm(
     if engine.current_line != 0 {
         return;
     }
-    let is_start = engine.current_script == "main"
-        || engine.current_script == "aiy00010";
+    let is_start = engine.current_script == "main" || engine.current_script == "aiy00010";
     if is_start {
         play_bgm.write(PlayBgmMessage {
             id: "0304".to_string(),
@@ -134,7 +135,10 @@ fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
 fn process_advance(
     mut params: ProcessAdvanceParams<'_, '_>,
     mut commands: Commands,
-    mut overlay_query: Query<(Entity, &mut BackgroundColor, &mut Visibility), With<ScreenOverlayRoot>>,
+    mut overlay_query: Query<
+        (Entity, &mut BackgroundColor, &mut Visibility),
+        With<ScreenOverlayRoot>,
+    >,
     mut window_query: Query<&mut Visibility, (With<DialogueUiRoot>, Without<ScreenOverlayRoot>)>,
     mut window_override: ResMut<WindowOverride>,
     view_blocking: Res<ViewBlocking>,
@@ -174,10 +178,11 @@ fn process_advance(
         ref mut overlay_mgr,
     } = &mut params;
 
-    for _ in advance_ev.read() {
-        // Reset auto/skip timers on manual advance
-        auto_skip.auto_timer = None;
-        auto_skip.skip_timer = None;
+    for ev in advance_ev.read() {
+        if ev.source == AdvanceSource::UserInput {
+            auto_skip.auto_timer = None;
+            auto_skip.skip_timer = None;
+        }
 
         // If View is active, block script execution
         if view_blocking.0 {
@@ -264,7 +269,12 @@ fn process_advance(
                     Some(ScriptCmd::Return) => {
                         engine.return_from_call();
                     }
-                    Some(ScriptCmd::Condition { var, value, operator, goto }) => {
+                    Some(ScriptCmd::Condition {
+                        var,
+                        value,
+                        operator,
+                        goto,
+                    }) => {
                         let flag_val = engine.flags.get(&var).copied().unwrap_or(0);
                         let met = match operator {
                             ConditionOp::Greater => flag_val > value,
@@ -288,7 +298,12 @@ fn process_advance(
                     Some(ScriptCmd::AffectionChange { char_id, delta }) => {
                         *affection.0.entry(char_id).or_insert(0) += delta;
                     }
-                    Some(ScriptCmd::AffectionCondition { char_id, value, operator, goto }) => {
+                    Some(ScriptCmd::AffectionCondition {
+                        char_id,
+                        value,
+                        operator,
+                        goto,
+                    }) => {
                         let affection_val = affection.0.get(&char_id).copied().unwrap_or(0);
                         let met = match operator {
                             ConditionOp::Greater => affection_val > value,
@@ -306,13 +321,32 @@ fn process_advance(
                         unlock_state.cg_unlocked.insert(file);
                     }
                     Some(ScriptCmd::SetBg { file, .. }) => {
-                        set_bg_writer.write(SetBgMessage { file, transition: None, duration: None });
+                        set_bg_writer.write(SetBgMessage {
+                            file,
+                            transition: None,
+                            duration: None,
+                        });
                     }
-                    Some(ScriptCmd::ShowFg { char_id, expression, position, .. }) => {
-                        show_fg_writer.write(ShowFgMessage { char_id, expression, position, transition: None, duration: None });
+                    Some(ScriptCmd::ShowFg {
+                        char_id,
+                        expression,
+                        position,
+                        ..
+                    }) => {
+                        show_fg_writer.write(ShowFgMessage {
+                            char_id,
+                            expression,
+                            position,
+                            transition: None,
+                            duration: None,
+                        });
                     }
                     Some(ScriptCmd::HideFg { char_id, .. }) => {
-                        hide_fg_writer.write(HideFgMessage { char_id, transition: None, duration: None });
+                        hide_fg_writer.write(HideFgMessage {
+                            char_id,
+                            transition: None,
+                            duration: None,
+                        });
                     }
                     Some(ScriptCmd::ShowFace { char_id, .. }) => {
                         show_face_writer.write(ShowFaceMessage { char_id });
@@ -321,24 +355,81 @@ fn process_advance(
                         hide_face_writer.write(HideFaceMessage);
                     }
                     Some(ScriptCmd::ShowCg { file, .. }) => {
-                        show_cg_writer.write(ShowCgMessage { file: file.clone(), transition: None, duration: None });
+                        show_cg_writer.write(ShowCgMessage {
+                            file: file.clone(),
+                            transition: None,
+                            duration: None,
+                        });
                         unlock_state.cg_unlocked.insert(file);
                     }
                     Some(ScriptCmd::HideCg { .. }) => {
-                        hide_cg_writer.write(HideCgMessage { transition: None, duration: None });
+                        hide_cg_writer.write(HideCgMessage {
+                            transition: None,
+                            duration: None,
+                        });
                     }
-                    Some(ScriptCmd::DrawSprite { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode }) => {
-                        draw_sprite_writer.write(DrawSpriteMessage { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode });
+                    Some(ScriptCmd::DrawSprite {
+                        id,
+                        file,
+                        x,
+                        y,
+                        z,
+                        alpha,
+                        priority,
+                        time,
+                        rotation,
+                        anchor_x,
+                        anchor_y,
+                        blend_mode,
+                    }) => {
+                        draw_sprite_writer.write(DrawSpriteMessage {
+                            id,
+                            file,
+                            x,
+                            y,
+                            z,
+                            alpha,
+                            priority,
+                            time,
+                            rotation,
+                            anchor_x,
+                            anchor_y,
+                            blend_mode,
+                        });
                     }
                     Some(ScriptCmd::FadeSprite { id, time }) => {
                         fade_sprite_writer.write(FadeSpriteMessage { id, time });
                     }
-                    Some(ScriptCmd::MoveSprite { id, x, y, z, alpha, time, wait }) => {
-                        move_sprite_writer.write(MoveSpriteMessage { id, x, y, z, alpha, time, wait });
+                    Some(ScriptCmd::MoveSprite {
+                        id,
+                        x,
+                        y,
+                        z,
+                        alpha,
+                        time,
+                        wait,
+                    }) => {
+                        move_sprite_writer.write(MoveSpriteMessage {
+                            id,
+                            x,
+                            y,
+                            z,
+                            alpha,
+                            time,
+                            wait,
+                        });
                     }
-                    Some(ScriptCmd::PlayBgm { id, volume, fade_in }) => {
+                    Some(ScriptCmd::PlayBgm {
+                        id,
+                        volume,
+                        fade_in,
+                    }) => {
                         if !intro.0 {
-                            play_bgm_writer.write(PlayBgmMessage { id, volume, fade_in });
+                            play_bgm_writer.write(PlayBgmMessage {
+                                id,
+                                volume,
+                                fade_in,
+                            });
                         }
                     }
                     Some(ScriptCmd::StopBgm { id, fade_out }) => {
@@ -346,9 +437,17 @@ fn process_advance(
                             stop_bgm_writer.write(StopBgmMessage { id, fade_out });
                         }
                     }
-                    Some(ScriptCmd::PlayBgmX { id, volume, fade_in }) => {
+                    Some(ScriptCmd::PlayBgmX {
+                        id,
+                        volume,
+                        fade_in,
+                    }) => {
                         if !intro.0 {
-                            play_bgmx_writer.write(PlayBgmXMessage { id, volume, fade_in });
+                            play_bgmx_writer.write(PlayBgmXMessage {
+                                id,
+                                volume,
+                                fade_in,
+                            });
                         }
                     }
                     Some(ScriptCmd::StopBgmX { id, fade_out }) => {
@@ -387,8 +486,16 @@ fn process_advance(
                     Some(ScriptCmd::PlaySe { file, volume }) => {
                         play_se_writer.write(PlaySeMessage { file, volume });
                     }
-                    Some(ScriptCmd::LoopSe { file, volume, channel }) => {
-                        loop_se_writer.write(LoopSeMessage { file, volume, channel });
+                    Some(ScriptCmd::LoopSe {
+                        file,
+                        volume,
+                        channel,
+                    }) => {
+                        loop_se_writer.write(LoopSeMessage {
+                            file,
+                            volume,
+                            channel,
+                        });
                     }
                     Some(ScriptCmd::StopStreamingSe { channel }) => {
                         stop_streaming_se_writer.write(StopStreamingSeMessage { channel });
@@ -397,11 +504,58 @@ fn process_advance(
                         pending_voice = Some(file.clone());
                         play_voice_writer.write(PlayVoiceMessage { file, volume: None });
                     }
-                    Some(ScriptCmd::ScrollBg { file, x1, y1, x2, y2, .. }) => {
-                        scroll_bg_writer.write(ScrollBgMessage { file, x1, y1, x2, y2, fade: 0, wait: false });
+                    Some(ScriptCmd::ScrollBg {
+                        file,
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        ..
+                    }) => {
+                        scroll_bg_writer.write(ScrollBgMessage {
+                            file,
+                            x1,
+                            y1,
+                            x2,
+                            y2,
+                            fade: 0,
+                            wait: false,
+                        });
                     }
-                    Some(ScriptCmd::AnimateSprite { id, file, max, frame_time, style, x, y, z, anchor_x, anchor_y, rotation, draw, alpha, priority, .. }) => {
-                        animate_sprite_writer.write(AnimateSpriteMessage { id, file, max, frame_time, style, x, y, z, anchor_x, anchor_y, rotation, draw, alpha, priority, wait: false });
+                    Some(ScriptCmd::AnimateSprite {
+                        id,
+                        file,
+                        max,
+                        frame_time,
+                        style,
+                        x,
+                        y,
+                        z,
+                        anchor_x,
+                        anchor_y,
+                        rotation,
+                        draw,
+                        alpha,
+                        priority,
+                        ..
+                    }) => {
+                        animate_sprite_writer.write(AnimateSpriteMessage {
+                            id,
+                            file,
+                            max,
+                            frame_time,
+                            style,
+                            x,
+                            y,
+                            z,
+                            anchor_x,
+                            anchor_y,
+                            rotation,
+                            draw,
+                            alpha,
+                            priority,
+                            wait: false,
+                        });
                     }
                     Some(ScriptCmd::Wait { .. }) => {}
                     Some(ScriptCmd::ScreenOverlay { color, .. }) => {
@@ -422,7 +576,11 @@ fn process_advance(
                     }
                     Some(ScriptCmd::Window { show, .. }) => {
                         for mut vis in window_query.iter_mut() {
-                            *vis = if show { Visibility::Visible } else { Visibility::Hidden };
+                            *vis = if show {
+                                Visibility::Visible
+                            } else {
+                                Visibility::Hidden
+                            };
                         }
                         window_override.0 = !show;
                     }
@@ -452,7 +610,8 @@ fn process_advance(
                     Some(ScriptCmd::RouteFlag) => {
                         let hero_routes = [103, 105, 107, 108, 110, 111];
                         if engine.global_flags.get(&113) != Some(&1) {
-                            let count = hero_routes.iter()
+                            let count = hero_routes
+                                .iter()
                                 .filter(|&f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1)
                                 .count();
                             if count == hero_routes.len() {
@@ -460,7 +619,8 @@ fn process_advance(
                             }
                         }
                         if engine.global_flags.get(&114) != Some(&1) {
-                            let all_clear = (151..=167).chain(std::iter::once(113))
+                            let all_clear = (151..=167)
+                                .chain(std::iter::once(113))
                                 .all(|f| engine.global_flags.get(&f).copied().unwrap_or(0) >= 1);
                             if all_clear {
                                 engine.global_flags.insert(114, 1);
@@ -534,7 +694,12 @@ fn process_advance(
                 Some(ScriptCmd::Return) => {
                     engine.return_from_call();
                 }
-                Some(ScriptCmd::Condition { var, value, operator, goto }) => {
+                Some(ScriptCmd::Condition {
+                    var,
+                    value,
+                    operator,
+                    goto,
+                }) => {
                     let flag_val = engine.flags.get(&var).copied().unwrap_or(0);
                     let met = match operator {
                         ConditionOp::Greater => flag_val > value,
@@ -558,7 +723,12 @@ fn process_advance(
                 Some(ScriptCmd::AffectionChange { char_id, delta }) => {
                     *affection.0.entry(char_id).or_insert(0) += delta;
                 }
-                Some(ScriptCmd::AffectionCondition { char_id, value, operator, goto }) => {
+                Some(ScriptCmd::AffectionCondition {
+                    char_id,
+                    value,
+                    operator,
+                    goto,
+                }) => {
                     let affection_val = affection.0.get(&char_id).copied().unwrap_or(0);
                     let met = match operator {
                         ConditionOp::Greater => affection_val > value,
@@ -575,14 +745,40 @@ fn process_advance(
                 Some(ScriptCmd::UnlockCg { file }) => {
                     unlock_state.cg_unlocked.insert(file);
                 }
-                Some(ScriptCmd::SetBg { file, transition, duration }) => {
-                    set_bg_writer.write(SetBgMessage { file, transition, duration: duration.map(|d| d as f64) });
+                Some(ScriptCmd::SetBg {
+                    file,
+                    transition,
+                    duration,
+                }) => {
+                    set_bg_writer.write(SetBgMessage {
+                        file,
+                        transition,
+                        duration: duration.map(|d| d as f64),
+                    });
                 }
-                Some(ScriptCmd::ShowFg { char_id, expression, position, transition }) => {
-                    show_fg_writer.write(ShowFgMessage { char_id, expression, position, transition, duration: None });
+                Some(ScriptCmd::ShowFg {
+                    char_id,
+                    expression,
+                    position,
+                    transition,
+                }) => {
+                    show_fg_writer.write(ShowFgMessage {
+                        char_id,
+                        expression,
+                        position,
+                        transition,
+                        duration: None,
+                    });
                 }
-                Some(ScriptCmd::HideFg { char_id, transition }) => {
-                    hide_fg_writer.write(HideFgMessage { char_id, transition, duration: None });
+                Some(ScriptCmd::HideFg {
+                    char_id,
+                    transition,
+                }) => {
+                    hide_fg_writer.write(HideFgMessage {
+                        char_id,
+                        transition,
+                        duration: None,
+                    });
                 }
                 Some(ScriptCmd::ShowFace { char_id, .. }) => {
                     show_face_writer.write(ShowFaceMessage { char_id });
@@ -591,26 +787,82 @@ fn process_advance(
                     hide_face_writer.write(HideFaceMessage);
                 }
                 Some(ScriptCmd::ShowCg { file, transition }) => {
-                    show_cg_writer.write(ShowCgMessage { file: file.clone(), transition, duration: None });
+                    show_cg_writer.write(ShowCgMessage {
+                        file: file.clone(),
+                        transition,
+                        duration: None,
+                    });
                     unlock_state.cg_unlocked.insert(file);
                 }
                 Some(ScriptCmd::HideCg { transition }) => {
-                    hide_cg_writer.write(HideCgMessage { transition, duration: None });
+                    hide_cg_writer.write(HideCgMessage {
+                        transition,
+                        duration: None,
+                    });
                 }
-                Some(ScriptCmd::DrawSprite { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode }) => {
-                    if file.contains("_tx") {
-                    }
-                    draw_sprite_writer.write(DrawSpriteMessage { id, file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode });
+                Some(ScriptCmd::DrawSprite {
+                    id,
+                    file,
+                    x,
+                    y,
+                    z,
+                    alpha,
+                    priority,
+                    time,
+                    rotation,
+                    anchor_x,
+                    anchor_y,
+                    blend_mode,
+                }) => {
+                    if file.contains("_tx") {}
+                    draw_sprite_writer.write(DrawSpriteMessage {
+                        id,
+                        file,
+                        x,
+                        y,
+                        z,
+                        alpha,
+                        priority,
+                        time,
+                        rotation,
+                        anchor_x,
+                        anchor_y,
+                        blend_mode,
+                    });
                 }
                 Some(ScriptCmd::FadeSprite { id, time }) => {
                     fade_sprite_writer.write(FadeSpriteMessage { id, time });
                 }
-                Some(ScriptCmd::MoveSprite { id, x, y, z, alpha, time, wait }) => {
-                    move_sprite_writer.write(MoveSpriteMessage { id, x, y, z, alpha, time, wait });
+                Some(ScriptCmd::MoveSprite {
+                    id,
+                    x,
+                    y,
+                    z,
+                    alpha,
+                    time,
+                    wait,
+                }) => {
+                    move_sprite_writer.write(MoveSpriteMessage {
+                        id,
+                        x,
+                        y,
+                        z,
+                        alpha,
+                        time,
+                        wait,
+                    });
                 }
-                Some(ScriptCmd::PlayBgm { id, volume, fade_in }) => {
+                Some(ScriptCmd::PlayBgm {
+                    id,
+                    volume,
+                    fade_in,
+                }) => {
                     if !intro.0 {
-                        play_bgm_writer.write(PlayBgmMessage { id, volume, fade_in });
+                        play_bgm_writer.write(PlayBgmMessage {
+                            id,
+                            volume,
+                            fade_in,
+                        });
                     }
                 }
                 Some(ScriptCmd::StopBgm { id, fade_out }) => {
@@ -618,9 +870,17 @@ fn process_advance(
                         stop_bgm_writer.write(StopBgmMessage { id, fade_out });
                     }
                 }
-                Some(ScriptCmd::PlayBgmX { id, volume, fade_in }) => {
+                Some(ScriptCmd::PlayBgmX {
+                    id,
+                    volume,
+                    fade_in,
+                }) => {
                     if !intro.0 {
-                        play_bgmx_writer.write(PlayBgmXMessage { id, volume, fade_in });
+                        play_bgmx_writer.write(PlayBgmXMessage {
+                            id,
+                            volume,
+                            fade_in,
+                        });
                     }
                 }
                 Some(ScriptCmd::StopBgmX { id, fade_out }) => {
@@ -631,8 +891,16 @@ fn process_advance(
                 Some(ScriptCmd::PlaySe { file, volume }) => {
                     play_se_writer.write(PlaySeMessage { file, volume });
                 }
-                Some(ScriptCmd::LoopSe { file, volume, channel }) => {
-                    loop_se_writer.write(LoopSeMessage { file, volume, channel });
+                Some(ScriptCmd::LoopSe {
+                    file,
+                    volume,
+                    channel,
+                }) => {
+                    loop_se_writer.write(LoopSeMessage {
+                        file,
+                        volume,
+                        channel,
+                    });
                 }
                 Some(ScriptCmd::StopStreamingSe { channel }) => {
                     stop_streaming_se_writer.write(StopStreamingSeMessage { channel });
@@ -641,18 +909,70 @@ fn process_advance(
                     pending_voice = Some(file.clone());
                     play_voice_writer.write(PlayVoiceMessage { file, volume: None });
                 }
-                Some(ScriptCmd::ScrollBg { file, x1, y1, x2, y2, fade, wait }) => {
-                    scroll_bg_writer.write(ScrollBgMessage { file, x1, y1, x2, y2, fade, wait });
+                Some(ScriptCmd::ScrollBg {
+                    file,
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    fade,
+                    wait,
+                }) => {
+                    scroll_bg_writer.write(ScrollBgMessage {
+                        file,
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        fade,
+                        wait,
+                    });
                     if wait {
-                        auto_skip.auto_timer = Some(Timer::from_seconds(fade as f32 / 1000.0, TimerMode::Once));
+                        auto_skip.auto_timer =
+                            Some(Timer::from_seconds(fade as f32 / 1000.0, TimerMode::Once));
                         break;
                     }
                 }
-                Some(ScriptCmd::AnimateSprite { id, file, max, frame_time, style, x, y, z, anchor_x, anchor_y, rotation, draw, alpha, priority, wait }) => {
-                    animate_sprite_writer.write(AnimateSpriteMessage { id, file, max, frame_time, style, x, y, z, anchor_x, anchor_y, rotation, draw, alpha, priority, wait });
+                Some(ScriptCmd::AnimateSprite {
+                    id,
+                    file,
+                    max,
+                    frame_time,
+                    style,
+                    x,
+                    y,
+                    z,
+                    anchor_x,
+                    anchor_y,
+                    rotation,
+                    draw,
+                    alpha,
+                    priority,
+                    wait,
+                }) => {
+                    animate_sprite_writer.write(AnimateSpriteMessage {
+                        id,
+                        file,
+                        max,
+                        frame_time,
+                        style,
+                        x,
+                        y,
+                        z,
+                        anchor_x,
+                        anchor_y,
+                        rotation,
+                        draw,
+                        alpha,
+                        priority,
+                        wait,
+                    });
                     if wait {
                         let total_ms = max as u64 * frame_time;
-                        auto_skip.auto_timer = Some(Timer::from_seconds(total_ms as f32 / 1000.0, TimerMode::Once));
+                        auto_skip.auto_timer = Some(Timer::from_seconds(
+                            total_ms as f32 / 1000.0,
+                            TimerMode::Once,
+                        ));
                         break;
                     }
                 }
@@ -699,7 +1019,10 @@ fn process_advance(
                     if settings.skip_mode {
                         // skip mode: continue without waiting
                     } else {
-                        auto_skip.auto_timer = Some(Timer::from_seconds(duration as f32 / 1000.0, TimerMode::Once));
+                        auto_skip.auto_timer = Some(Timer::from_seconds(
+                            duration as f32 / 1000.0,
+                            TimerMode::Once,
+                        ));
                         break;
                     }
                 }
@@ -735,7 +1058,11 @@ fn process_advance(
                 }
                 Some(ScriptCmd::Window { show, .. }) => {
                     for mut vis in window_query.iter_mut() {
-                        *vis = if show { Visibility::Visible } else { Visibility::Hidden };
+                        *vis = if show {
+                            Visibility::Visible
+                        } else {
+                            Visibility::Hidden
+                        };
                     }
                     window_override.0 = !show;
                 }
@@ -776,7 +1103,8 @@ fn process_advance(
                 Some(ScriptCmd::RouteFlag) => {
                     let hero_routes = [103, 105, 107, 108, 110, 111];
                     if engine.global_flags.get(&113) != Some(&1) {
-                        let count = hero_routes.iter()
+                        let count = hero_routes
+                            .iter()
                             .filter(|&f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1)
                             .count();
                         if count == hero_routes.len() {
@@ -785,7 +1113,8 @@ fn process_advance(
                     }
                     if engine.global_flags.get(&114) != Some(&1) {
                         let complete: Vec<u32> = (151..=167).collect();
-                        let all_clear = std::iter::once(&113u32).chain(complete.iter())
+                        let all_clear = std::iter::once(&113u32)
+                            .chain(complete.iter())
                             .all(|f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1);
                         if all_clear {
                             engine.global_flags.insert(114, 1);
@@ -819,7 +1148,8 @@ fn update_text_reveal(
     if dialogue.is_displaying && dialogue.text_progress < dialogue.current_text.len() {
         let chars_per_sec = (settings.text_speed as f64).max(1.0);
         let increment = (time.delta_secs_f64() * chars_per_sec) as usize;
-        dialogue.text_progress = (dialogue.text_progress + increment).min(dialogue.current_text.len());
+        dialogue.text_progress =
+            (dialogue.text_progress + increment).min(dialogue.current_text.len());
     }
 }
 
@@ -830,39 +1160,20 @@ fn handle_auto_skip(
     dialogue: Res<DialogueState>,
     choice_state: Res<ChoiceState>,
     settings: Res<Settings>,
+    view_blocking: Res<ViewBlocking>,
 ) {
+    if view_blocking.0 {
+        return;
+    }
+
     if choice_state.active {
         auto_skip.auto_timer = None;
         auto_skip.skip_timer = None;
         return;
     }
 
-    let text_fully_displayed = !dialogue.is_displaying
-        || dialogue.text_progress >= dialogue.current_text.len();
-
-    if settings.auto_mode && !settings.skip_mode {
-        if !text_fully_displayed || dialogue.current_text.is_empty() {
-            auto_skip.auto_timer = None;
-            auto_skip.skip_timer = None;
-            return;
-        }
-        let timer = auto_skip.auto_timer.get_or_insert_with(|| {
-            Timer::from_seconds(2.0, TimerMode::Once)
-        });
-        timer.tick(time.delta());
-        if timer.just_finished() {
-            advance_ev.write(AdvanceEvent);
-            auto_skip.auto_timer = None;
-        }
-    } else if !settings.skip_mode {
-        if let Some(timer) = &mut auto_skip.auto_timer {
-            timer.tick(time.delta());
-            if timer.just_finished() {
-                advance_ev.write(AdvanceEvent);
-                auto_skip.auto_timer = None;
-            }
-        }
-    }
+    let text_fully_displayed =
+        !dialogue.is_displaying || dialogue.text_progress >= dialogue.current_text.len();
 
     if settings.skip_mode {
         if !text_fully_displayed || dialogue.current_text.is_empty() {
@@ -870,13 +1181,45 @@ fn handle_auto_skip(
             auto_skip.skip_timer = None;
             return;
         }
-        let timer = auto_skip.skip_timer.get_or_insert_with(|| {
-            Timer::from_seconds(0.5, TimerMode::Once)
-        });
+        auto_skip.auto_timer = None;
+        let timer = auto_skip
+            .skip_timer
+            .get_or_insert_with(|| Timer::from_seconds(0.05, TimerMode::Once));
         timer.tick(time.delta());
         if timer.just_finished() {
             auto_skip.skip_timer = None;
-            advance_ev.write(AdvanceEvent);
+            advance_ev.write(AdvanceEvent {
+                source: AdvanceSource::Skip,
+            });
+        }
+        return;
+    }
+
+    if settings.auto_mode {
+        if !text_fully_displayed || dialogue.current_text.is_empty() {
+            auto_skip.auto_timer = None;
+            return;
+        }
+        let timer = auto_skip
+            .auto_timer
+            .get_or_insert_with(|| Timer::from_seconds(settings.auto_delay_secs, TimerMode::Once));
+        timer.tick(time.delta());
+        if timer.just_finished() {
+            auto_skip.auto_timer = None;
+            advance_ev.write(AdvanceEvent {
+                source: AdvanceSource::Auto,
+            });
+        }
+        return;
+    }
+
+    if let Some(timer) = &mut auto_skip.auto_timer {
+        timer.tick(time.delta());
+        if timer.just_finished() {
+            auto_skip.auto_timer = None;
+            advance_ev.write(AdvanceEvent {
+                source: AdvanceSource::Auto,
+            });
         }
     }
 }

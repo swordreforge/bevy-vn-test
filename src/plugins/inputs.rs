@@ -4,7 +4,16 @@ use bevy::prelude::*;
 pub struct InputPlugin;
 
 #[derive(Message)]
-pub struct AdvanceEvent;
+pub struct AdvanceEvent {
+    pub source: AdvanceSource,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdvanceSource {
+    UserInput,
+    Auto,
+    Skip,
+}
 
 #[derive(Message)]
 pub struct MenuToggleEvent;
@@ -48,7 +57,9 @@ fn handle_global_input(
 ) {
     if *state != AppState::Title {
         if mouse.just_pressed(MouseButton::Left) || touches.any_just_pressed() {
-            advance_ev.write(AdvanceEvent);
+            advance_ev.write(AdvanceEvent {
+                source: AdvanceSource::UserInput,
+            });
         }
     }
     if keyboard.just_pressed(KeyCode::Escape) {

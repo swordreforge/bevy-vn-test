@@ -96,6 +96,7 @@ pub enum SliderSetting {
     VoiceVolume,
     TextSpeed,
     MsgOpacity,
+    AutoDelay,
 }
 
 #[derive(Component)]

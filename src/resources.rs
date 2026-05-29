@@ -1,9 +1,9 @@
+use crate::script::FgPosition;
+use crate::state::AppState;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
-use crate::script::FgPosition;
-use crate::state::AppState;
 
 pub struct SpriteFade {
     pub timer: Timer,
@@ -60,7 +60,9 @@ pub struct SaveDir(pub String);
 impl Default for SaveDir {
     fn default() -> Self {
         #[cfg(not(feature = "android"))]
-        { Self("saves".to_string()) }
+        {
+            Self("saves".to_string())
+        }
         #[cfg(feature = "android")]
         {
             let p = if let Some(app) = bevy_android::ANDROID_APP.get() {
@@ -130,10 +132,27 @@ pub struct Settings {
     pub text_speed: u32,
     pub auto_mode: bool,
     pub skip_mode: bool,
+    pub auto_delay_secs: f32,
     pub message_window_opacity: u8,
     pub window_color_idx: i32,
     pub window_design: i32,
     pub click_to_advance: bool,
+}
+
+impl Settings {
+    pub fn set_auto_mode(&mut self, value: bool) {
+        self.auto_mode = value;
+        if value {
+            self.skip_mode = false;
+        }
+    }
+
+    pub fn set_skip_mode(&mut self, value: bool) {
+        self.skip_mode = value;
+        if value {
+            self.auto_mode = false;
+        }
+    }
 }
 
 impl Default for Settings {
@@ -145,6 +164,7 @@ impl Default for Settings {
             text_speed: 40,
             auto_mode: false,
             skip_mode: false,
+            auto_delay_secs: 1.5,
             message_window_opacity: 70,
             window_color_idx: 0,
             window_design: 0,
