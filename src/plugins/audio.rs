@@ -1,7 +1,7 @@
 use bevy::{audio::Volume, prelude::*};
 use crate::audio_messages::*;
 use crate::components::{AudioType, BgmFade, BgmFadeLayer};
-use crate::resources::{BgmManager, BgmXManager, PendingBgm, PendingBgmLoad, SeManager, Settings, VoiceManager};
+use crate::resources::{BgmManager, BgmXManager, PendingBgm, PendingBgmLoad, PendingSe, PendingSeLoad, SeKind, SeManager, Settings, VoiceManager};
 use rodio::{self, Source};
 use std::io::Cursor;
 use std::sync::Arc;
@@ -15,6 +15,7 @@ impl Plugin for AudioPlugin {
             .init_resource::<BgmXManager>()
             .init_resource::<VoiceManager>()
             .init_resource::<SeManager>()
+            .init_resource::<PendingSe>()
             .init_resource::<PendingBgm>()
             .add_message::<PlayBgmMessage>()
             .add_message::<StopBgmMessage>()
@@ -33,6 +34,7 @@ impl Plugin for AudioPlugin {
                 handle_play_se,
                 handle_loop_se,
                 handle_stop_streaming_se,
+                process_pending_se,
                 handle_play_voice,
                 apply_audio_settings,
                 update_bgm_fade,
@@ -297,24 +299,32 @@ fn concat_ogg_bytes(a: &[u8], b: &[u8]) -> Vec<u8> {
 fn handle_play_se(
     mut reader: MessageReader<PlaySeMessage>,
     asset_server: Res<AssetServer>,
-    mut commands: Commands,
+    mut pending: ResMut<PendingSe>,
 ) {
     for msg in reader.read() {
-        let path = format!("audio/se/{}.ogg", msg.file);
-        let handle: Handle<AudioSource> = asset_server.load(&path);
-        commands.spawn((
-            AudioPlayer(handle),
-            PlaybackSettings::DESPAWN,
-            AudioType::Se,
-        ));
+        let path_a = format!("audio/se/{}_a.ogg", msg.file);
+        let path_b = format!("audio/se/{}_b.ogg", msg.file);
+        let path_single = format!("audio/se/{}.ogg", msg.file);
+        let handle_a: Handle<AudioSource> = asset_server.load(&path_a);
+        let handle_b: Handle<AudioSource> = asset_server.load(&path_b);
+        let handle_single: Handle<AudioSource> = asset_server.load(&path_single);
+        pending.0.push(PendingSeLoad {
+            file: msg.file.clone(),
+            handle_a,
+            handle_b: Some(handle_b),
+            handle_single,
+            kind: SeKind::OneShot,
+            frames_waited: 0,
+        });
     }
 }
 
 fn handle_loop_se(
     mut reader: MessageReader<LoopSeMessage>,
     asset_server: Res<AssetServer>,
-    mut commands: Commands,
+    mut pending: ResMut<PendingSe>,
     mut se: ResMut<SeManager>,
+    mut commands: Commands,
 ) {
     for msg in reader.read() {
         if let Some(old) = se.entities.remove(&msg.channel) {
@@ -323,18 +333,23 @@ fn handle_loop_se(
             }
         }
         let vol = msg.volume.unwrap_or(1.0);
-        let path = format!("audio/se/{}.ogg", msg.file);
-        let handle: Handle<AudioSource> = asset_server.load(&path);
-        let entity = commands.spawn((
-            AudioPlayer(handle),
-            PlaybackSettings {
-                mode: bevy::audio::PlaybackMode::Loop,
-                volume: Volume::Linear(vol),
-                ..default()
+        let path_a = format!("audio/se/{}_a.ogg", msg.file);
+        let path_b = format!("audio/se/{}_b.ogg", msg.file);
+        let path_single = format!("audio/se/{}.ogg", msg.file);
+        let handle_a: Handle<AudioSource> = asset_server.load(&path_a);
+        let handle_b: Handle<AudioSource> = asset_server.load(&path_b);
+        let handle_single: Handle<AudioSource> = asset_server.load(&path_single);
+        pending.0.push(PendingSeLoad {
+            file: msg.file.clone(),
+            handle_a,
+            handle_b: Some(handle_b),
+            handle_single,
+            kind: SeKind::Loop {
+                channel: msg.channel,
+                volume: vol,
             },
-            AudioType::Se,
-        )).id();
-        se.entities.insert(msg.channel, entity);
+            frames_waited: 0,
+        });
     }
 }
 
@@ -348,6 +363,92 @@ fn handle_stop_streaming_se(
             if let Ok(mut cmd) = commands.get_entity(entity) {
                 cmd.despawn();
             }
+        }
+    }
+}
+
+fn process_pending_se(
+    mut pending: ResMut<PendingSe>,
+    mut assets: ResMut<Assets<AudioSource>>,
+    mut commands: Commands,
+    mut se: ResMut<SeManager>,
+) {
+    let mut i = 0;
+    while i < pending.0.len() {
+        let p = &mut pending.0[i];
+        let has_b = p.handle_b.as_ref().and_then(|h| assets.get(h));
+        match assets.get(&p.handle_a) {
+            Some(a) => {
+                if let Some(b) = has_b {
+                    let combined = concat_ogg_bytes(&a.bytes, &b.bytes);
+                    let combined_source = AudioSource { bytes: std::sync::Arc::from(combined) };
+                    let handle = assets.add(combined_source);
+                    spawn_se(&mut commands, &mut se, &p.kind, handle);
+                    info!("SE concat: {} complete", p.file);
+                    pending.0.swap_remove(i);
+                } else if p.frames_waited >= 2 {
+                    let handle = p.handle_a.clone();
+                    spawn_se(&mut commands, &mut se, &p.kind, handle);
+                    info!("SE single (no B layer): {}", p.file);
+                    pending.0.swap_remove(i);
+                } else {
+                    p.frames_waited += 1;
+                    i += 1;
+                }
+            }
+            None => {
+                if let Some(single) = assets.get(&p.handle_single) {
+                    let cloned_bytes = single.bytes.clone();
+                    let handle = assets.add(AudioSource { bytes: cloned_bytes });
+                    spawn_se(&mut commands, &mut se, &p.kind, handle);
+                    info!("SE single (no _a/_b): {}", p.file);
+                    pending.0.swap_remove(i);
+                } else if p.frames_waited >= 30 {
+                    let handle = p.handle_single.clone();
+                    spawn_se(&mut commands, &mut se, &p.kind, handle);
+                    warn!("SE fallback (not yet loaded): {}", p.file);
+                    pending.0.swap_remove(i);
+                } else {
+                    p.frames_waited += 1;
+                    i += 1;
+                }
+            }
+        }
+    }
+}
+
+fn spawn_se(
+    commands: &mut Commands,
+    se: &mut ResMut<SeManager>,
+    kind: &SeKind,
+    handle: Handle<AudioSource>,
+) {
+    match kind {
+        SeKind::OneShot => {
+            commands.spawn((
+                AudioPlayer(handle),
+                PlaybackSettings::DESPAWN,
+                AudioType::Se,
+            ));
+        }
+        SeKind::Loop { channel, volume } => {
+            let ch = *channel;
+            let vol = *volume;
+            if let Some(old) = se.entities.remove(&ch) {
+                if let Ok(mut cmd) = commands.get_entity(old) {
+                    cmd.despawn();
+                }
+            }
+            let entity = commands.spawn((
+                AudioPlayer(handle),
+                PlaybackSettings {
+                    mode: bevy::audio::PlaybackMode::Loop,
+                    volume: Volume::Linear(vol),
+                    ..default()
+                },
+                AudioType::Se,
+            )).id();
+            se.entities.insert(ch, entity);
         }
     }
 }

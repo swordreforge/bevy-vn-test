@@ -360,6 +360,23 @@ pub struct SeManager {
     pub entities: HashMap<u32, Entity>,
 }
 
+pub enum SeKind {
+    OneShot,
+    Loop { channel: u32, volume: f32 },
+}
+
+pub struct PendingSeLoad {
+    pub file: String,
+    pub handle_a: Handle<AudioSource>,
+    pub handle_b: Option<Handle<AudioSource>>,
+    pub handle_single: Handle<AudioSource>,
+    pub kind: SeKind,
+    pub frames_waited: u32,
+}
+
+#[derive(Resource, Default)]
+pub struct PendingSe(pub Vec<PendingSeLoad>);
+
 #[derive(Resource, Default)]
 pub struct WindowOverride(pub bool);
 
