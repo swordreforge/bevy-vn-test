@@ -20,6 +20,7 @@ pub struct CgFade {
     pub kind: CgFadeKind,
 }
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum CgFadeKind {
     FadeIn,
     FadeOut,

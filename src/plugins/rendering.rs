@@ -217,12 +217,23 @@ fn cleanup_rendering(
 fn handle_set_bg(
     mut msg: MessageReader<SetBgMessage>,
     mut bg_state: ResMut<BgState>,
+    mut cg_state: ResMut<CgState>,
     mut cache: ResMut<TextureCache>,
     asset_server: Res<AssetServer>,
     mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor, &mut Node)>,
     mut commands: Commands,
 ) {
     for msg in msg.read() {
+        // Auto-cleanup CG if active (CG covers bg, so changing bg needs CG gone)
+        if cg_state.active {
+            if let Some(cg_entity) = cg_state.entity.take() {
+                commands.entity(cg_entity).despawn();
+            }
+            cg_state.active = false;
+            cg_state.texture = None;
+            cg_state.fade = None;
+        }
+
         // Complete any in-progress fade instantly
         if bg_state.fade.is_some() {
             if let Ok((_, mut vis, _, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
@@ -647,40 +658,37 @@ fn update_fg_fade(
 fn update_cg_fade(
     time: Res<Time>,
     mut cg_state: ResMut<CgState>,
+    mut commands: Commands,
     mut query: Query<(&mut BackgroundColor, &mut Visibility)>,
 ) {
-    let entity = cg_state.entity;
-    let finished = {
-        let fade = match &mut cg_state.fade {
-            Some(f) => f,
-            None => return,
-        };
-
-        fade.timer.tick(time.delta());
-        let t = fade.timer.fraction();
-
-        if let Some(entity) = entity {
-            if let Ok((mut bg, _)) = query.get_mut(entity) {
-                let alpha = match fade.kind {
-                    CgFadeKind::FadeIn => t,
-                    CgFadeKind::FadeOut => 1.0 - t,
-                };
-                bg.0 = Color::srgba(0.0, 0.0, 0.0, alpha);
-            }
-
-            let finished = fade.timer.just_finished();
-            if finished && matches!(fade.kind, CgFadeKind::FadeOut) {
-                if let Ok((_, mut vis)) = query.get_mut(entity) {
-                    *vis = Visibility::Hidden;
-                }
-            }
-            finished
-        } else {
-            true
-        }
+    let Some(ref mut fade) = cg_state.fade else {
+        return;
     };
 
+    fade.timer.tick(time.delta());
+    let t = fade.timer.fraction();
+    let kind = fade.kind;
+    let finished = fade.timer.just_finished();
+    let entity = cg_state.entity;
+    if let Some(entity) = entity {
+        if let Ok((mut bg, _)) = query.get_mut(entity) {
+            let alpha = match kind {
+                CgFadeKind::FadeIn => t,
+                CgFadeKind::FadeOut => 1.0 - t,
+            };
+            bg.0 = Color::srgba(0.0, 0.0, 0.0, alpha);
+        }
+    }
+
     if finished {
+        if kind == CgFadeKind::FadeOut {
+            if let Some(entity) = entity {
+                commands.entity(entity).despawn();
+            }
+            cg_state.active = false;
+            cg_state.texture = None;
+            cg_state.entity = None;
+        }
         cg_state.fade = None;
     }
 }
