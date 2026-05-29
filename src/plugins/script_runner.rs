@@ -126,6 +126,7 @@ fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
     engine.call_stack.clear();
     engine.flags.clear();
     engine.dialogue_idx = 0;
+    engine.finished = false;
     if engine.scripts.contains_key("main") {
         engine.current_script = "main".to_string();
     } else if engine.scripts.contains_key("aiy00010") {
@@ -136,6 +137,7 @@ fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
 fn process_advance(
     mut params: ProcessAdvanceParams<'_, '_>,
     mut commands: Commands,
+    mut next_state: ResMut<NextState<AppState>>,
     mut overlay_query: Query<
         (Entity, &mut BackgroundColor, &mut Visibility),
         With<ScreenOverlayRoot>,
@@ -187,6 +189,20 @@ fn process_advance(
 
         // If View is active, block script execution
         if view_blocking.0 {
+            continue;
+        }
+
+        // If previous script finished, reset dialogue for next script
+        if engine.finished && engine.has_more() {
+            engine.finished = false;
+            dialogue.current_text.clear();
+            dialogue.current_speaker = None;
+            dialogue.text_progress = 0;
+            dialogue.is_displaying = false;
+        }
+
+        // If script ended and no next script, wait for state transition
+        if engine.finished {
             continue;
         }
 
@@ -257,17 +273,21 @@ fn process_advance(
                         dialogue.is_displaying = false;
                     }
                     Some(ScriptCmd::Jump { target }) => {
+                        engine.finished = false;
                         if !engine.jump_to_label(&target) {
                             warn!("Jump target not found: {}", target);
                         }
                     }
                     Some(ScriptCmd::Call { target }) => {
+                        engine.finished = false;
                         engine.call_label(&target);
                     }
                     Some(ScriptCmd::CallScript { script, label }) => {
+                        engine.finished = false;
                         engine.call_script(&script, label.as_deref());
                     }
                     Some(ScriptCmd::Return) => {
+                        engine.finished = false;
                         engine.return_from_call();
                     }
                     Some(ScriptCmd::Condition {
@@ -640,8 +660,14 @@ fn process_advance(
                     None => break,
                 }
             }
-            if !engine.has_more() && !dialogue.is_displaying {
-                info!("Script finished: {}", engine.current_script);
+            if !engine.has_more() && !engine.finished {
+                engine.finished = true;
+                if engine.next_script() {
+                    info!("Script finished: advancing to {}", engine.current_script);
+                } else {
+                    info!("Script finished (no next): returning to title");
+                    next_state.set(AppState::Title);
+                }
             }
             continue;
         }
@@ -682,17 +708,21 @@ fn process_advance(
                     dialogue.is_displaying = false;
                 }
                 Some(ScriptCmd::Jump { target }) => {
+                    engine.finished = false;
                     if !engine.jump_to_label(&target) {
                         warn!("Jump target not found: {}", target);
                     }
                 }
                 Some(ScriptCmd::Call { target }) => {
+                    engine.finished = false;
                     engine.call_label(&target);
                 }
                 Some(ScriptCmd::CallScript { script, label }) => {
+                    engine.finished = false;
                     engine.call_script(&script, label.as_deref());
                 }
                 Some(ScriptCmd::Return) => {
+                    engine.finished = false;
                     engine.return_from_call();
                 }
                 Some(ScriptCmd::Condition {
@@ -1135,8 +1165,14 @@ fn process_advance(
             }
         }
 
-        if !engine.has_more() && !dialogue.is_displaying {
-            info!("Script finished: {}", engine.current_script);
+        if !engine.has_more() && !engine.finished {
+            engine.finished = true;
+            if engine.next_script() {
+                info!("Script finished: advancing to {}", engine.current_script);
+            } else {
+                info!("Script finished (no next): returning to title");
+                next_state.set(AppState::Title);
+            }
         }
     }
 }
@@ -1178,6 +1214,11 @@ fn handle_auto_skip(
 
     if settings.skip_mode {
         if !text_fully_displayed || dialogue.current_text.is_empty() {
+            if dialogue.current_text.is_empty() && !dialogue.is_displaying {
+                advance_ev.write(AdvanceEvent {
+                    source: AdvanceSource::Skip,
+                });
+            }
             auto_skip.auto_timer = None;
             auto_skip.skip_timer = None;
             return;
@@ -1198,6 +1239,11 @@ fn handle_auto_skip(
 
     if settings.auto_mode {
         if !text_fully_displayed || dialogue.current_text.is_empty() {
+            if dialogue.current_text.is_empty() && !dialogue.is_displaying {
+                advance_ev.write(AdvanceEvent {
+                    source: AdvanceSource::Auto,
+                });
+            }
             auto_skip.auto_timer = None;
             return;
         }

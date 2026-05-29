@@ -270,6 +270,7 @@ pub struct ScriptEngine {
     pub global_flags: HashMap<u32, i32>,
     pub scripts: HashMap<String, Vec<ScriptCmd>>,
     pub dialogue_idx: usize,
+    pub finished: bool,
 }
 
 impl ScriptEngine {
@@ -344,5 +345,32 @@ impl ScriptEngine {
         self.scripts
             .get(&self.current_script)
             .is_some_and(|s| self.current_line < s.len())
+    }
+
+    pub fn next_script(&mut self) -> bool {
+        let next = self.find_next_script();
+        if let Some(name) = next {
+            self.current_script = name;
+            self.current_line = 0;
+            self.dialogue_idx = 0;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn find_next_script(&self) -> Option<String> {
+        let current = &self.current_script;
+        let num_start = current.find(|c: char| c.is_ascii_digit())?;
+        let prefix = &current[..num_start];
+        let num_part = &current[num_start..];
+        let width = num_part.len();
+        let num: u32 = num_part.parse().ok()?;
+        let next_name = format!("{}{:0>width$}", prefix, num + 10, width = width);
+        if self.scripts.contains_key(&next_name) {
+            Some(next_name)
+        } else {
+            None
+        }
     }
 }

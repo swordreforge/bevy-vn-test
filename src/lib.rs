@@ -12,7 +12,7 @@ pub use script::Transition;
 
 use bevy::prelude::*;
 use bevy::camera::ScalingMode;
-use bevy::window::WindowResolution;
+use bevy::window::{PresentMode, WindowResolution};
 
 use state::AppState;
 use resources::{GameFont, ObjFileIndex};
@@ -42,6 +42,7 @@ pub fn build_app() -> App {
         primary_window: Some(Window {
             resolution: WindowResolution::new(1280, 720).with_scale_factor_override(1.0),
             title: "Aiyoku no Eustia".to_string(),
+            present_mode: PresentMode::Fifo,
             ..default()
         }),
         ..default()
