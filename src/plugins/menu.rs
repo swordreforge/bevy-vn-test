@@ -26,6 +26,7 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(AppState::Menu), cleanup_menu_ui)
             .add_systems(Update, (
                 handle_menu_button_interaction,
+                handle_menu_close_outside,
                 handle_menu_toggle,
             ));
     }
@@ -34,6 +35,7 @@ impl Plugin for MenuPlugin {
 fn setup_menu_ui(mut commands: Commands, game_font: Res<GameFont>) {
     commands.spawn((
         MenuUiRoot,
+        Button,
         Node {
             width: Val::Percent(100.0),
             height: Val::Percent(100.0),
@@ -99,6 +101,26 @@ fn handle_menu_button_interaction(
             MenuButtonAction::Title => screen_transition.pending_state = Some(AppState::Title),
         }
     }
+}
+
+fn handle_menu_close_outside(
+    root_query: Query<&Interaction, (Changed<Interaction>, With<MenuUiRoot>)>,
+    child_query: Query<&Interaction, (Changed<Interaction>, With<MenuButtonAction>)>,
+    state: Res<State<AppState>>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    if *state != AppState::Menu {
+        return;
+    }
+    let root_pressed = root_query.iter().any(|i| *i == Interaction::Pressed);
+    if !root_pressed {
+        return;
+    }
+    let child_pressed = child_query.iter().any(|i| *i == Interaction::Pressed);
+    if child_pressed {
+        return;
+    }
+    next_state.set(AppState::Gameplay);
 }
 
 fn handle_menu_toggle(
