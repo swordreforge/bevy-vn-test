@@ -104,21 +104,16 @@ fn setup_display_scaling(
     }
 }
 
+include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
+
 fn load_obj_index(mut index: ResMut<ObjFileIndex>) {
-    let path = std::path::Path::new("assets/scripts/obj_index.ron");
-    if path.exists() {
-        match std::fs::read_to_string(path) {
-            Ok(content) => match ron::from_str::<std::collections::HashMap<String, String>>(&content) {
-                Ok(map) => {
-                    index.0 = map;
-                    info!("Loaded obj_index.ron with {} entries", index.0.len());
-                }
-                Err(e) => warn!("Failed to parse obj_index.ron: {}", e),
-            },
-            Err(e) => warn!("Failed to read obj_index.ron: {}", e),
+    let content = obj_index_content();
+    match ron::from_str::<std::collections::HashMap<String, String>>(content) {
+        Ok(map) => {
+            index.0 = map;
+            info!("Loaded obj_index.ron with {} entries", index.0.len());
         }
-    } else {
-        info!("obj_index.ron not found, using fallback path construction");
+        Err(e) => warn!("Failed to parse obj_index.ron: {}", e),
     }
 }
 

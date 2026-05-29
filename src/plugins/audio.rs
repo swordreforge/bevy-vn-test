@@ -76,33 +76,17 @@ fn handle_play_bgm(
         let path_a = format!("audio/bgm/bgm_{}_a.ogg", msg.id);
         let path_b = format!("audio/bgm/bgm_{}_b.ogg", msg.id);
 
-        if std::path::Path::new(&format!("assets/{}", path_b)).exists() {
-            let handle_a: Handle<AudioSource> = asset_server.load(&path_a);
-            let handle_b: Handle<AudioSource> = asset_server.load(&path_b);
-            pending.0 = Some(PendingBgmLoad { id: msg.id.clone(), handle_a, handle_b, volume });
-        } else {
-            let handle: Handle<AudioSource> = asset_server.load(&path_a);
-            let mut spawn_cmd = commands.spawn((
-                AudioPlayer(handle),
-                PlaybackSettings {
-                    mode: bevy::audio::PlaybackMode::Loop,
-                    volume: Volume::Linear(if has_fade { 0.0 } else { volume }),
-                    ..default()
-                },
-                AudioType::Bgm,
-            ));
-
-            if has_fade {
-                spawn_cmd.insert(BgmFade {
-                    timer: Timer::from_seconds(fade_in_sec, TimerMode::Once),
-                    start_mult: 0.0,
-                    end_mult: 1.0,
-                    layer: BgmFadeLayer::Bgm,
-                });
-            }
-
-            bgm.entity = Some(spawn_cmd.id());
-        }
+        let handle_a: Handle<AudioSource> = asset_server.load(&path_a);
+        let handle_b: Handle<AudioSource> = asset_server.load(&path_b);
+        pending.0 = Some(PendingBgmLoad {
+            id: msg.id.clone(),
+            handle_a,
+            handle_b,
+            volume,
+            has_fade,
+            fade_in_sec,
+            frames_waited: 0,
+        });
     }
 }
 
@@ -141,28 +125,46 @@ fn process_pending_bgm(
     mut commands: Commands,
     mut bgm: ResMut<BgmManager>,
 ) {
-    let Some(ref p) = pending.0 else { return };
-    let Some(ref source_a) = assets.get(&p.handle_a) else { return };
-    let Some(ref source_b) = assets.get(&p.handle_b) else { return };
+    let Some(ref mut p) = pending.0 else { return };
+    let Some(ref source_a) = assets.get(&p.handle_a) else { p.frames_waited = 0; return };
 
-    let volume = p.volume;
     let id = p.id.clone();
-    let combined = concat_ogg_bytes(&source_a.bytes, &source_b.bytes);
-    let combined_source = AudioSource { bytes: Arc::from(combined) };
-    let handle = assets.add(combined_source);
+    let volume = p.volume;
+    let spawn_bgm = |cmds: &mut Commands, handle: Handle<AudioSource>, fade: bool, fade_sec: f32| {
+        let mut entity = cmds.spawn((
+            AudioPlayer(handle),
+            PlaybackSettings {
+                mode: bevy::audio::PlaybackMode::Loop,
+                volume: Volume::Linear(if fade { 0.0 } else { volume }),
+                ..default()
+            },
+            AudioType::Bgm,
+        ));
+        if fade {
+            entity.insert(BgmFade {
+                timer: Timer::from_seconds(fade_sec, TimerMode::Once),
+                start_mult: 0.0,
+                end_mult: 1.0,
+                layer: BgmFadeLayer::Bgm,
+            });
+        }
+        entity.id()
+    };
 
-    let entity = commands.spawn((
-        AudioPlayer(handle),
-        PlaybackSettings {
-            mode: bevy::audio::PlaybackMode::Loop,
-            volume: Volume::Linear(volume),
-            ..default()
-        },
-        AudioType::Bgm,
-    )).id();
-    bgm.entity = Some(entity);
-    pending.0 = None;
-    info!("BGM concat: {} complete", id);
+    if let Some(ref source_b) = assets.get(&p.handle_b) {
+        let combined = concat_ogg_bytes(&source_a.bytes, &source_b.bytes);
+        let combined_source = AudioSource { bytes: Arc::from(combined) };
+        let handle = assets.add(combined_source);
+        bgm.entity = Some(spawn_bgm(&mut commands, handle, p.has_fade, p.fade_in_sec));
+        pending.0 = None;
+        info!("BGM concat: {} complete", id);
+    } else if p.frames_waited >= 60 {
+        bgm.entity = Some(spawn_bgm(&mut commands, p.handle_a.clone(), p.has_fade, p.fade_in_sec));
+        pending.0 = None;
+        info!("BGM single (no B layer): {} complete", id);
+    } else {
+        p.frames_waited += 1;
+    }
 }
 
 fn handle_play_bgmx(

@@ -53,6 +53,34 @@ pub struct SaveData {
     pub bgmx_id: Option<String>,
 }
 
+#[derive(Resource, Clone)]
+pub struct SaveDir(pub String);
+
+impl Default for SaveDir {
+    fn default() -> Self {
+        #[cfg(not(feature = "android"))]
+        { Self("saves".to_string()) }
+        #[cfg(feature = "android")]
+        {
+            let p = if let Some(app) = bevy_android::ANDROID_APP.get() {
+                if let Some(path) = app.internal_data_path() {
+                    Some(format!("{}/saves", path.display()))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            if let Some(ref p) = p {
+                let _ = std::fs::create_dir_all(p);
+                Self(p.clone())
+            } else {
+                Self("saves".to_string())
+            }
+        }
+    }
+}
+
 #[derive(Resource, Default)]
 pub struct SaveManager {
     pub slots: Vec<Option<SaveData>>,
@@ -65,10 +93,9 @@ impl SaveManager {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn refresh_from_disk(&mut self) {
+    pub fn refresh_from_disk(&mut self, save_dir: &SaveDir) {
         for i in 0..self.slots.len() {
-            let path = format!("saves/slot_{}.json", i);
+            let path = format!("{}/slot_{}.json", save_dir.0, i);
             match std::fs::read_to_string(&path) {
                 Ok(json) => self.slots[i] = serde_json::from_str(&json).ok(),
                 Err(_) => self.slots[i] = None,
@@ -76,17 +103,17 @@ impl SaveManager {
         }
     }
 
-    pub fn save_slot(&mut self, idx: usize, data: SaveData) {
-        let _ = std::fs::create_dir_all("saves");
-        let path = format!("saves/slot_{}.json", idx);
+    pub fn save_slot(&mut self, idx: usize, data: SaveData, save_dir: &SaveDir) {
+        let _ = std::fs::create_dir_all(&save_dir.0);
+        let path = format!("{}/slot_{}.json", save_dir.0, idx);
         if let Ok(json) = serde_json::to_string_pretty(&data) {
             let _ = std::fs::write(&path, &json);
         }
         self.slots[idx] = Some(data);
     }
 
-    pub fn load_slot_from_disk(&mut self, idx: usize) -> Option<SaveData> {
-        let path = format!("saves/slot_{}.json", idx);
+    pub fn load_slot_from_disk(&mut self, idx: usize, save_dir: &SaveDir) -> Option<SaveData> {
+        let path = format!("{}/slot_{}.json", save_dir.0, idx);
         let json = std::fs::read_to_string(path).ok()?;
         let data: SaveData = serde_json::from_str(&json).ok()?;
         self.slots[idx] = Some(data.clone());
@@ -128,26 +155,14 @@ impl Default for Settings {
 #[derive(Resource, Default)]
 pub struct ViewBlocking(pub bool);
 
+include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
+
 #[derive(Resource)]
 pub struct AllCgFiles(pub Vec<String>);
 
 impl AllCgFiles {
     pub fn scan() -> Self {
-        let mut files = Vec::new();
-        if let Ok(entries) = std::fs::read_dir("assets/image/ev") {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() {
-                    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                        if ext == "png" || ext == "jpg" || ext == "jpeg" {
-                            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                                files.push(name.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        let mut files: Vec<String> = all_cg_files().into_iter().map(String::from).collect();
         files.sort();
         Self(files)
     }
@@ -252,6 +267,9 @@ pub struct PendingBgmLoad {
     pub handle_a: Handle<AudioSource>,
     pub handle_b: Handle<AudioSource>,
     pub volume: f32,
+    pub has_fade: bool,
+    pub fade_in_sec: f32,
+    pub frames_waited: u32,
 }
 
 #[derive(Resource, Default)]

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 use crate::components::*;
-use crate::resources::{BgmManager, BgmXManager, GameFont, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, UnlockState};
+use crate::resources::{BgmManager, BgmXManager, GameFont, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, UnlockState};
 use crate::state::AppState;
 use crate::script::{ScriptCmd, ScriptEngine};
 use crate::rendering_messages::{
@@ -18,8 +18,9 @@ pub struct SaveLoadPlugin;
 impl Plugin for SaveLoadPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(SaveManager::new(75))
+            .init_resource::<SaveDir>()
             .init_resource::<SaveLoadPage>()
-            .add_systems(Startup, |mut mgr: ResMut<SaveManager>| mgr.refresh_from_disk())
+            .add_systems(Startup, |mut mgr: ResMut<SaveManager>, dir: Res<SaveDir>| mgr.refresh_from_disk(&dir))
             .add_systems(OnEnter(AppState::SaveLoad), setup_save_load_ui)
             .add_systems(OnExit(AppState::SaveLoad), cleanup_save_load_ui)
             .add_systems(Update, (
@@ -338,6 +339,7 @@ fn handle_confirm(
     confirm_dialogs: Query<Entity, With<ConfirmDialogRoot>>,
     mode: Res<SaveLoadMode>,
     mut save_mgr: ResMut<SaveManager>,
+    save_dir: Res<SaveDir>,
     mut script_engine: ResMut<ScriptEngine>,
     mut affection: ResMut<AffectionMap>,
     mut unlock_state: ResMut<UnlockState>,
@@ -359,8 +361,8 @@ fn handle_confirm(
                     &settings, &bgm, &bgmx,
                     view_query.single().ok(),
                 );
-                save_mgr.save_slot(idx, data);
-            } else if let Some(data) = save_mgr.load_slot_from_disk(idx) {
+                save_mgr.save_slot(idx, data, &save_dir);
+            } else if let Some(data) = save_mgr.load_slot_from_disk(idx, &save_dir) {
                 let scene_name = data.scene_name.clone();
                 let script_line = data.script_line;
                 let call_stack = data.call_stack.clone();
