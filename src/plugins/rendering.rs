@@ -9,6 +9,8 @@ use crate::rendering_messages::{
     AnimateSpriteMessage, DrawSpriteMessage, FadeSpriteMessage, MoveSpriteMessage,
 };
 
+include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
+
 fn char_dir(char_id: &str) -> Option<&'static str> {
     let prefix = &char_id[..2];
     match prefix {
@@ -493,7 +495,7 @@ fn handle_show_cg(
             commands.entity(entity).despawn();
         }
 
-        let path = format!("image/ev/{}", msg.file);
+        let path = ev_file_path(&msg.file);
         let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
             asset_server.load(&path)
         }).clone();

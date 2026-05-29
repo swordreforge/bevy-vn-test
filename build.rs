@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -48,25 +49,101 @@ fn main() {
     .unwrap();
     writeln!(f, "}}").unwrap();
 
-    // ---- CG files list ----
-    writeln!(f, "pub fn all_cg_files() -> Vec<&'static str> {{").unwrap();
-    writeln!(f, "    vec![").unwrap();
+    // ---- CG files: scan all ev files recursively ----
     let ev_dir = Path::new(&manifest_dir).join("assets/image/ev");
+    let mut top_ev_files: Vec<String> = Vec::new();
+    let mut ext_map: HashMap<String, &'static str> = HashMap::new();
+
     if let Ok(entries) = fs::read_dir(&ev_dir) {
-        let mut entries: Vec<_> = entries.filter_map(|e| e.ok()).collect();
-        entries.sort_by_key(|e| e.file_name());
-        for entry in &entries {
+        let file_entries: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+        for entry in &file_entries {
             let path = entry.path();
             if path.is_file() {
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.ends_with(".png") || name.ends_with(".jpg") || name.ends_with(".jpeg")
-                    {
-                        writeln!(f, "        \"{}\",", name).unwrap();
+                    if is_image_file(name) {
+                        top_ev_files.push(name.to_string());
+                        ext_map.insert(strip_ext(name), ext_of(name));
+                    }
+                }
+            }
+        }
+        for entry in &file_entries {
+            let path = entry.path();
+            if path.is_dir() {
+                scan_ev_subdir(&path, &mut ext_map);
+            }
+        }
+    }
+    top_ev_files.sort();
+
+    // Generate all_cg_files (top-level only)
+    writeln!(f, "pub fn all_cg_files() -> Vec<&'static str> {{").unwrap();
+    writeln!(f, "    vec![").unwrap();
+    for name in &top_ev_files {
+        writeln!(f, "        \"{}\",", name).unwrap();
+    }
+    writeln!(f, "    ]").unwrap();
+    writeln!(f, "}}").unwrap();
+
+    // Generate ev_file_ext (all files including subdirs)
+    // Collect non-png entries for the match
+    let non_png: Vec<(&str, &str)> = ext_map.iter()
+        .filter(|(_, ext)| **ext != "png")
+        .map(|(base, ext)| (base.as_str(), *ext))
+        .collect();
+
+    writeln!(f, "pub fn ev_file_ext(file: &str) -> &'static str {{").unwrap();
+    if non_png.is_empty() {
+        writeln!(f, "    \".png\"").unwrap();
+    } else {
+        writeln!(f, "    match file {{").unwrap();
+        for (base, ext) in &non_png {
+            writeln!(f, "        \"{}\" => \".{}\",", base, ext).unwrap();
+        }
+        writeln!(f, "        _ => \".png\",").unwrap();
+        writeln!(f, "    }}").unwrap();
+    }
+    writeln!(f, "}}").unwrap();
+
+    writeln!(f, "pub fn ev_file_path(file: &str) -> String {{").unwrap();
+    writeln!(f, "    format!(\"image/ev/{{}}{{}}\", file, ev_file_ext(file))").unwrap();
+    writeln!(f, "}}").unwrap();
+}
+
+fn is_image_file(name: &str) -> bool {
+    name.ends_with(".png") || name.ends_with(".jpg") || name.ends_with(".jpeg")
+}
+
+fn strip_ext(name: &str) -> String {
+    let s = name.to_string();
+    for ext in &[".png", ".jpg", ".jpeg"] {
+        if let Some(stripped) = s.strip_suffix(ext) {
+            return stripped.to_string();
+        }
+    }
+    s
+}
+
+fn ext_of(_name: &str) -> &'static str {
+    if _name.ends_with(".png") { return "png"; }
+    if _name.ends_with(".jpg") { return "jpg"; }
+    if _name.ends_with(".jpeg") { return "jpeg"; }
+    ""
+}
+
+fn scan_ev_subdir(dir: &Path, ext_map: &mut HashMap<String, &'static str>) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        let collected: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+        for entry in &collected {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if is_image_file(name) {
+                        let parent = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                        ext_map.insert(format!("{}/{}", parent, strip_ext(name)), ext_of(name));
                     }
                 }
             }
         }
     }
-    writeln!(f, "    ]").unwrap();
-    writeln!(f, "}}").unwrap();
 }
