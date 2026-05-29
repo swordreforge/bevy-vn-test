@@ -11,7 +11,8 @@ pub mod choice_messages;
 pub use script::Transition;
 
 use bevy::prelude::*;
-use bevy::window::Window;
+use bevy::camera::ScalingMode;
+use bevy::window::WindowResolution;
 
 use state::AppState;
 use resources::{GameFont, ObjFileIndex};
@@ -39,7 +40,7 @@ pub fn build_app() -> App {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
-            resolution: (1280, 720).into(),
+            resolution: WindowResolution::new(1280, 720).with_scale_factor_override(1.0),
             title: "Aiyoku no Eustia".to_string(),
             ..default()
         }),
@@ -47,6 +48,7 @@ pub fn build_app() -> App {
     }))
     .init_state::<AppState>()
     .init_resource::<ScriptEngine>()
+    .add_systems(PostStartup, setup_display_scaling)
     .add_plugins(SplashPlugin)
     .add_plugins(TitlePlugin)
     .add_plugins(InputPlugin)
@@ -75,9 +77,31 @@ fn startup(
     asset_server: Res<AssetServer>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    commands.spawn(Camera2d);
+    commands.spawn((
+        Camera2d,
+        Projection::Orthographic(OrthographicProjection::default_2d()),
+    ));
     commands.insert_resource(GameFont(asset_server.load("fonts/sourcehansans-medium.otf")));
     next_state.set(AppState::Splash);
+}
+
+fn setup_display_scaling(
+    mut commands: Commands,
+    windows: Query<&Window>,
+    mut camera_query: Query<&mut Projection, With<Camera2d>>,
+) {
+    if let Ok(window) = windows.single() {
+        let scale = (window.width() / 1280.0).max(1.0);
+        commands.insert_resource(UiScale(scale));
+    }
+    if let Ok(mut proj) = camera_query.single_mut() {
+        if let Projection::Orthographic(ref mut ortho) = *proj {
+            ortho.scaling_mode = ScalingMode::AutoMin {
+                min_width: 1280.0,
+                min_height: 720.0,
+            };
+        }
+    }
 }
 
 fn load_obj_index(mut index: ResMut<ObjFileIndex>) {
