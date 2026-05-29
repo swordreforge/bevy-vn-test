@@ -56,6 +56,9 @@ pub struct SaveLoadPageRightBtn;
 pub struct SaveLoadPageText;
 
 #[derive(Component)]
+pub struct SaveLoadBackButton;
+
+#[derive(Component)]
 pub struct GalleryRoot;
 
 #[derive(Component)]

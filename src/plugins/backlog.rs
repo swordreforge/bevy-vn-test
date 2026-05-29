@@ -90,13 +90,18 @@ fn setup_backlog_ui(mut commands: Commands, backlog: Res<Backlog>, game_font: Re
         parent.spawn((
             BacklogCloseBtn,
             Button,
-            Text::new("Close"),
-            TextFont { font: game_font.0.clone(), font_size: 22.0, ..default() },
-            TextColor(Color::srgb(0.8, 0.8, 1.0)),
+            Text::new("← Back"),
+            TextFont { font: game_font.0.clone(), font_size: 18.0, ..default() },
+            TextColor(Color::WHITE),
             Node {
+                width: Val::Px(80.0),
+                height: Val::Px(36.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
                 margin: UiRect::top(Val::Px(12.0)),
                 ..default()
             },
+            BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
         ));
     });
 }

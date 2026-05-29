@@ -91,7 +91,7 @@ fn setup_display_scaling(
     mut camera_query: Query<&mut Projection, With<Camera2d>>,
 ) {
     if let Ok(window) = windows.single() {
-        let scale = (window.width() / 1280.0).max(1.0);
+        let scale = (window.width() / 640.0).max(1.0);
         commands.insert_resource(UiScale(scale));
     }
     if let Ok(mut proj) = camera_query.single_mut() {

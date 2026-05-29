@@ -86,6 +86,26 @@ fn setup_save_load_ui(
         ));
 
         parent.spawn((
+            SaveLoadBackButton,
+            Button,
+            Node {
+                width: Val::Px(80.0),
+                height: Val::Px(36.0),
+                position_type: PositionType::Absolute,
+                top: Val::Px(8.0),
+                left: Val::Px(8.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+        )).with_child((
+            Text::new("← Back"),
+            TextFont { font: game_font.0.clone(), font_size: 18.0, ..default() },
+            TextColor(Color::WHITE),
+        ));
+
+        parent.spawn((
             SaveLoadSlotGrid,
             Node {
                 display: Display::Flex,
@@ -663,9 +683,19 @@ fn handle_save_load_escape(
     keyboard: Res<ButtonInput<KeyCode>>,
     state: Res<State<AppState>>,
     mut next_state: ResMut<NextState<AppState>>,
+    btn_query: Query<&Interaction, (Changed<Interaction>, With<SaveLoadBackButton>)>,
 ) {
-    if keyboard.just_pressed(KeyCode::Escape) && *state == AppState::SaveLoad {
+    if *state != AppState::SaveLoad {
+        return;
+    }
+    if keyboard.just_pressed(KeyCode::Escape) {
         next_state.set(AppState::Menu);
+        return;
+    }
+    for interaction in &btn_query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(AppState::Menu);
+        }
     }
 }
 
