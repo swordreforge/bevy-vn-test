@@ -10,6 +10,29 @@ BUILD_TYPE="${1:-release}"
 
 cd "$PROJECT_DIR"
 
+echo "=== Step 0: Generating launcher icons ==="
+ICON_SRC="$PROJECT_DIR/9w.png"
+ICON_DIR="$SCRIPT_DIR/app/src/main/res"
+if [ -f "$ICON_SRC" ]; then
+    MDPI="$ICON_DIR/mipmap-mdpi"
+    HDPI="$ICON_DIR/mipmap-hdpi"
+    XHDPI="$ICON_DIR/mipmap-xhdpi"
+    XXHDPI="$ICON_DIR/mipmap-xxhdpi"
+    XXXHDPI="$ICON_DIR/mipmap-xxxhdpi"
+    mkdir -p "$MDPI" "$HDPI" "$XHDPI" "$XXHDPI" "$XXXHDPI"
+    convert "$ICON_SRC" -resize 48x48   "$MDPI/ic_launcher.png"
+    convert "$ICON_SRC" -resize 72x72   "$HDPI/ic_launcher.png"
+    convert "$ICON_SRC" -resize 96x96   "$XHDPI/ic_launcher.png"
+    convert "$ICON_SRC" -resize 144x144 "$XXHDPI/ic_launcher.png"
+    convert "$ICON_SRC" -resize 192x192 "$XXXHDPI/ic_launcher.png"
+    for dir in "$MDPI" "$HDPI" "$XHDPI" "$XXHDPI" "$XXXHDPI"; do
+        cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
+    done
+    echo "       Icons generated from 9w.png"
+else
+    echo "       WARNING: 9w.png not found, skipping icon generation"
+fi
+
 echo "=== Step 1: Cross-compiling Rust to aarch64-linux-android ==="
 cargo ndk -t aarch64-linux-android build "--$BUILD_TYPE" --features android
 

@@ -5,7 +5,9 @@
 
     <application
         android:allowBackup="true"
-        android:label="Aiyoku no Eustia">
+        android:label="Aiyoku no Eustia"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
 
         <activity
             android:name=".MainActivity"
