@@ -1,5 +1,5 @@
 use crate::components::*;
-use crate::resources::{GameFont, Settings};
+use crate::resources::{load_settings, save_settings, GameFont, Settings};
 use crate::state::AppState;
 use bevy::prelude::*;
 
@@ -7,7 +7,7 @@ pub struct SettingsPlugin;
 
 impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Settings>()
+        app.insert_resource(load_settings())
             .add_systems(OnEnter(AppState::Settings), setup_settings_ui)
             .add_systems(OnExit(AppState::Settings), cleanup_settings)
             .add_systems(
@@ -409,7 +409,12 @@ fn update_toggle_visuals(
     }
 }
 
-fn cleanup_settings(mut commands: Commands, query: Query<Entity, With<SettingsScreen>>) {
+fn cleanup_settings(
+    mut commands: Commands,
+    query: Query<Entity, With<SettingsScreen>>,
+    settings: Res<Settings>,
+) {
+    save_settings(&settings);
     for entity in &query {
         commands.entity(entity).despawn();
     }

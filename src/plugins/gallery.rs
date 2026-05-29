@@ -1,27 +1,34 @@
-use bevy::prelude::*;
-use crate::state::AppState;
-use crate::resources::{GameFont, GalleryState, TextureCache, UnlockState, AllCgFiles, SafeMode};
 use crate::components::*;
+use crate::resources::{
+    load_unlock_state, save_unlock_state, AllCgFiles, GalleryState, GameFont, SafeMode,
+    TextureCache, UnlockState,
+};
+use crate::state::AppState;
+use bevy::prelude::*;
 
 pub struct GalleryPlugin;
 
 impl Plugin for GalleryPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<UnlockState>()
+        app.insert_resource(load_unlock_state())
             .init_resource::<GalleryState>()
             .init_resource::<TextureCache>()
             .init_resource::<AllCgFiles>()
             .init_resource::<SafeMode>()
             .add_systems(OnEnter(AppState::Gallery), setup_gallery)
-            .add_systems(Update, (
-                handle_thumbnail_click,
-                handle_back_button,
-                handle_fullscreen_click,
-                handle_gallery_escape,
-                handle_gallery_page_nav,
-                handle_debug_unlock_all,
-                handle_safe_mode_toggle,
-            ).run_if(in_state(AppState::Gallery)))
+            .add_systems(
+                Update,
+                (
+                    handle_thumbnail_click,
+                    handle_back_button,
+                    handle_fullscreen_click,
+                    handle_gallery_escape,
+                    handle_gallery_page_nav,
+                    handle_debug_unlock_all,
+                    handle_safe_mode_toggle,
+                )
+                    .run_if(in_state(AppState::Gallery)),
+            )
             .add_systems(OnExit(AppState::Gallery), cleanup_gallery);
     }
 }
@@ -69,7 +76,9 @@ fn populate_gallery_grid(
         let file = filtered[i];
         if unlock_state.cg_unlocked.contains(file.as_str()) {
             let path = format!("image/ev/{}", file);
-            let handle = cache.cache.entry(path.clone())
+            let handle = cache
+                .cache
+                .entry(path.clone())
                 .or_insert_with(|| asset_server.load(&path))
                 .clone();
             grid.spawn((
@@ -96,9 +105,14 @@ fn populate_gallery_grid(
                 },
                 BackgroundColor(Color::srgba(0.15, 0.15, 0.2, 1.0)),
                 ZIndex(5),
-            )).with_child((
+            ))
+            .with_child((
                 Text::new("[ LOCKED ]"),
-                TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
+                TextFont {
+                    font: game_font.0.clone(),
+                    font_size: 16.0,
+                    ..default()
+                },
                 TextColor(Color::srgb(0.3, 0.3, 0.4)),
             ));
         }
@@ -118,153 +132,198 @@ fn setup_gallery(
     let filtered_count = filtered_cg_files(&cg_files.0, safe_mode.0).len();
     let total_pages = safe_total_pages(filtered_count);
 
-    commands.spawn((
-        GalleryRoot,
-        GalleryScreen,
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            position_type: PositionType::Absolute,
-            top: Val::Px(0.0),
-            left: Val::Px(0.0),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.05, 0.05, 0.1, 0.95)),
-        ZIndex(5),
-    )).with_children(|root| {
-        root.spawn((
-            GalleryBackButton,
-            Button,
+    commands
+        .spawn((
+            GalleryRoot,
+            GalleryScreen,
             Node {
-                width: Val::Px(80.0),
-                height: Val::Px(36.0),
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
                 position_type: PositionType::Absolute,
-                top: Val::Px(8.0),
-                left: Val::Px(8.0),
-                justify_content: JustifyContent::Center,
+                top: Val::Px(0.0),
+                left: Val::Px(0.0),
+                flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
-        )).with_child((
-            Text::new("← Back"),
-            TextFont { font: game_font.0.clone(), font_size: 18.0, ..default() },
-            TextColor(Color::WHITE),
-        ));
+            BackgroundColor(Color::srgba(0.05, 0.05, 0.1, 0.95)),
+            ZIndex(5),
+        ))
+        .with_children(|root| {
+            root.spawn((
+                GalleryBackButton,
+                Button,
+                Node {
+                    width: Val::Px(80.0),
+                    height: Val::Px(36.0),
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(8.0),
+                    left: Val::Px(8.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+            ))
+            .with_child((
+                Text::new("← Back"),
+                TextFont {
+                    font: game_font.0.clone(),
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
 
-        root.spawn((
-            Text::new("CG Gallery"),
-            TextFont { font: game_font.0.clone(), font_size: 28.0, ..default() },
-            TextColor(Color::WHITE),
-            Node {
-                margin: UiRect::top(Val::Px(12.0)),
-                ..default()
-            },
-        ));
+            root.spawn((
+                Text::new("CG Gallery"),
+                TextFont {
+                    font: game_font.0.clone(),
+                    font_size: 28.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::top(Val::Px(12.0)),
+                    ..default()
+                },
+            ));
 
-        root.spawn((
-            Node {
+            root.spawn((Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
                 column_gap: Val::Px(16.0),
                 margin: UiRect::vertical(Val::Px(6.0)),
                 ..default()
-            },
-        )).with_children(|nav| {
-            nav.spawn((
-                GalleryPageLeftBtn,
-                Button,
-                Node {
-                    width: Val::Px(36.0),
-                    height: Val::Px(36.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
-            )).with_child((
-                Text::new("◀"),
-                TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                TextColor(Color::WHITE),
-            ));
+            },))
+                .with_children(|nav| {
+                    nav.spawn((
+                        GalleryPageLeftBtn,
+                        Button,
+                        Node {
+                            width: Val::Px(36.0),
+                            height: Val::Px(36.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+                    ))
+                    .with_child((
+                        Text::new("◀"),
+                        TextFont {
+                            font: game_font.0.clone(),
+                            font_size: 20.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                    ));
 
-            nav.spawn((
-                GalleryPageText,
-                Text::new(format!("Page {}/{}", gallery_state.page + 1, total_pages)),
-                TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                TextColor(Color::srgb(0.7, 0.7, 0.8)),
-            ));
+                    nav.spawn((
+                        GalleryPageText,
+                        Text::new(format!("Page {}/{}", gallery_state.page + 1, total_pages)),
+                        TextFont {
+                            font: game_font.0.clone(),
+                            font_size: 20.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.7, 0.7, 0.8)),
+                    ));
 
-            nav.spawn((
-                GalleryPageRightBtn,
-                Button,
-                Node {
-                    width: Val::Px(36.0),
-                    height: Val::Px(36.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
-            )).with_child((
-                Text::new("▶"),
-                TextFont { font: game_font.0.clone(), font_size: 20.0, ..default() },
-                TextColor(Color::WHITE),
-            ));
-        });
+                    nav.spawn((
+                        GalleryPageRightBtn,
+                        Button,
+                        Node {
+                            width: Val::Px(36.0),
+                            height: Val::Px(36.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+                    ))
+                    .with_child((
+                        Text::new("▶"),
+                        TextFont {
+                            font: game_font.0.clone(),
+                            font_size: 20.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                    ));
+                });
 
-        root.spawn((
-            Node {
+            root.spawn((Node {
                 flex_direction: FlexDirection::Row,
                 justify_content: JustifyContent::Center,
                 margin: UiRect::bottom(Val::Px(4.0)),
                 ..default()
-            },
-        )).with_children(|row| {
-            row.spawn((
-                GallerySafeModeBtn,
-                Button,
+            },))
+                .with_children(|row| {
+                    row.spawn((
+                        GallerySafeModeBtn,
+                        Button,
+                        Node {
+                            width: Val::Px(140.0),
+                            height: Val::Px(30.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+                    ))
+                    .with_child((
+                        Text::new(if safe_mode.0 {
+                            "[x] Safe Mode"
+                        } else {
+                            "[ ] Safe Mode"
+                        }),
+                        TextFont {
+                            font: game_font.0.clone(),
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.7, 0.7, 0.8)),
+                        SafeModeLabel,
+                    ));
+                });
+
+            root.spawn((
+                GalleryGridContent,
                 Node {
-                    width: Val::Px(140.0),
-                    height: Val::Px(30.0),
+                    width: Val::Percent(90.0),
+                    flex_grow: 1.0,
+                    flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
                     justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
+                    align_items: AlignItems::FlexStart,
+                    align_content: AlignContent::FlexStart,
+                    column_gap: Val::Px(12.0),
+                    row_gap: Val::Px(12.0),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
-            )).with_child((
-                Text::new(if safe_mode.0 { "[x] Safe Mode" } else { "[ ] Safe Mode" }),
-                TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
-                TextColor(Color::srgb(0.7, 0.7, 0.8)),
-                SafeModeLabel,
-            ));
+            ))
+            .with_children(|grid| {
+                populate_gallery_grid(
+                    grid,
+                    gallery_state.page,
+                    &cg_files.0,
+                    &*unlock_state,
+                    safe_mode.0,
+                    &*asset_server,
+                    &mut *cache,
+                    &*game_font,
+                );
+            });
         });
-
-        root.spawn((
-            GalleryGridContent,
-            Node {
-                width: Val::Percent(90.0),
-                flex_grow: 1.0,
-                flex_direction: FlexDirection::Row,
-                flex_wrap: FlexWrap::Wrap,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::FlexStart,
-                align_content: AlignContent::FlexStart,
-                column_gap: Val::Px(12.0),
-                row_gap: Val::Px(12.0),
-                ..default()
-            },
-        )).with_children(|grid| {
-            populate_gallery_grid(grid, gallery_state.page, &cg_files.0, &*unlock_state, safe_mode.0, &*asset_server, &mut *cache, &*game_font);
-        });
-    });
 }
 
 fn handle_thumbnail_click(
-    interaction_query: Query<(&Interaction, &GalleryThumbnail), (Changed<Interaction>, With<Button>)>,
+    interaction_query: Query<
+        (&Interaction, &GalleryThumbnail),
+        (Changed<Interaction>, With<Button>),
+    >,
     mut gallery_state: ResMut<GalleryState>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -280,7 +339,9 @@ fn handle_thumbnail_click(
             if unlock_state.cg_unlocked.contains(file) {
                 gallery_state.fullscreen = Some(file.clone());
                 let path = format!("image/ev/{}", file);
-                let handle = cache.cache.entry(path.clone())
+                let handle = cache
+                    .cache
+                    .entry(path.clone())
                     .or_insert_with(|| asset_server.load(&path))
                     .clone();
                 commands.spawn((
@@ -395,14 +456,25 @@ fn handle_gallery_page_nav(
 
         for entity in &grid_query {
             commands.entity(entity).with_children(|grid| {
-                populate_gallery_grid(grid, gallery_state.page, &cg_files.0, &*unlock_state, safe_mode.0, &*asset_server, &mut *cache, &*game_font);
+                populate_gallery_grid(
+                    grid,
+                    gallery_state.page,
+                    &cg_files.0,
+                    &*unlock_state,
+                    safe_mode.0,
+                    &*asset_server,
+                    &mut *cache,
+                    &*game_font,
+                );
             });
         }
 
         for entity in &page_text_query {
-            commands.entity(entity).insert(Text::new(
-                format!("Page {}/{}", gallery_state.page + 1, total_pages),
-            ));
+            commands.entity(entity).insert(Text::new(format!(
+                "Page {}/{}",
+                gallery_state.page + 1,
+                total_pages
+            )));
         }
     }
 }
@@ -464,14 +536,25 @@ fn handle_debug_unlock_all(
 
     for entity in &grid_query {
         commands.entity(entity).with_children(|grid| {
-            populate_gallery_grid(grid, gallery_state.page, &cg_files.0, &*unlock_state, safe_mode.0, &*asset_server, &mut *cache, &*game_font);
+            populate_gallery_grid(
+                grid,
+                gallery_state.page,
+                &cg_files.0,
+                &*unlock_state,
+                safe_mode.0,
+                &*asset_server,
+                &mut *cache,
+                &*game_font,
+            );
         });
     }
 
     for entity in &page_text_query {
-        commands.entity(entity).insert(Text::new(
-            format!("Page {}/{}", gallery_state.page + 1, total_pages),
-        ));
+        commands.entity(entity).insert(Text::new(format!(
+            "Page {}/{}",
+            gallery_state.page + 1,
+            total_pages
+        )));
     }
 }
 
@@ -509,22 +592,49 @@ fn handle_safe_mode_toggle(
 
     for entity in &grid_query {
         commands.entity(entity).with_children(|grid| {
-            populate_gallery_grid(grid, gallery_state.page, &cg_files.0, &*unlock_state, safe_mode.0, &*asset_server, &mut *cache, &*game_font);
+            populate_gallery_grid(
+                grid,
+                gallery_state.page,
+                &cg_files.0,
+                &*unlock_state,
+                safe_mode.0,
+                &*asset_server,
+                &mut *cache,
+                &*game_font,
+            );
         });
     }
 
     for entity in &page_text_query {
-        commands.entity(entity).insert(Text::new(
-            format!("Page {}/{}", gallery_state.page + 1, total_pages),
-        ));
+        commands.entity(entity).insert(Text::new(format!(
+            "Page {}/{}",
+            gallery_state.page + 1,
+            total_pages
+        )));
     }
 
     for mut text in &mut label_query {
-        text.0 = if safe_mode.0 { "[x] Safe Mode".to_string() } else { "[ ] Safe Mode".to_string() };
+        text.0 = if safe_mode.0 {
+            "[x] Safe Mode".to_string()
+        } else {
+            "[ ] Safe Mode".to_string()
+        };
     }
 }
 
-fn cleanup_gallery(mut commands: Commands, query: Query<Entity, Or<(With<GalleryRoot>, With<GalleryFullscreen>, With<GalleryScreen>)>>) {
+fn cleanup_gallery(
+    mut commands: Commands,
+    query: Query<
+        Entity,
+        Or<(
+            With<GalleryRoot>,
+            With<GalleryFullscreen>,
+            With<GalleryScreen>,
+        )>,
+    >,
+    unlock_state: Res<UnlockState>,
+) {
+    save_unlock_state(&unlock_state);
     for entity in &query {
         commands.entity(entity).despawn();
     }

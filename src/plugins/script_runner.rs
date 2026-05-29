@@ -13,8 +13,8 @@ use crate::rendering_messages::{
     ShowFaceMessage, ShowFgMessage,
 };
 use crate::resources::{
-    AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase, QuakeState,
-    Settings, SpriteOverlayManager, UnlockState,
+    save_unlock_state, AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase,
+    QuakeState, Settings, SpriteOverlayManager, UnlockState,
 };
 use crate::resources::{ViewBlocking, WindowOverride};
 use crate::script::{ConditionOp, OverlayColor, ScriptCmd, ScriptEngine};
@@ -85,6 +85,7 @@ impl Plugin for ScriptRunnerPlugin {
                 (start_script_execution, start_intro_bgm),
             )
             .add_systems(OnEnter(AppState::Title), reset_engine_on_title)
+            .add_systems(OnExit(AppState::Gameplay), persist_gameplay)
             .add_systems(
                 Update,
                 (handle_auto_skip, process_advance, update_text_reveal)
@@ -1222,4 +1223,9 @@ fn handle_auto_skip(
             });
         }
     }
+}
+
+fn persist_gameplay(unlock_state: Res<UnlockState>, settings: Res<Settings>) {
+    save_unlock_state(&unlock_state);
+    crate::resources::save_settings(&settings);
 }

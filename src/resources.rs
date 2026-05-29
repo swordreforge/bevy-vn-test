@@ -59,29 +59,30 @@ pub struct SaveDir(pub String);
 
 impl Default for SaveDir {
     fn default() -> Self {
-        #[cfg(not(feature = "android"))]
-        {
-            Self("saves".to_string())
-        }
-        #[cfg(feature = "android")]
-        {
-            let p = if let Some(app) = bevy_android::ANDROID_APP.get() {
-                if let Some(path) = app.internal_data_path() {
-                    Some(format!("{}/saves", path.display()))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            if let Some(ref p) = p {
-                let _ = std::fs::create_dir_all(p);
-                Self(p.clone())
-            } else {
-                Self("saves".to_string())
+        let path = persist_dir();
+        let _ = std::fs::create_dir_all(&path);
+        Self(path)
+    }
+}
+
+pub fn persist_dir() -> String {
+    #[cfg(feature = "android")]
+    {
+        if let Some(app) = bevy_android::ANDROID_APP.get() {
+            if let Some(path) = app.internal_data_path() {
+                return format!("{}", path.display());
             }
         }
     }
+    #[cfg(not(feature = "android"))]
+    {
+        if let Some(dir) = dirs::data_local_dir() {
+            let dir = dir.join("bevy-vn");
+            let _ = std::fs::create_dir_all(&dir);
+            return format!("{}", dir.display());
+        }
+    }
+    "saves".to_string()
 }
 
 #[derive(Resource, Default)]
@@ -124,7 +125,43 @@ impl SaveManager {
     }
 }
 
-#[derive(Resource, Clone)]
+pub fn load_settings() -> Settings {
+    let dir = persist_dir();
+    let path = format!("{}/settings.json", dir);
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|json| serde_json::from_str::<Settings>(&json).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_settings(settings: &Settings) {
+    let dir = persist_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    let path = format!("{}/settings.json", dir);
+    if let Ok(json) = serde_json::to_string_pretty(settings) {
+        let _ = std::fs::write(&path, &json);
+    }
+}
+
+pub fn load_unlock_state() -> UnlockState {
+    let dir = persist_dir();
+    let path = format!("{}/unlock_state.json", dir);
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|json| serde_json::from_str::<UnlockState>(&json).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_unlock_state(state: &UnlockState) {
+    let dir = persist_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    let path = format!("{}/unlock_state.json", dir);
+    if let Ok(json) = serde_json::to_string_pretty(state) {
+        let _ = std::fs::write(&path, &json);
+    }
+}
+
+#[derive(Resource, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub bgm_volume: f32,
     pub se_volume: f32,
@@ -132,11 +169,16 @@ pub struct Settings {
     pub text_speed: u32,
     pub auto_mode: bool,
     pub skip_mode: bool,
+    #[serde(default = "default_auto_delay")]
     pub auto_delay_secs: f32,
     pub message_window_opacity: u8,
     pub window_color_idx: i32,
     pub window_design: i32,
     pub click_to_advance: bool,
+}
+
+fn default_auto_delay() -> f32 {
+    1.5
 }
 
 impl Settings {
