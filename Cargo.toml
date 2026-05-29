@@ -13,6 +13,7 @@ default = []
 android = [
     "bevy/android-game-activity",
     "bevy/android_shared_stdcxx",
+    "android-activity/game-activity",
     "dep:android-activity",
     "dep:bevy_android",
 ]

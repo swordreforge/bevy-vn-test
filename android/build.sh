@@ -18,6 +18,14 @@ mkdir -p "$JNILIBS_DIR/arm64-v8a"
 cp "$TARGET_DIR/aarch64-linux-android/$BUILD_TYPE/libbevy_vn.so" \
    "$JNILIBS_DIR/arm64-v8a/libbevy_vn.so"
 
+echo "=== Step 2b: Copying libc++_shared.so ==="
+CXX_SHARED="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+if [ -f "$CXX_SHARED" ]; then
+    cp "$CXX_SHARED" "$JNILIBS_DIR/arm64-v8a/libc++_shared.so"
+else
+    echo "WARNING: libc++_shared.so not found at $CXX_SHARED"
+fi
+
 echo "=== Step 3: Copying assets ==="
 rm -rf "$ASSETS_DIR"
 mkdir -p "$ASSETS_DIR"

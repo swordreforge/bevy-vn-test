@@ -100,9 +100,7 @@ fn load_obj_index(mut index: ResMut<ObjFileIndex>) {
 
 #[cfg(feature = "android")]
 #[no_mangle]
-fn android_main(app: android_activity::AndroidApp) {
-    std::thread::spawn(move || {
-        let _ = bevy_android::ANDROID_APP.set(app);
-        build_app().run();
-    });
+pub fn android_main(app: android_activity::AndroidApp) {
+    let _ = bevy_android::ANDROID_APP.set(app);
+    build_app().run();
 }
