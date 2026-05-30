@@ -14,7 +14,7 @@ use crate::rendering_messages::{
 };
 use crate::resources::{
     save_unlock_state, sync_affection_from_work, AffectionMap, Backlog, BacklogEntry, ChoiceState,
-    DialogueState, GameRestrictions, IntroPhase, QuakeState, RouteConfig, Settings,
+    CompletedRoute, DialogueState, GameRestrictions, IntroPhase, QuakeState, RouteConfig, Settings,
     SpriteOverlayManager, UnlockState,
 };
 use crate::resources::{SelectedRoute, ViewBlocking, WindowOverride};
@@ -161,6 +161,7 @@ fn process_advance(
     mut params: ProcessAdvanceParams<'_, '_>,
     mut commands: Commands,
     mut next_state: ResMut<NextState<AppState>>,
+    mut completed_route: ResMut<CompletedRoute>,
     mut overlay_query: Query<
         (Entity, &mut BackgroundColor, &mut Visibility),
         With<ScreenOverlayRoot>,
@@ -364,6 +365,8 @@ fn process_advance(
                     Some(ScriptCmd::Halt) => {
                         if let Some(name) = engine.detect_route_completion(config) {
                             unlock_state.mark_route_cleared(&name);
+                            completed_route.0 = Some(name);
+                            next_state.set(AppState::RouteEnd);
                         }
                         engine.call_stack.clear();
                         engine.current_script.clear();
@@ -835,6 +838,8 @@ fn process_advance(
                 Some(ScriptCmd::Halt) => {
                     if let Some(name) = engine.detect_route_completion(config) {
                         unlock_state.mark_route_cleared(&name);
+                        completed_route.0 = Some(name);
+                        next_state.set(AppState::RouteEnd);
                     }
                     engine.call_stack.clear();
                     engine.current_script.clear();

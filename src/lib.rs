@@ -15,7 +15,7 @@ use bevy::camera::ScalingMode;
 use bevy::window::{PresentMode, WindowResolution};
 
 use state::AppState;
-use resources::{GameFont, GameRestrictions, ObjFileIndex, RouteConfig, SelectedRoute};
+use resources::{CompletedRoute, GameFont, GameRestrictions, ObjFileIndex, RouteConfig, SelectedRoute};
 use script::ScriptEngine;
 use plugins::audio::AudioPlugin;
 use plugins::title::TitlePlugin;
@@ -34,6 +34,7 @@ use plugins::choice::ChoicePlugin;
 use plugins::screen_transition::ScreenTransitionPlugin;
 use plugins::backlog::BacklogPlugin;
 use plugins::event_system::EventSystemPlugin;
+use plugins::route_end::RouteEndPlugin;
 use plugins::routing::RoutePlugin;
 use bevy_scrollbar::ScrollbarPlugin;
 
@@ -69,12 +70,14 @@ pub fn build_app() -> App {
     .add_plugins(BacklogPlugin)
     .add_plugins(EventSystemPlugin)
     .add_plugins(RoutePlugin)
+    .add_plugins(RouteEndPlugin)
     .add_plugins(ScrollbarPlugin)
     .insert_resource(
         ron::from_str::<RouteConfig>(include_str!("../assets/routes.ron"))
             .expect("Failed to parse routes.ron")
     )
     .init_resource::<SelectedRoute>()
+    .init_resource::<CompletedRoute>()
     .init_resource::<GameRestrictions>()
     .init_resource::<ObjFileIndex>()
     .add_systems(Startup, (startup, load_obj_index));

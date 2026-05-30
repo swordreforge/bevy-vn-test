@@ -8,6 +8,7 @@ pub enum AppState {
     Title,
     Gameplay,
     RouteSelection,
+    RouteEnd,
     Menu,
     SaveLoad,
     Gallery,

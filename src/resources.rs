@@ -320,6 +320,9 @@ impl RouteConfig {
 pub struct SelectedRoute(pub Option<String>);
 
 #[derive(Resource, Default)]
+pub struct CompletedRoute(pub Option<String>);
+
+#[derive(Resource, Default)]
 pub struct DialogueState {
     pub current_text: String,
     pub current_speaker: Option<String>,
