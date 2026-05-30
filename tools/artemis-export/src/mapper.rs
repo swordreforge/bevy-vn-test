@@ -410,6 +410,16 @@ fn map_command(
                 ScriptCmd::ShowCg { file, transition },
             ])
         }
+        "Hcg" => {
+            let file = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let file = format!("hcg_{}", file);
+            let transition = map_event_transition(cmd.attrs.get("1"));
+            Some(vec![
+                ScriptCmd::Window { show: false, time: None },
+                ScriptCmd::HideFg { char_id: "all".into(), transition: None },
+                ScriptCmd::ShowCg { file, transition },
+            ])
+        }
         "DrawScene" => {
             let file = cmd.attrs.get("0").cloned().unwrap_or_default();
             let prefix = cmd.attrs.get("2").cloned().unwrap_or_default();
@@ -1205,5 +1215,40 @@ mod tests {
         let c = cmd("Refresh", vec![]);
         let r = map_command("Refresh", &c, &GameConfig::default());
         assert!(r.is_none());
+    }
+
+    #[test]
+    fn test_map_hcg() {
+        let c = cmd("Hcg", vec![("0", "010101"), ("1", "FAST")]);
+        let r = map_command("Hcg", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 3);
+        assert!(matches!(&cmds[0], ScriptCmd::Window { show: false, .. }));
+        assert!(matches!(&cmds[1], ScriptCmd::HideFg { char_id, .. } if char_id == "all"));
+        assert!(matches!(&cmds[2], ScriptCmd::ShowCg { file, transition }
+            if file == "hcg_010101" && transition == &Some(Transition::Fade)));
+    }
+
+    #[test]
+    fn test_map_hcg_default_transition() {
+        let c = cmd("Hcg", vec![("0", "0201")]);  // no attr "1"
+        let r = map_command("Hcg", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 3);
+        assert!(matches!(&cmds[2], ScriptCmd::ShowCg { file, transition }
+            if file == "hcg_0201" && transition.is_none()));
+    }
+
+    #[test]
+    fn test_map_hcg_sudden() {
+        let c = cmd("Hcg", vec![("0", "0301"), ("1", "SUDDEN")]);
+        let r = map_command("Hcg", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 3);
+        assert!(matches!(&cmds[2], ScriptCmd::ShowCg { file, transition }
+            if file == "hcg_0301" && transition.is_none()));
     }
 }
