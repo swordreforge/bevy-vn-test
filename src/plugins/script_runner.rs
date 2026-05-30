@@ -125,6 +125,9 @@ fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
     engine.current_line = 0;
     engine.call_stack.clear();
     engine.flags.clear();
+    engine.global_flags.clear();
+    engine.local_work.clear();
+    engine.local_flags.clear();
     engine.dialogue_idx = 0;
     engine.finished = false;
     if engine.scripts.contains_key("main") {
@@ -301,6 +304,7 @@ fn process_advance(
                             ConditionOp::Greater => flag_val > value,
                             ConditionOp::Less => flag_val < value,
                             ConditionOp::Equal => flag_val == value,
+                            ConditionOp::NotEqual => flag_val != value,
                             ConditionOp::GreaterEqual => flag_val >= value,
                             ConditionOp::LessEqual => flag_val <= value,
                         };
@@ -311,10 +315,29 @@ fn process_advance(
                     Some(ScriptCmd::SetFlag { name, value }) => {
                         engine.flags.insert(name, value);
                     }
+                    Some(ScriptCmd::SetLocalFlag { index, value }) => {
+                        engine.local_flags.insert(index, value);
+                    }
+                    Some(ScriptCmd::StoreValueToLocalWork { index, value }) => {
+                        engine.local_work.insert(index, value);
+                    }
+                    Some(ScriptCmd::LoadValueFromLocalWork { index }) => {
+                        let val = engine.local_work.get(&index).copied().unwrap_or(0);
+                        engine.flags.insert("tmp".to_string(), val);
+                    }
+                    Some(ScriptCmd::GetLocalFlag { index }) => {
+                        let val = engine.local_flags.get(&index).copied().unwrap_or(0);
+                        engine.flags.insert("tmp".to_string(), val);
+                    }
+                    Some(ScriptCmd::GetGlobalFlag { index }) => {
+                        let val = engine.global_flags.get(&index).copied().unwrap_or(0);
+                        engine.flags.insert("tmp".to_string(), val);
+                    }
                     Some(ScriptCmd::Halt) => {
                         engine.call_stack.clear();
                         engine.current_script.clear();
                         engine.current_line = 0;
+                        engine.finished = true;
                     }
                     Some(ScriptCmd::AffectionChange { char_id, delta }) => {
                         *affection.0.entry(char_id).or_insert(0) += delta;
@@ -330,6 +353,7 @@ fn process_advance(
                             ConditionOp::Greater => affection_val > value,
                             ConditionOp::Less => affection_val < value,
                             ConditionOp::Equal => affection_val == value,
+                            ConditionOp::NotEqual => affection_val != value,
                             ConditionOp::GreaterEqual => affection_val >= value,
                             ConditionOp::LessEqual => affection_val <= value,
                         };
@@ -662,7 +686,10 @@ fn process_advance(
             }
             if !engine.has_more() && !engine.finished {
                 engine.finished = true;
-                if engine.next_script() {
+                if !engine.call_stack.is_empty() {
+                    engine.return_from_call();
+                    engine.finished = false;
+                } else if engine.next_script() {
                     info!("Script finished: advancing to {}", engine.current_script);
                 } else {
                     info!("Script finished (no next): returning to title");
@@ -736,6 +763,7 @@ fn process_advance(
                         ConditionOp::Greater => flag_val > value,
                         ConditionOp::Less => flag_val < value,
                         ConditionOp::Equal => flag_val == value,
+                        ConditionOp::NotEqual => flag_val != value,
                         ConditionOp::GreaterEqual => flag_val >= value,
                         ConditionOp::LessEqual => flag_val <= value,
                     };
@@ -746,10 +774,29 @@ fn process_advance(
                 Some(ScriptCmd::SetFlag { name, value }) => {
                     engine.flags.insert(name, value);
                 }
+                Some(ScriptCmd::SetLocalFlag { index, value }) => {
+                    engine.local_flags.insert(index, value);
+                }
+                Some(ScriptCmd::StoreValueToLocalWork { index, value }) => {
+                    engine.local_work.insert(index, value);
+                }
+                Some(ScriptCmd::LoadValueFromLocalWork { index }) => {
+                    let val = engine.local_work.get(&index).copied().unwrap_or(0);
+                    engine.flags.insert("tmp".to_string(), val);
+                }
+                Some(ScriptCmd::GetLocalFlag { index }) => {
+                    let val = engine.local_flags.get(&index).copied().unwrap_or(0);
+                    engine.flags.insert("tmp".to_string(), val);
+                }
+                Some(ScriptCmd::GetGlobalFlag { index }) => {
+                    let val = engine.global_flags.get(&index).copied().unwrap_or(0);
+                    engine.flags.insert("tmp".to_string(), val);
+                }
                 Some(ScriptCmd::Halt) => {
                     engine.call_stack.clear();
                     engine.current_script.clear();
                     engine.current_line = 0;
+                    engine.finished = true;
                 }
                 Some(ScriptCmd::AffectionChange { char_id, delta }) => {
                     *affection.0.entry(char_id).or_insert(0) += delta;
@@ -765,6 +812,7 @@ fn process_advance(
                         ConditionOp::Greater => affection_val > value,
                         ConditionOp::Less => affection_val < value,
                         ConditionOp::Equal => affection_val == value,
+                        ConditionOp::NotEqual => affection_val != value,
                         ConditionOp::GreaterEqual => affection_val >= value,
                         ConditionOp::LessEqual => affection_val <= value,
                     };
@@ -1167,7 +1215,10 @@ fn process_advance(
 
         if !engine.has_more() && !engine.finished {
             engine.finished = true;
-            if engine.next_script() {
+            if !engine.call_stack.is_empty() {
+                engine.return_from_call();
+                engine.finished = false;
+            } else if engine.next_script() {
                 info!("Script finished: advancing to {}", engine.current_script);
             } else {
                 info!("Script finished (no next): returning to title");

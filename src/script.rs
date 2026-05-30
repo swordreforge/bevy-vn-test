@@ -230,6 +230,23 @@ pub enum ScriptCmd {
         index: u32,
         value: i32,
     },
+    GetGlobalFlag {
+        index: u32,
+    },
+    SetLocalFlag {
+        index: u32,
+        value: i32,
+    },
+    StoreValueToLocalWork {
+        index: u32,
+        value: i32,
+    },
+    LoadValueFromLocalWork {
+        index: u32,
+    },
+    GetLocalFlag {
+        index: u32,
+    },
     RouteFlag,
     GameMode {
         mode: u32,
@@ -248,6 +265,7 @@ pub enum ConditionOp {
     Greater,
     Less,
     Equal,
+    NotEqual,
     GreaterEqual,
     LessEqual,
 }
@@ -268,6 +286,8 @@ pub struct ScriptEngine {
     pub call_stack: Vec<(String, usize)>,
     pub flags: HashMap<String, i32>,
     pub global_flags: HashMap<u32, i32>,
+    pub local_work: HashMap<u32, i32>,
+    pub local_flags: HashMap<u32, i32>,
     pub scripts: HashMap<String, Vec<ScriptCmd>>,
     pub dialogue_idx: usize,
     pub finished: bool,

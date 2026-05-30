@@ -1,5 +1,6 @@
 use crate::asb::{AsbCommand, AsbScript};
 use bevy_vn::script::{ChoiceOption, FgPosition, OverlayColor, Script, ScriptCmd, Transition};
+use std::collections::HashMap;
 
 pub fn map_script(
     asb: &AsbScript,
@@ -8,6 +9,10 @@ pub fn map_script(
 ) -> Script {
     let mut output = Script::new();
     let mut pending_speaker: Option<String> = None;
+
+    let mut pending_choice_opts: Vec<ChoiceOption> = Vec::new();
+    let mut pending_exp_values: Vec<i32> = Vec::new();
+    let mut last_choice_idx: Option<usize> = None;
 
     for block in &asb.blocks {
         output.push(ScriptCmd::Label {
@@ -28,6 +33,43 @@ pub fn map_script(
                     }
                 }
                 "click" | "rp2" | "ruby" | "/ruby" => {}
+                "sel_init" => {
+                    pending_choice_opts.clear();
+                    pending_exp_values.clear();
+                }
+                "sel_text" => {
+                    let text = cmd.attrs.get("text").cloned().unwrap_or_default();
+                    let exp_val = cmd
+                        .attrs
+                        .get("exp")
+                        .and_then(|s| s.strip_prefix("t.ens:"))
+                        .and_then(|s| s.parse::<i32>().ok());
+                    if let Some(ev) = exp_val {
+                        pending_exp_values.push(ev);
+                    }
+                    pending_choice_opts.push(ChoiceOption {
+                        text,
+                        affection_change: None,
+                        goto: None,
+                    });
+                }
+                "select" => {
+                    let options = std::mem::take(&mut pending_choice_opts);
+                    last_choice_idx = Some(output.len());
+                    output.push(ScriptCmd::Choice { options });
+                }
+                "Select" => {}
+                "exswitch" => {
+                    if let Some(data) = cmd.attrs.get("data") {
+                        update_choice_gotos(
+                            &mut output,
+                            &mut last_choice_idx,
+                            data,
+                            &pending_exp_values,
+                        );
+                    }
+                    pending_exp_values.clear();
+                }
                 tag => {
                     if let Some(commands) = map_command(tag, cmd, config) {
                         output.extend(commands);
@@ -40,6 +82,46 @@ pub fn map_script(
     }
 
     output
+}
+
+fn update_choice_gotos(
+    output: &mut Script,
+    last_choice_idx: &mut Option<usize>,
+    data: &str,
+    exp_values: &[i32],
+) {
+    let parts: Vec<&str> = data.split("<>").collect();
+    if parts.len() < 2 {
+        return;
+    }
+
+    let mut branch_map: HashMap<i32, String> = HashMap::new();
+    let mut default_target: Option<String> = None;
+
+    for part in &parts[1..] {
+        if let Some((key, target)) = part.split_once(':') {
+            if key == "default" {
+                default_target = Some(target.to_string());
+            } else if let Ok(val) = key.parse::<i32>() {
+                branch_map.insert(val, target.to_string());
+            }
+        }
+    }
+
+    if let Some(idx) = last_choice_idx.take() {
+        if idx < output.len() {
+            if let ScriptCmd::Choice { ref mut options } = &mut output[idx] {
+                for (i, opt) in options.iter_mut().enumerate() {
+                    let exp_val = exp_values.get(i).copied().unwrap_or(i as i32);
+                    if let Some(target) = branch_map.get(&exp_val) {
+                        opt.goto = Some(target.clone());
+                    } else if let Some(ref default) = default_target {
+                        opt.goto = Some(default.clone());
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn map_command(
@@ -344,7 +426,28 @@ fn map_command(
             let value = cmd.attrs.get("1").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
             Some(vec![ScriptCmd::SetGlobalFlag { index, value }])
         }
-        "GetGlobalFlag" => None,
+        "GetGlobalFlag" => {
+            let index = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::GetGlobalFlag { index }])
+        }
+        "StoreValueToLocalWork" => {
+            let index = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let value = cmd.attrs.get("1").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::StoreValueToLocalWork { index, value }])
+        }
+        "LoadValueFromLocalWork" => {
+            let index = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::LoadValueFromLocalWork { index }])
+        }
+        "GetLocalFlag" => {
+            let index = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::GetLocalFlag { index }])
+        }
+        "SetLocalFlag" => {
+            let index = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let value = cmd.attrs.get("1").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::SetLocalFlag { index, value }])
+        }
         "RouteFlag" => {
             Some(vec![ScriptCmd::RouteFlag])
         }
@@ -352,6 +455,10 @@ fn map_command(
             let mode = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
             Some(vec![ScriptCmd::GameMode { mode }])
         }
+        "SavePoint" => {
+            Some(vec![ScriptCmd::SavePoint])
+        }
+        "Refresh" => None,
         _ => None,
     }
 }
@@ -663,6 +770,7 @@ mod tests {
         assert!(matches!(&cmds[0], ScriptCmd::DrawSprite { ref id, ref file, x, y, z, alpha, priority, time, rotation, anchor_x, anchor_y, blend_mode }
             if id == "01" && file == "sprite_01" && *x == 100.0 && *y == 200.0 && *z == 50 && *alpha == 255 && *priority == 10 && *time == 300
             && *rotation == 0.0 && *anchor_x == 0.5 && *anchor_y == 0.5 && *blend_mode == 0));
+    }
 
     #[test]
     fn test_draw_sprite_with_transform() {
@@ -679,7 +787,6 @@ mod tests {
             if id == "fx_01" && file == "sparkle" && *x == 400.0 && *y == 300.0 && *z == 10
             && *alpha == 200 && *priority == 5 && *time == 500
             && *rotation == 45.0 && *anchor_x == 0.5 && *anchor_y == 0.0 && *blend_mode == 1));
-    }
     }
 
     #[test]
@@ -810,5 +917,245 @@ mod tests {
             ScriptCmd::ChangeWindowColor { color_idx } => assert_eq!(*color_idx, 2),
             _ => panic!("Expected ChangeWindowColor"),
         }
+    }
+
+    // ── Choice / exswitch tests ──
+
+    fn choice_script(
+        blocks: Vec<Vec<(&str, Vec<(&str, &str)>)>>,
+    ) -> Script {
+        let asb = AsbScript {
+            blocks: blocks.into_iter().map(|cmds| crate::asb::AsbBlock {
+                label: "main".into(),
+                commands: cmds.into_iter().map(|(tag, attrs)| cmd(tag, attrs)).collect(),
+            }).collect(),
+        };
+        map_script(&asb, &GameConfig::default(), false)
+    }
+
+    #[test]
+    fn test_choice_basic_two_options() {
+        let result = choice_script(vec![vec![
+            ("sel_init", vec![]),
+            ("sel_text", vec![("text", "选项A"), ("exp", "t.ens:0")]),
+            ("sel_text", vec![("text", "选项B"), ("exp", "t.ens:1")]),
+            ("select", vec![]),
+        ]]);
+        let choice_idx = result.iter().position(|c| matches!(c, ScriptCmd::Choice { .. }))
+            .expect("Should have a Choice command");
+        if let ScriptCmd::Choice { options } = &result[choice_idx] {
+            assert_eq!(options.len(), 2);
+            assert_eq!(options[0].text, "选项A");
+            assert_eq!(options[1].text, "选项B");
+            assert!(options[0].goto.is_none());
+            assert!(options[1].goto.is_none());
+        } else {
+            panic!("Expected Choice");
+        }
+    }
+
+    #[test]
+    fn test_choice_ignores_sel_init_select() {
+        let result = choice_script(vec![vec![
+            ("sel_init", vec![]),
+            ("sel_text", vec![("text", "选项")]),
+            ("select", vec![]),
+            ("Select", vec![]),
+        ]]);
+        let choice_count = result.iter().filter(|c| matches!(c, ScriptCmd::Choice { .. })).count();
+        assert_eq!(choice_count, 1);
+        // sel_init, Select should not appear in output
+        let labels = result.iter().filter(|c| matches!(c, ScriptCmd::Label { .. }));
+        assert!(labels.count() >= 1);
+    }
+
+    #[test]
+    fn test_choice_with_exswitch_goto() {
+        let result = choice_script(vec![vec![
+            ("sel_init", vec![]),
+            ("sel_text", vec![("text", "行く"), ("exp", "t.ens:0")]),
+            ("sel_text", vec![("text", "止まる"), ("exp", "t.ens:1")]),
+            ("select", vec![]),
+            ("Select", vec![]),
+            ("exswitch", vec![("data", "t.tmp<>0:route_a<>1:route_b<>default:route_default")]),
+        ]]);
+        let choice_idx = result.iter().position(|c| matches!(c, ScriptCmd::Choice { .. }))
+            .expect("Should have a Choice command");
+        if let ScriptCmd::Choice { options } = &result[choice_idx] {
+            assert_eq!(options.len(), 2);
+            assert_eq!(options[0].goto.as_deref(), Some("route_a"));
+            assert_eq!(options[1].goto.as_deref(), Some("route_b"));
+        } else {
+            panic!("Expected Choice");
+        }
+    }
+
+    #[test]
+    fn test_choice_exswitch_default_fallback() {
+        let result = choice_script(vec![vec![
+            ("sel_init", vec![]),
+            ("sel_text", vec![("text", "X"), ("exp", "t.ens:0")]),
+            ("sel_text", vec![("text", "Y"), ("exp", "t.ens:2")]),
+            ("select", vec![]),
+            ("Select", vec![]),
+            ("exswitch", vec![("data", "t.tmp<>0:zero_path<>default:fallback")]),
+        ]]);
+        let choice_idx = result.iter().position(|c| matches!(c, ScriptCmd::Choice { .. }))
+            .expect("Should have a Choice command");
+        if let ScriptCmd::Choice { options } = &result[choice_idx] {
+            assert_eq!(options.len(), 2);
+            assert_eq!(options[0].goto.as_deref(), Some("zero_path"));
+            assert_eq!(options[1].goto.as_deref(), Some("fallback"));
+        } else {
+            panic!("Expected Choice");
+        }
+    }
+
+    #[test]
+    fn test_choice_exswitch_cross_block() {
+        let asb = AsbScript {
+            blocks: vec![
+                crate::asb::AsbBlock {
+                    label: "main".into(),
+                    commands: vec![
+                        cmd("sel_init", vec![]),
+                        cmd("sel_text", vec![("text", "是"), ("exp", "t.ens:0")]),
+                        cmd("sel_text", vec![("text", "否"), ("exp", "t.ens:1")]),
+                        cmd("select", vec![]),
+                    ],
+                },
+                crate::asb::AsbBlock {
+                    label: "SelectItem000001".into(),
+                    commands: vec![
+                        cmd("Select", vec![]),
+                        cmd("exswitch", vec![("data", "t.tmp<>0:yes_branch<>1:no_branch<>default:common")]),
+                    ],
+                },
+            ],
+        };
+        let result = map_script(&asb, &GameConfig::default(), false);
+        let choice_idx = result.iter().position(|c| matches!(c, ScriptCmd::Choice { .. }))
+            .expect("Should have a Choice command");
+        if let ScriptCmd::Choice { options } = &result[choice_idx] {
+            assert_eq!(options.len(), 2);
+            assert_eq!(options[0].goto.as_deref(), Some("yes_branch"));
+            assert_eq!(options[1].goto.as_deref(), Some("no_branch"));
+        } else {
+            panic!("Expected Choice");
+        }
+    }
+
+    #[test]
+    fn test_choice_no_exswitch() {
+        let result = choice_script(vec![vec![
+            ("sel_init", vec![]),
+            ("sel_text", vec![("text", "继续"), ("exp", "t.ens:0")]),
+            ("select", vec![]),
+            // No exswitch — goto remains None
+        ]]);
+        let choice_idx = result.iter().position(|c| matches!(c, ScriptCmd::Choice { .. }))
+            .expect("Should have a Choice command");
+        if let ScriptCmd::Choice { options } = &result[choice_idx] {
+            assert_eq!(options.len(), 1);
+            assert!(options[0].goto.is_none());
+        } else {
+            panic!("Expected Choice");
+        }
+    }
+
+    #[test]
+    fn test_choice_empty_exp_values() {
+        let result = choice_script(vec![vec![
+            ("sel_init", vec![]),
+            ("sel_text", vec![("text", "A")]),  // no exp attribute
+            ("sel_text", vec![("text", "B")]),  // no exp attribute
+            ("select", vec![]),
+            ("Select", vec![]),
+            ("exswitch", vec![("data", "t.tmp<>0:branch_0<>1:branch_1<>default:fallback")]),
+        ]]);
+        let choice_idx = result.iter().position(|c| matches!(c, ScriptCmd::Choice { .. }))
+            .expect("Should have a Choice command");
+        if let ScriptCmd::Choice { options } = &result[choice_idx] {
+            assert_eq!(options.len(), 2);
+            // Without exp values, fall back to index-based mapping
+            assert_eq!(options[0].goto.as_deref(), Some("branch_0"));
+            assert_eq!(options[1].goto.as_deref(), Some("branch_1"));
+        } else {
+            panic!("Expected Choice");
+        }
+    }
+
+    // ── Local work / flag map_command tests ──
+
+    #[test]
+    fn test_map_store_value_to_local_work() {
+        let c = cmd("StoreValueToLocalWork", vec![("0", "1"), ("1", "5")]);
+        let r = map_command("StoreValueToLocalWork", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::StoreValueToLocalWork { index, value }
+            if *index == 1 && *value == 5));
+    }
+
+    #[test]
+    fn test_map_load_value_from_local_work() {
+        let c = cmd("LoadValueFromLocalWork", vec![("0", "3")]);
+        let r = map_command("LoadValueFromLocalWork", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::LoadValueFromLocalWork { index }
+            if *index == 3));
+    }
+
+    #[test]
+    fn test_map_get_local_flag() {
+        let c = cmd("GetLocalFlag", vec![("0", "42")]);
+        let r = map_command("GetLocalFlag", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::GetLocalFlag { index }
+            if *index == 42));
+    }
+
+    #[test]
+    fn test_map_set_local_flag() {
+        let c = cmd("SetLocalFlag", vec![("0", "7"), ("1", "1")]);
+        let r = map_command("SetLocalFlag", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::SetLocalFlag { index, value }
+            if *index == 7 && *value == 1));
+    }
+
+    #[test]
+    fn test_map_get_global_flag() {
+        let c = cmd("GetGlobalFlag", vec![("0", "51")]);
+        let r = map_command("GetGlobalFlag", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::GetGlobalFlag { index }
+            if *index == 51));
+    }
+
+    #[test]
+    fn test_map_save_point() {
+        let c = cmd("SavePoint", vec![]);
+        let r = map_command("SavePoint", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::SavePoint));
+    }
+
+    #[test]
+    fn test_map_refresh_is_ignored() {
+        let c = cmd("Refresh", vec![]);
+        let r = map_command("Refresh", &c, &GameConfig::default());
+        assert!(r.is_none());
     }
 }

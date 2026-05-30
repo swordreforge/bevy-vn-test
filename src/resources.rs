@@ -40,6 +40,10 @@ pub struct SaveData {
     pub flags: HashMap<String, i32>,
     #[serde(default)]
     pub global_flags: HashMap<u32, i32>,
+    #[serde(default)]
+    pub local_work: HashMap<u32, i32>,
+    #[serde(default)]
+    pub local_flags: HashMap<u32, i32>,
     pub affection: HashMap<String, i32>,
     #[serde(default)]
     pub unlock_state: UnlockState,

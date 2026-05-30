@@ -368,6 +368,8 @@ fn handle_confirm(
                 let call_stack = data.call_stack.clone();
                 let flags = data.flags.clone();
                 let global_flags = data.global_flags.clone();
+                let local_work = data.local_work.clone();
+                let local_flags = data.local_flags.clone();
                 let unlocked = data.unlock_state.clone();
                 let aff = data.affection.clone();
 
@@ -376,6 +378,8 @@ fn handle_confirm(
                 script_engine.call_stack = call_stack;
                 script_engine.flags = flags;
                 script_engine.global_flags = global_flags;
+                script_engine.local_work = local_work;
+                script_engine.local_flags = local_flags;
                 *unlock_state = unlocked;
                 *affection = AffectionMap(aff);
 
@@ -724,6 +728,8 @@ fn build_save_data(
         call_stack: engine.call_stack.clone(),
         flags: engine.flags.clone(),
         global_flags: engine.global_flags.clone(),
+        local_work: engine.local_work.clone(),
+        local_flags: engine.local_flags.clone(),
         affection: affection.0.clone(),
         unlock_state: unlock_state.clone(),
         play_time: 0,
