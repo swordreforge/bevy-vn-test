@@ -9,6 +9,7 @@ pub mod save_load;
 pub mod dialogue;
 pub mod settings;
 pub mod gallery;
+pub mod routing;
 pub mod rendering;
 pub mod choice;
 pub mod screen_transition;

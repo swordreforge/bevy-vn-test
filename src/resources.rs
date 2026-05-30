@@ -26,6 +26,20 @@ pub enum CgFadeKind {
     FadeOut,
 }
 
+pub const HEROINE_WORK_MAP: [(u32, &str); 5] = [
+    (1, "Fione"),
+    (2, "Eris"),
+    (3, "Colette"),
+    (4, "Lysia"),
+    (5, "Lavi"),
+];
+
+pub fn sync_affection_from_work(index: u32, value: i32, affection: &mut AffectionMap) {
+    if let Some((_, name)) = HEROINE_WORK_MAP.iter().find(|(i, _)| *i == index) {
+        affection.0.insert(name.to_string(), value);
+    }
+}
+
 #[derive(Resource, Default, Debug, Clone)]
 pub struct AffectionMap(pub HashMap<String, i32>);
 
@@ -248,7 +262,62 @@ pub struct UnlockState {
     pub bgm_unlocked: HashSet<String>,
     #[allow(dead_code)]
     pub scene_cleared: HashSet<String>,
+    #[allow(dead_code)]
+    pub routes_cleared: HashSet<String>,
 }
+
+impl UnlockState {
+    pub fn is_route_cleared(&self, name: &str) -> bool {
+        self.routes_cleared.contains(name)
+    }
+
+    pub fn mark_route_cleared(&mut self, name: &str) {
+        self.routes_cleared.insert(name.to_string());
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouteEntry {
+    pub index: u32,
+    pub name: String,
+    pub script: String,
+    #[serde(default)]
+    pub unlock_flag: u32,
+    #[serde(default)]
+    pub hero_work: Option<u32>,
+    #[serde(default)]
+    pub ending_flags: Vec<u32>,
+    #[serde(default)]
+    pub always_unlocked: bool,
+}
+
+#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
+pub struct RouteConfig {
+    pub heroines: Vec<RouteEntry>,
+    pub extra: RouteEntry,
+    pub route_unlock_flags: Vec<u32>,
+    pub all_routes_cleared_flag: u32,
+    pub full_completion_flag: u32,
+    pub ending_flag_range: (u32, u32),
+    pub ending_count: u32,
+}
+
+impl RouteConfig {
+    pub fn heroines_including_extra(&self) -> impl Iterator<Item = &RouteEntry> {
+        self.heroines.iter().chain(std::iter::once(&self.extra))
+    }
+
+    pub fn find_by_index(&self, index: u32) -> Option<&RouteEntry> {
+        self.heroines_including_extra().find(|e| e.index == index)
+    }
+
+    pub fn find_by_script(&self, script: &str) -> Option<&RouteEntry> {
+        self.heroines_including_extra().find(|e| script.starts_with(&e.script))
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct SelectedRoute(pub Option<String>);
 
 #[derive(Resource, Default)]
 pub struct DialogueState {
@@ -400,6 +469,23 @@ pub struct IntroPhase(pub bool);
 pub struct QuakeState {
     pub timer: Option<Timer>,
     pub intensity: f32,
+}
+
+#[derive(Resource)]
+pub struct GameRestrictions {
+    pub saving: bool,
+    pub loading: bool,
+    pub input: bool,
+}
+
+impl Default for GameRestrictions {
+    fn default() -> Self {
+        Self {
+            saving: true,
+            loading: true,
+            input: true,
+        }
+    }
 }
 
 #[derive(Resource, Default)]

@@ -1,3 +1,4 @@
+use crate::resources::GameRestrictions;
 use crate::state::AppState;
 use bevy::prelude::*;
 
@@ -54,8 +55,9 @@ fn handle_global_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut advance_ev: MessageWriter<AdvanceEvent>,
     mut menu_ev: MessageWriter<MenuToggleEvent>,
+    restrictions: Res<GameRestrictions>,
 ) {
-    if *state != AppState::Title {
+    if *state != AppState::Title && restrictions.input {
         if mouse.just_pressed(MouseButton::Left) || touches.any_just_pressed() {
             advance_ev.write(AdvanceEvent {
                 source: AdvanceSource::UserInput,

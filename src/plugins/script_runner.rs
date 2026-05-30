@@ -13,11 +13,12 @@ use crate::rendering_messages::{
     ShowFaceMessage, ShowFgMessage,
 };
 use crate::resources::{
-    save_unlock_state, AffectionMap, Backlog, BacklogEntry, ChoiceState, DialogueState, IntroPhase,
-    QuakeState, Settings, SpriteOverlayManager, UnlockState,
+    save_unlock_state, sync_affection_from_work, AffectionMap, Backlog, BacklogEntry, ChoiceState,
+    DialogueState, GameRestrictions, IntroPhase, QuakeState, RouteConfig, Settings,
+    SpriteOverlayManager, UnlockState,
 };
-use crate::resources::{ViewBlocking, WindowOverride};
-use crate::script::{ConditionOp, OverlayColor, ScriptCmd, ScriptEngine};
+use crate::resources::{SelectedRoute, ViewBlocking, WindowOverride};
+use crate::script::{evaluate_script_expression, ConditionOp, OverlayColor, ScriptCmd, ScriptEngine};
 use crate::state::AppState;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -47,6 +48,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     affection: ResMut<'w, AffectionMap>,
     backlog: ResMut<'w, Backlog>,
     unlock_state: ResMut<'w, UnlockState>,
+    config: Res<'w, RouteConfig>,
     set_bg_writer: MessageWriter<'w, SetBgMessage>,
     show_fg_writer: MessageWriter<'w, ShowFgMessage>,
     hide_fg_writer: MessageWriter<'w, HideFgMessage>,
@@ -73,6 +75,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     auto_skip: ResMut<'w, AutoSkipTimer>,
     intro: ResMut<'w, IntroPhase>,
     overlay_mgr: ResMut<'w, SpriteOverlayManager>,
+    restrictions: ResMut<'w, GameRestrictions>,
 }
 
 impl Plugin for ScriptRunnerPlugin {
@@ -95,11 +98,28 @@ impl Plugin for ScriptRunnerPlugin {
     }
 }
 
-fn start_script_execution(mut dialogue: ResMut<DialogueState>) {
+fn start_script_execution(
+    mut dialogue: ResMut<DialogueState>,
+    mut engine: ResMut<ScriptEngine>,
+    mut selected_route: ResMut<SelectedRoute>,
+) {
     dialogue.current_text.clear();
     dialogue.current_speaker = None;
     dialogue.text_progress = 0;
     dialogue.is_displaying = false;
+
+    if let Some(script) = selected_route.0.take() {
+        engine.flags.clear();
+        engine.global_flags.clear();
+        engine.local_work.clear();
+        engine.local_flags.clear();
+        engine.dialogue_idx = 0;
+        engine.finished = false;
+        engine.call_stack.clear();
+        engine.current_script = script;
+        engine.current_line = 0;
+        info!("Starting route script: {}", engine.current_script);
+    }
 }
 
 fn start_intro_bgm(
@@ -156,6 +176,7 @@ fn process_advance(
         ref mut affection,
         ref mut backlog,
         ref mut unlock_state,
+        ref mut config,
         ref mut set_bg_writer,
         ref mut show_fg_writer,
         ref mut hide_fg_writer,
@@ -182,6 +203,7 @@ fn process_advance(
         ref mut auto_skip,
         ref mut intro,
         ref mut overlay_mgr,
+        ref mut restrictions,
     } = &mut params;
 
     for ev in advance_ev.read() {
@@ -318,8 +340,14 @@ fn process_advance(
                     Some(ScriptCmd::SetLocalFlag { index, value }) => {
                         engine.local_flags.insert(index, value);
                     }
-                    Some(ScriptCmd::StoreValueToLocalWork { index, value }) => {
-                        engine.local_work.insert(index, value);
+                    Some(ScriptCmd::StoreValueToLocalWork { index, value, expression }) => {
+                        let final_val = if let Some(ref expr) = expression {
+                            evaluate_script_expression(expr, &engine.flags)
+                        } else {
+                            value
+                        };
+                        engine.local_work.insert(index, final_val);
+                        sync_affection_from_work(index, final_val, &mut *affection);
                     }
                     Some(ScriptCmd::LoadValueFromLocalWork { index }) => {
                         let val = engine.local_work.get(&index).copied().unwrap_or(0);
@@ -334,6 +362,9 @@ fn process_advance(
                         engine.flags.insert("tmp".to_string(), val);
                     }
                     Some(ScriptCmd::Halt) => {
+                        if let Some(name) = engine.detect_route_completion(config) {
+                            unlock_state.mark_route_cleared(&name);
+                        }
                         engine.call_stack.clear();
                         engine.current_script.clear();
                         engine.current_line = 0;
@@ -653,22 +684,18 @@ fn process_advance(
                         engine.global_flags.insert(index, value);
                     }
                     Some(ScriptCmd::RouteFlag) => {
-                        let hero_routes = [103, 105, 107, 108, 110, 111];
-                        if engine.global_flags.get(&113) != Some(&1) {
-                            let count = hero_routes
-                                .iter()
-                                .filter(|&f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1)
-                                .count();
-                            if count == hero_routes.len() {
-                                engine.global_flags.insert(113, 1);
-                            }
+                        let count = config.route_unlock_flags.iter()
+                            .filter(|&f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1)
+                            .count();
+                        if count == config.route_unlock_flags.len() {
+                            engine.global_flags.insert(config.all_routes_cleared_flag, 1);
                         }
-                        if engine.global_flags.get(&114) != Some(&1) {
-                            let all_clear = (151..=167)
-                                .chain(std::iter::once(113))
+                        if engine.global_flags.get(&config.full_completion_flag) != Some(&1) {
+                            let all_clear = (config.ending_flag_range.0..=config.ending_flag_range.1)
+                                .chain(std::iter::once(config.all_routes_cleared_flag))
                                 .all(|f| engine.global_flags.get(&f).copied().unwrap_or(0) >= 1);
                             if all_clear {
-                                engine.global_flags.insert(114, 1);
+                                engine.global_flags.insert(config.full_completion_flag, 1);
                             }
                         }
                     }
@@ -677,6 +704,13 @@ fn process_advance(
                             let mut settings = world.resource_mut::<Settings>();
                             settings.click_to_advance = mode == 2;
                         });
+                    }
+                    Some(ScriptCmd::SetValidity { mode, allowed }) => {
+                        match mode {
+                            crate::script::ValidityMode::Saving => restrictions.saving = allowed,
+                            crate::script::ValidityMode::Loading => restrictions.loading = allowed,
+                            crate::script::ValidityMode::Input => restrictions.input = allowed,
+                        }
                     }
                     Some(cmd) => {
                         info!("Script cmd (no-op): {:?}", cmd);
@@ -777,8 +811,14 @@ fn process_advance(
                 Some(ScriptCmd::SetLocalFlag { index, value }) => {
                     engine.local_flags.insert(index, value);
                 }
-                Some(ScriptCmd::StoreValueToLocalWork { index, value }) => {
-                    engine.local_work.insert(index, value);
+                Some(ScriptCmd::StoreValueToLocalWork { index, value, expression }) => {
+                    let final_val = if let Some(ref expr) = expression {
+                        evaluate_script_expression(expr, &engine.flags)
+                    } else {
+                        value
+                    };
+                    engine.local_work.insert(index, final_val);
+                    sync_affection_from_work(index, final_val, &mut *affection);
                 }
                 Some(ScriptCmd::LoadValueFromLocalWork { index }) => {
                     let val = engine.local_work.get(&index).copied().unwrap_or(0);
@@ -793,6 +833,9 @@ fn process_advance(
                     engine.flags.insert("tmp".to_string(), val);
                 }
                 Some(ScriptCmd::Halt) => {
+                    if let Some(name) = engine.detect_route_completion(config) {
+                        unlock_state.mark_route_cleared(&name);
+                    }
                     engine.call_stack.clear();
                     engine.current_script.clear();
                     engine.current_line = 0;
@@ -1180,23 +1223,18 @@ fn process_advance(
                     engine.global_flags.insert(index, value);
                 }
                 Some(ScriptCmd::RouteFlag) => {
-                    let hero_routes = [103, 105, 107, 108, 110, 111];
-                    if engine.global_flags.get(&113) != Some(&1) {
-                        let count = hero_routes
-                            .iter()
-                            .filter(|&f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1)
-                            .count();
-                        if count == hero_routes.len() {
-                            engine.global_flags.insert(113, 1);
-                        }
+                    let count = config.route_unlock_flags.iter()
+                        .filter(|&f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1)
+                        .count();
+                    if count == config.route_unlock_flags.len() {
+                        engine.global_flags.insert(config.all_routes_cleared_flag, 1);
                     }
-                    if engine.global_flags.get(&114) != Some(&1) {
-                        let complete: Vec<u32> = (151..=167).collect();
-                        let all_clear = std::iter::once(&113u32)
-                            .chain(complete.iter())
-                            .all(|f| engine.global_flags.get(f).copied().unwrap_or(0) >= 1);
+                    if engine.global_flags.get(&config.full_completion_flag) != Some(&1) {
+                        let all_clear = (config.ending_flag_range.0..=config.ending_flag_range.1)
+                            .chain(std::iter::once(config.all_routes_cleared_flag))
+                            .all(|f| engine.global_flags.get(&f).copied().unwrap_or(0) >= 1);
                         if all_clear {
-                            engine.global_flags.insert(114, 1);
+                            engine.global_flags.insert(config.full_completion_flag, 1);
                         }
                     }
                 }
@@ -1205,6 +1243,13 @@ fn process_advance(
                         let mut settings = world.resource_mut::<Settings>();
                         settings.click_to_advance = mode == 2;
                     });
+                }
+                Some(ScriptCmd::SetValidity { mode, allowed }) => {
+                    match mode {
+                        crate::script::ValidityMode::Saving => restrictions.saving = allowed,
+                        crate::script::ValidityMode::Loading => restrictions.loading = allowed,
+                        crate::script::ValidityMode::Input => restrictions.input = allowed,
+                    }
                 }
                 Some(cmd) => {
                     info!("Script cmd (no-op): {:?}", cmd);

@@ -55,8 +55,13 @@ fn parse_iet_content(text: &str, verbose: bool) -> Result<Script> {
             "StoreValueToLocalWork" => {
                 let (idx_str, val_str) = split_two_args(rest);
                 let index = idx_str.trim().parse::<u32>().context("Invalid StoreValueToLocalWork index")?;
-                let value = val_str.trim().parse::<i32>().context("Invalid StoreValueToLocalWork value")?;
-                output.push(ScriptCmd::StoreValueToLocalWork { index, value });
+                let raw = val_str.trim();
+                let (value, expression) = if raw.starts_with("t.tmp") {
+                    (0, Some(raw.to_string()))
+                } else {
+                    (raw.parse::<i32>().context("Invalid StoreValueToLocalWork value")?, None)
+                };
+                output.push(ScriptCmd::StoreValueToLocalWork { index, value, expression });
             }
             "LoadValueFromLocalWork" => {
                 let idx_str = rest.trim();
@@ -580,8 +585,8 @@ mod tests {
 [LoadValueFromLocalWork 9]
 "#;
         let result = parse_iet_content(input, false).unwrap();
-        assert!(result.iter().any(|c| matches!(c, ScriptCmd::StoreValueToLocalWork { index: 1, value: 0 })));
-        assert!(result.iter().any(|c| matches!(c, ScriptCmd::StoreValueToLocalWork { index: 4, value: 0 })));
+        assert!(result.iter().any(|c| matches!(c, ScriptCmd::StoreValueToLocalWork { index: 1, value: 0, .. })));
+        assert!(result.iter().any(|c| matches!(c, ScriptCmd::StoreValueToLocalWork { index: 4, value: 0, .. })));
         assert!(result.iter().any(|c| matches!(c, ScriptCmd::LoadValueFromLocalWork { index: 9 })));
     }
 

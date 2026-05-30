@@ -59,3 +59,27 @@ This project uses Bevy 0.18 which has breaking API changes from earlier versions
 ## .gitignore quirk
 
 `assets/scripts/*.bscript.ron` is gitignored (they are conversion output from `tools/artemis-export`), but are required at build time. A local checkout needs the conversion step or pre-generated files.
+
+## Progress
+
+### Phase 2 — Done
+`StoreValueToLocalWork` expression evaluation + affection sync:
+
+- **script.rs**: `StoreValueToLocalWork` has `expression: Option<String>` field; added `evaluate_script_expression()` for runtime `t.tmp+N` arithmetic
+- **resources.rs**: `HEROINE_WORK_MAP: [(u32, &str); 5]` mapping work[1-5] to Fione/Eris/Colette/Lysia/Lavi; `sync_affection_from_work()` helper
+- **mapper.rs**: detects `t.tmp+N` pattern in `StoreValueToLocalWork` attr "1", stores raw expression string; 2 new tests (76/76 pass)
+- **iet.rs**: same expression parsing for IET format
+- **script_runner.rs**: both skip & normal paths evaluate expression via `evaluate_script_expression()` and call `sync_affection_from_work()` to keep `AffectionMap` in sync
+- **Re-export verified**: 203 ASB + 1 IET → 19 StoreValueToLocalWork (10 with expressions), 17 Choice commands, correct `exswitch` goto targets
+
+### Phase 1 — Done
+Choice tag handling:
+
+- **mapper.rs**: `sel_init`/`sel_text`/`select`/`Select`/`exswitch` → `ChoiceOption` + `Choice` + `update_choice_gotos()` for `exswitch` cross-block target resolution
+- 14 new tests for choice/exswitch (74/74 pass)
+- ASB local work/flags mapping: `StoreValueToLocalWork`, `LoadValueFromLocalWork`, `GetLocalFlag`, `SetLocalFlag`, `GetGlobalFlag`, `SavePoint`, `Refresh`
+- `ScriptCmd` additions: `GetGlobalFlag`, `SetLocalFlag` variants
+- **script_runner.rs**: runtime handlers for `SetLocalFlag` and `GetGlobalFlag` in both paths
+
+### Phase 3 — Planned
+Route branching system (main.iet conditional branching via `LoadValueFromLocalWork` + `if`/`else`), remaining unmapped tags (20+).

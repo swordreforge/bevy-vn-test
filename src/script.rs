@@ -1,3 +1,4 @@
+use crate::resources::RouteConfig;
 use bevy::prelude::Resource;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -240,6 +241,8 @@ pub enum ScriptCmd {
     StoreValueToLocalWork {
         index: u32,
         value: i32,
+        #[serde(default)]
+        expression: Option<String>,
     },
     LoadValueFromLocalWork {
         index: u32,
@@ -251,6 +254,17 @@ pub enum ScriptCmd {
     GameMode {
         mode: u32,
     },
+    SetValidity {
+        mode: ValidityMode,
+        allowed: bool,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ValidityMode {
+    Saving,
+    Loading,
+    Input,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -392,5 +406,29 @@ impl ScriptEngine {
         } else {
             None
         }
+    }
+
+    pub fn detect_route_completion(&self, config: &RouteConfig) -> Option<String> {
+        config.find_by_script(&self.current_script).map(|e| e.name.clone())
+    }
+}
+
+pub fn evaluate_script_expression(expr: &str, flags: &HashMap<String, i32>) -> i32 {
+    let resolved = if expr.contains("t.tmp") {
+        let tmp_val = flags.get("tmp").copied().unwrap_or(0);
+        expr.replace("t.tmp", &tmp_val.to_string())
+    } else {
+        expr.to_string()
+    };
+    if let Some((left, right)) = resolved.split_once('+') {
+        let l = left.trim().parse::<i32>().unwrap_or(0);
+        let r = right.trim().parse::<i32>().unwrap_or(0);
+        l + r
+    } else if let Some((left, right)) = resolved.split_once('-') {
+        let l = left.trim().parse::<i32>().unwrap_or(0);
+        let r = right.trim().parse::<i32>().unwrap_or(0);
+        l - r
+    } else {
+        resolved.trim().parse::<i32>().unwrap_or(0)
     }
 }

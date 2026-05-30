@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::resources::{GameFont, SaveLoadMode, ScreenTransition};
+use crate::resources::{GameFont, GameRestrictions, SaveLoadMode, ScreenTransition};
 use crate::state::AppState;
 use crate::plugins::inputs::MenuToggleEvent;
 
@@ -12,6 +12,7 @@ pub struct MenuUiRoot;
 pub enum MenuButtonAction {
     Save,
     Load,
+    RouteSelection,
     Settings,
     Gallery,
     Backlog,
@@ -55,10 +56,11 @@ fn setup_menu_ui(mut commands: Commands, game_font: Res<GameFont>) {
             TextColor(Color::WHITE),
             Node { ..default() },
         ));
-        let items: [(MenuButtonAction, &str); 6] = [
+        let items: [(MenuButtonAction, &str); 7] = [
             (MenuButtonAction::Save, "Save"),
             (MenuButtonAction::Load, "Load"),
             (MenuButtonAction::Backlog, "Backlog"),
+            (MenuButtonAction::RouteSelection, "Routes"),
             (MenuButtonAction::Settings, "Settings"),
             (MenuButtonAction::Gallery, "Gallery"),
             (MenuButtonAction::Title, "Back to Title"),
@@ -87,17 +89,19 @@ fn handle_menu_button_interaction(
     mut mode: ResMut<SaveLoadMode>,
     mut next_state: ResMut<NextState<AppState>>,
     mut screen_transition: ResMut<ScreenTransition>,
+    restrictions: Res<GameRestrictions>,
 ) {
     for (action, interaction) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
         match action {
-            MenuButtonAction::Save => { mode.0 = true; next_state.set(AppState::SaveLoad); }
-            MenuButtonAction::Load => { mode.0 = false; next_state.set(AppState::SaveLoad); }
+            MenuButtonAction::Save => { if restrictions.saving { mode.0 = true; next_state.set(AppState::SaveLoad); } }
+            MenuButtonAction::Load => { if restrictions.loading { mode.0 = false; next_state.set(AppState::SaveLoad); } }
             MenuButtonAction::Settings => next_state.set(AppState::Settings),
             MenuButtonAction::Gallery => next_state.set(AppState::Gallery),
             MenuButtonAction::Backlog => next_state.set(AppState::Backlog),
+            MenuButtonAction::RouteSelection => next_state.set(AppState::RouteSelection),
             MenuButtonAction::Title => screen_transition.pending_state = Some(AppState::Title),
         }
     }

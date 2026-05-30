@@ -15,6 +15,7 @@ enum TitleButtonAction {
     NewGame,
     LoadGame,
     Settings,
+    RouteSelection,
     Gallery,
     Exit,
 }
@@ -67,9 +68,10 @@ fn setup_title(
         },
         ZIndex(1),
     )).with_children(|parent| {
-        let items: [(TitleButtonAction, &str); 5] = [
+        let items: [(TitleButtonAction, &str); 6] = [
             (TitleButtonAction::NewGame, "New Game"),
             (TitleButtonAction::LoadGame, "Load Game"),
+            (TitleButtonAction::RouteSelection, "Routes"),
             (TitleButtonAction::Settings, "Settings"),
             (TitleButtonAction::Gallery, "Gallery"),
             (TitleButtonAction::Exit, "Exit"),
@@ -118,6 +120,9 @@ fn handle_title_buttons(
                     }
                     TitleButtonAction::Settings => {
                         next_state.set(AppState::Settings);
+                    }
+                    TitleButtonAction::RouteSelection => {
+                        next_state.set(AppState::RouteSelection);
                     }
                     TitleButtonAction::Gallery => {
                         next_state.set(AppState::Gallery);

@@ -1,5 +1,5 @@
 use crate::asb::{AsbCommand, AsbScript};
-use bevy_vn::script::{ChoiceOption, FgPosition, OverlayColor, Script, ScriptCmd, Transition};
+use bevy_vn::script::{ChoiceOption, FgPosition, OverlayColor, Script, ScriptCmd, Transition, ValidityMode};
 use std::collections::HashMap;
 
 pub fn map_script(
@@ -361,7 +361,7 @@ fn map_command(
             let design = cmd.attrs.get("0").and_then(|s| s.parse().ok()).unwrap_or(0);
             Some(vec![ScriptCmd::ChangeWindowDesign { design }])
         }
-        "Quake" => {
+        "Quake" | "Jishin" => {
             let power = cmd.attrs.get("0").and_then(|s| s.parse().ok()).unwrap_or(5.0);
             let time = cmd.attrs.get("1").and_then(|s| s.parse().ok()).unwrap_or(500);
             Some(vec![ScriptCmd::Quake { power, time }])
@@ -432,8 +432,13 @@ fn map_command(
         }
         "StoreValueToLocalWork" => {
             let index = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-            let value = cmd.attrs.get("1").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
-            Some(vec![ScriptCmd::StoreValueToLocalWork { index, value }])
+            let raw = cmd.attrs.get("1").cloned().unwrap_or_default();
+            let (value, expression) = if raw.starts_with("t.tmp") {
+                (0, Some(raw))
+            } else {
+                (raw.parse::<i32>().unwrap_or(0), None)
+            };
+            Some(vec![ScriptCmd::StoreValueToLocalWork { index, value, expression }])
         }
         "LoadValueFromLocalWork" => {
             let index = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
@@ -455,10 +460,31 @@ fn map_command(
             let mode = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
             Some(vec![ScriptCmd::GameMode { mode }])
         }
+        "SetValidityOfSaving" => {
+            let allowed = cmd.attrs.get("0").map(|s| s != "0").unwrap_or(true);
+            Some(vec![ScriptCmd::SetValidity { mode: ValidityMode::Saving, allowed }])
+        }
+        "SetValidityOfLoading" => {
+            let allowed = cmd.attrs.get("0").map(|s| s != "0").unwrap_or(true);
+            Some(vec![ScriptCmd::SetValidity { mode: ValidityMode::Loading, allowed }])
+        }
+        "SetValidityOfInput" => {
+            let allowed = cmd.attrs.get("0").map(|s| s != "0").unwrap_or(true);
+            Some(vec![ScriptCmd::SetValidity { mode: ValidityMode::Input, allowed }])
+        }
         "SavePoint" => {
             Some(vec![ScriptCmd::SavePoint])
         }
         "Refresh" => None,
+        "NextDay" => {
+            Some(vec![
+                ScriptCmd::Window { show: false, time: None },
+                ScriptCmd::ScreenOverlay { color: OverlayColor::Black, time: 0 },
+                ScriptCmd::ClearOverlay { time: 500 },
+                ScriptCmd::Wait { duration: 2000 },
+                ScriptCmd::ScreenOverlay { color: OverlayColor::Black, time: 1000 },
+            ])
+        }
         _ => None,
     }
 }
@@ -1094,8 +1120,30 @@ mod tests {
         assert!(r.is_some());
         let cmds = r.unwrap();
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(&cmds[0], ScriptCmd::StoreValueToLocalWork { index, value }
-            if *index == 1 && *value == 5));
+        assert!(matches!(&cmds[0], ScriptCmd::StoreValueToLocalWork { index, value, expression }
+            if *index == 1 && *value == 5 && expression.is_none()));
+    }
+
+    #[test]
+    fn test_map_store_value_to_local_work_expression() {
+        let c = cmd("StoreValueToLocalWork", vec![("0", "1"), ("1", "t.tmp+1")]);
+        let r = map_command("StoreValueToLocalWork", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::StoreValueToLocalWork { index, value, expression }
+            if *index == 1 && *value == 0 && expression.as_deref() == Some("t.tmp+1")));
+    }
+
+    #[test]
+    fn test_map_store_value_to_local_work_expression_plus2() {
+        let c = cmd("StoreValueToLocalWork", vec![("0", "4"), ("1", "t.tmp+2")]);
+        let r = map_command("StoreValueToLocalWork", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::StoreValueToLocalWork { index, value, expression }
+            if *index == 4 && *value == 0 && expression.as_deref() == Some("t.tmp+2")));
     }
 
     #[test]
