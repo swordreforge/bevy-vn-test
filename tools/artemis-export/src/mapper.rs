@@ -495,6 +495,13 @@ fn map_command(
                 ScriptCmd::ScreenOverlay { color: OverlayColor::Black, time: 1000 },
             ])
         }
+        "Ending_Base" => {
+            Some(vec![
+                ScriptCmd::Window { show: false, time: None },
+                ScriptCmd::GameMode { mode: 2 },
+                ScriptCmd::Wait { duration: 5000 },
+            ])
+        }
         _ => None,
     }
 }
@@ -1250,5 +1257,17 @@ mod tests {
         assert_eq!(cmds.len(), 3);
         assert!(matches!(&cmds[2], ScriptCmd::ShowCg { file, transition }
             if file == "hcg_0301" && transition.is_none()));
+    }
+
+    #[test]
+    fn test_map_ending_base() {
+        let c = cmd("Ending_Base", vec![("0", "t.tmp==1")]);
+        let r = map_command("Ending_Base", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 3);
+        assert!(matches!(&cmds[0], ScriptCmd::Window { show: false, .. }));
+        assert!(matches!(&cmds[1], ScriptCmd::GameMode { mode: 2 }));
+        assert!(matches!(&cmds[2], ScriptCmd::Wait { duration: 5000 }));
     }
 }
