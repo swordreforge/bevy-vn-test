@@ -36,6 +36,7 @@ use plugins::backlog::BacklogPlugin;
 use plugins::event_system::EventSystemPlugin;
 use plugins::route_end::RouteEndPlugin;
 use plugins::routing::RoutePlugin;
+use plugins::video::VideoPlugin;
 use bevy_scrollbar::ScrollbarPlugin;
 
 pub fn build_app() -> App {
@@ -71,6 +72,7 @@ pub fn build_app() -> App {
     .add_plugins(EventSystemPlugin)
     .add_plugins(RoutePlugin)
     .add_plugins(RouteEndPlugin)
+    .add_plugins(VideoPlugin)
     .add_plugins(ScrollbarPlugin)
     .insert_resource(
         ron::from_str::<RouteConfig>(include_str!("../assets/routes.ron"))

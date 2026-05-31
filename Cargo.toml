@@ -31,6 +31,14 @@ dirs = "5"
 #anyhow = "1"
 bevy_scrollbar = "0.6"
 
+# Target-specific video playback dependencies.
+# Desktop uses system ffmpeg via bevy_movie_player when available:
+# [target.'cfg(not(target_os = "android"))'.dependencies]
+# bevy_movie_player = { version = "0.7", default-features = false, features = ["ffmpeg"] }
+#
+# Note: ffmpeg-sys-next 7.x does not compile against ffmpeg >= 8.0.
+# See https://github.com/zmwang/rust-ffmpeg-sys for compatibility.
+
 [profile.dev]
 opt-level = 1
 

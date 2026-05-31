@@ -12,10 +12,11 @@ use crate::rendering_messages::{
     HideFgMessage, MoveSpriteMessage, ScrollBgMessage, SetBgMessage, ShowCgMessage,
     ShowFaceMessage, ShowFgMessage,
 };
+use crate::plugins::video::spawn_video;
 use crate::resources::{
-    save_unlock_state, sync_affection_from_work, AffectionMap, Backlog, BacklogEntry, ChoiceState,
-    CompletedRoute, DialogueState, GameRestrictions, IntroPhase, PendingVideo, QuakeState,
-    RouteConfig, Settings, SpriteOverlayManager, UnlockState,
+    save_unlock_state, sync_affection_from_work, map_video_file, AffectionMap, Backlog,
+    BacklogEntry, ChoiceState, CompletedRoute, DialogueState, GameRestrictions, IntroPhase,
+    PendingVideo, QuakeState, RouteConfig, Settings, SpriteOverlayManager, UnlockState,
 };
 use crate::resources::{SelectedRoute, ViewBlocking, WindowOverride};
 use crate::script::{evaluate_script_expression, ConditionOp, OverlayColor, ScriptCmd, ScriptEngine};
@@ -93,7 +94,7 @@ impl Plugin for ScriptRunnerPlugin {
             .add_systems(OnExit(AppState::Gameplay), persist_gameplay)
             .add_systems(
                 Update,
-                (tick_pending_video, handle_auto_skip, process_advance, update_text_reveal)
+                (handle_auto_skip, process_advance, update_text_reveal)
                     .chain()
                     .run_if(in_state(AppState::Gameplay)),
             );
@@ -1154,8 +1155,11 @@ fn process_advance(
                     break;
                 }
                 Some(ScriptCmd::PlayMovie { file }) => {
-                    info!("Video stub: {} (3s)", file);
+                    let actual = map_video_file(&file);
+                    let path = format!("movie/{}", actual);
+                    let entity = spawn_video(&mut commands, path);
                     pending_video.playing = true;
+                    pending_video.entity = Some(entity);
                     pending_video.timer = Some(Timer::from_seconds(3.0, TimerMode::Once));
                     break;
                 }
@@ -1291,28 +1295,6 @@ fn process_advance(
                 info!("Script finished (no next): returning to title");
                 next_state.set(AppState::Title);
             }
-        }
-    }
-}
-
-fn tick_pending_video(
-    time: Res<Time>,
-    mut pending_video: ResMut<PendingVideo>,
-    mut advance_ev: MessageWriter<AdvanceEvent>,
-) {
-    if pending_video.playing {
-        if let Some(timer) = &mut pending_video.timer {
-            timer.tick(time.delta());
-            if timer.just_finished() {
-                info!("Video stub finished, resuming script");
-                pending_video.playing = false;
-                pending_video.timer = None;
-                advance_ev.write(AdvanceEvent {
-                    source: AdvanceSource::Auto,
-                });
-            }
-        } else {
-            pending_video.playing = false;
         }
     }
 }

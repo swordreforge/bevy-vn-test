@@ -325,6 +325,7 @@ pub struct CompletedRoute(pub Option<String>);
 #[derive(Resource, Default)]
 pub struct PendingVideo {
     pub playing: bool,
+    pub entity: Option<Entity>,
     pub timer: Option<Timer>,
 }
 
@@ -537,5 +538,15 @@ pub enum TransitionPhase {
 impl Default for TransitionPhase {
     fn default() -> Self {
         Self::Idle
+    }
+}
+
+/// Map the video filename from ASB reference to actual file.
+/// ASB scripts reference .mpg, but actual files are .ogv (Ogg Theora).
+pub fn map_video_file(asb_path: &str) -> String {
+    if asb_path.ends_with(".mpg") {
+        asb_path.replacen(".mpg", ".ogv", 1)
+    } else {
+        format!("{}.ogv", asb_path)
     }
 }
