@@ -43,7 +43,21 @@ impl Plugin for AudioPlugin {
 }
 
 fn asset_path_exists(relative: &str) -> bool {
-    std::path::Path::new("assets").join(relative).exists()
+    let path = std::path::Path::new("assets").join(relative);
+    if path.exists() {
+        return true;
+    }
+    // Android: assets are inside APK, not on filesystem.
+    // Fall back to _a.ogg naming convention; if the file is truly missing,
+    // process_pending_bgm's 60-frame timeout will handle it.
+    #[cfg(target_os = "android")]
+    {
+        relative.contains("_a.ogg")
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        false
+    }
 }
 
 fn handle_play_bgm(

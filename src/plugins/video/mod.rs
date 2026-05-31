@@ -1,8 +1,13 @@
+// This module is heavily platform-gated. On Android, many params are intentionally unused.
+#![cfg_attr(target_os = "android", allow(unused, unused_mut))]
+
 use crate::plugins::inputs::{AdvanceEvent, AdvanceSource};
 use crate::resources::{
-    GstVideoState, PendingSpriteVideoBlock, PendingVideo, PendingVideoInit, RainGstState,
+    PendingSpriteVideoBlock, PendingVideo, PendingVideoInit,
     RainOverlayState, SpriteVideoManager,
 };
+#[cfg(not(target_os = "android"))]
+use crate::resources::{GstVideoState, RainGstState};
 use bevy::prelude::*;
 
 pub struct VideoPlugin;
