@@ -323,6 +323,12 @@ pub struct SelectedRoute(pub Option<String>);
 pub struct CompletedRoute(pub Option<String>);
 
 #[derive(Resource, Default)]
+pub struct PendingVideo {
+    pub playing: bool,
+    pub timer: Option<Timer>,
+}
+
+#[derive(Resource, Default)]
 pub struct DialogueState {
     pub current_text: String,
     pub current_speaker: Option<String>,

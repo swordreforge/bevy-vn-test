@@ -14,8 +14,8 @@ use crate::rendering_messages::{
 };
 use crate::resources::{
     save_unlock_state, sync_affection_from_work, AffectionMap, Backlog, BacklogEntry, ChoiceState,
-    CompletedRoute, DialogueState, GameRestrictions, IntroPhase, QuakeState, RouteConfig, Settings,
-    SpriteOverlayManager, UnlockState,
+    CompletedRoute, DialogueState, GameRestrictions, IntroPhase, PendingVideo, QuakeState,
+    RouteConfig, Settings, SpriteOverlayManager, UnlockState,
 };
 use crate::resources::{SelectedRoute, ViewBlocking, WindowOverride};
 use crate::script::{evaluate_script_expression, ConditionOp, OverlayColor, ScriptCmd, ScriptEngine};
@@ -76,12 +76,14 @@ pub struct ProcessAdvanceParams<'w, 's> {
     intro: ResMut<'w, IntroPhase>,
     overlay_mgr: ResMut<'w, SpriteOverlayManager>,
     restrictions: ResMut<'w, GameRestrictions>,
+    pending_video: ResMut<'w, PendingVideo>,
 }
 
 impl Plugin for ScriptRunnerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AutoSkipTimer>()
             .init_resource::<IntroPhase>()
+            .init_resource::<PendingVideo>()
             .init_resource::<WindowOverride>()
             .add_systems(
                 OnEnter(AppState::Gameplay),
@@ -91,7 +93,7 @@ impl Plugin for ScriptRunnerPlugin {
             .add_systems(OnExit(AppState::Gameplay), persist_gameplay)
             .add_systems(
                 Update,
-                (handle_auto_skip, process_advance, update_text_reveal)
+                (tick_pending_video, handle_auto_skip, process_advance, update_text_reveal)
                     .chain()
                     .run_if(in_state(AppState::Gameplay)),
             );
@@ -205,6 +207,7 @@ fn process_advance(
         ref mut intro,
         ref mut overlay_mgr,
         ref mut restrictions,
+        ref mut pending_video,
     } = &mut params;
 
     for ev in advance_ev.read() {
@@ -215,6 +218,11 @@ fn process_advance(
 
         // If View is active, block script execution
         if view_blocking.0 {
+            continue;
+        }
+
+        // If video is playing, block script execution
+        if pending_video.playing {
             continue;
         }
 
@@ -372,6 +380,9 @@ fn process_advance(
                         engine.current_script.clear();
                         engine.current_line = 0;
                         engine.finished = true;
+                    }
+                    Some(ScriptCmd::PlayMovie { file }) => {
+                        info!("Video skipped: {}", file);
                     }
                     Some(ScriptCmd::AffectionChange { char_id, delta }) => {
                         *affection.0.entry(char_id).or_insert(0) += delta;
@@ -1142,6 +1153,12 @@ fn process_advance(
                     choice_state.options = options;
                     break;
                 }
+                Some(ScriptCmd::PlayMovie { file }) => {
+                    info!("Video stub: {} (3s)", file);
+                    pending_video.playing = true;
+                    pending_video.timer = Some(Timer::from_seconds(3.0, TimerMode::Once));
+                    break;
+                }
                 Some(ScriptCmd::Wait { duration }) => {
                     if settings.skip_mode {
                         // skip mode: continue without waiting
@@ -1274,6 +1291,28 @@ fn process_advance(
                 info!("Script finished (no next): returning to title");
                 next_state.set(AppState::Title);
             }
+        }
+    }
+}
+
+fn tick_pending_video(
+    time: Res<Time>,
+    mut pending_video: ResMut<PendingVideo>,
+    mut advance_ev: MessageWriter<AdvanceEvent>,
+) {
+    if pending_video.playing {
+        if let Some(timer) = &mut pending_video.timer {
+            timer.tick(time.delta());
+            if timer.just_finished() {
+                info!("Video stub finished, resuming script");
+                pending_video.playing = false;
+                pending_video.timer = None;
+                advance_ev.write(AdvanceEvent {
+                    source: AdvanceSource::Auto,
+                });
+            }
+        } else {
+            pending_video.playing = false;
         }
     }
 }
