@@ -3,6 +3,8 @@ use crate::resources::{
     load_unlock_state, save_unlock_state, AllCgFiles, GalleryState, GameFont, SafeMode,
     TextureCache, UnlockState,
 };
+
+include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
 use crate::state::AppState;
 use bevy::prelude::*;
 
@@ -75,7 +77,7 @@ fn populate_gallery_grid(
     for i in start..end {
         let file = filtered[i];
         if unlock_state.cg_unlocked.contains(file.as_str()) {
-            let path = format!("image/ev/{}", file);
+            let path = ev_file_path(file);
             let handle = cache
                 .cache
                 .entry(path.clone())

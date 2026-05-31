@@ -380,7 +380,8 @@ fn handle_confirm(
                 script_engine.global_flags = global_flags;
                 script_engine.local_work = local_work;
                 script_engine.local_flags = local_flags;
-                *unlock_state = unlocked;
+                unlock_state.cg_unlocked.extend(unlocked.cg_unlocked);
+                unlock_state.routes_cleared = unlocked.routes_cleared;
                 *affection = AffectionMap(aff);
 
                 commands.insert_resource(PendingLoadRestore {

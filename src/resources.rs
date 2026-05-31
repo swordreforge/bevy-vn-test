@@ -241,9 +241,21 @@ include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
 #[derive(Resource)]
 pub struct AllCgFiles(pub Vec<String>);
 
+fn strip_image_ext(name: &str) -> &str {
+    for ext in &[".png", ".jpg", ".jpeg"] {
+        if let Some(stripped) = name.strip_suffix(ext) {
+            return stripped;
+        }
+    }
+    name
+}
+
 impl AllCgFiles {
     pub fn scan() -> Self {
-        let mut files: Vec<String> = all_cg_files().into_iter().map(String::from).collect();
+        let mut files: Vec<String> = all_cg_files()
+            .into_iter()
+            .map(|f| strip_image_ext(f).to_string())
+            .collect();
         files.sort();
         Self(files)
     }
