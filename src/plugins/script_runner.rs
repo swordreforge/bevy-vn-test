@@ -108,6 +108,7 @@ fn start_script_execution(
     mut dialogue: ResMut<DialogueState>,
     mut engine: ResMut<ScriptEngine>,
     mut selected_route: ResMut<SelectedRoute>,
+    mut advance_ev: MessageWriter<AdvanceEvent>,
 ) {
     dialogue.current_text.clear();
     dialogue.current_speaker = None;
@@ -126,6 +127,12 @@ fn start_script_execution(
         engine.current_line = 0;
         info!("Starting route script: {}", engine.current_script);
     }
+
+    // Auto-start: emit the first AdvanceEvent so script execution begins
+    // immediately on entering Gameplay, matching the original game behavior.
+    advance_ev.write(AdvanceEvent {
+        source: AdvanceSource::Auto,
+    });
 }
 
 fn start_intro_bgm(
