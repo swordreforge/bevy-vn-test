@@ -42,6 +42,10 @@ impl Plugin for AudioPlugin {
     }
 }
 
+fn asset_path_exists(relative: &str) -> bool {
+    std::path::Path::new("assets").join(relative).exists()
+}
+
 fn handle_play_bgm(
     mut reader: MessageReader<PlayBgmMessage>,
     asset_server: Res<AssetServer>,
@@ -78,8 +82,12 @@ fn handle_play_bgm(
         let path_a = format!("audio/bgm/bgm_{}_a.ogg", msg.id);
         let path_b = format!("audio/bgm/bgm_{}_b.ogg", msg.id);
 
-        let handle_a: Handle<AudioSource> = asset_server.load(&path_a);
-        let handle_b: Handle<AudioSource> = asset_server.load(&path_b);
+        let (handle_a, handle_b) = if asset_path_exists(&path_a) {
+            (asset_server.load(&path_a), asset_server.load(&path_b))
+        } else {
+            let single = asset_server.load(format!("audio/bgm/bgm_{}.ogg", msg.id));
+            (single.clone(), single)
+        };
         pending.0 = Some(PendingBgmLoad {
             id: msg.id.clone(),
             handle_a,
@@ -303,19 +311,31 @@ fn handle_play_se(
 ) {
     for msg in reader.read() {
         let path_a = format!("audio/se/{}_a.ogg", msg.file);
-        let path_b = format!("audio/se/{}_b.ogg", msg.file);
         let path_single = format!("audio/se/{}.ogg", msg.file);
-        let handle_a: Handle<AudioSource> = asset_server.load(&path_a);
-        let handle_b: Handle<AudioSource> = asset_server.load(&path_b);
-        let handle_single: Handle<AudioSource> = asset_server.load(&path_single);
-        pending.0.push(PendingSeLoad {
-            file: msg.file.clone(),
-            handle_a,
-            handle_b: Some(handle_b),
-            handle_single,
-            kind: SeKind::OneShot,
-            frames_waited: 0,
-        });
+        if asset_path_exists(&path_a) {
+            let path_b = format!("audio/se/{}_b.ogg", msg.file);
+            let handle_a = asset_server.load(&path_a);
+            let handle_b = asset_server.load(&path_b);
+            let handle_single = asset_server.load(&path_single);
+            pending.0.push(PendingSeLoad {
+                file: msg.file.clone(),
+                handle_a,
+                handle_b: Some(handle_b),
+                handle_single,
+                kind: SeKind::OneShot,
+                frames_waited: 0,
+            });
+        } else {
+            let handle = asset_server.load(&path_single);
+            pending.0.push(PendingSeLoad {
+                file: msg.file.clone(),
+                handle_a: handle.clone(),
+                handle_b: None,
+                handle_single: handle,
+                kind: SeKind::OneShot,
+                frames_waited: 0,
+            });
+        }
     }
 }
 
@@ -334,22 +354,37 @@ fn handle_loop_se(
         }
         let vol = msg.volume.unwrap_or(1.0);
         let path_a = format!("audio/se/{}_a.ogg", msg.file);
-        let path_b = format!("audio/se/{}_b.ogg", msg.file);
         let path_single = format!("audio/se/{}.ogg", msg.file);
-        let handle_a: Handle<AudioSource> = asset_server.load(&path_a);
-        let handle_b: Handle<AudioSource> = asset_server.load(&path_b);
-        let handle_single: Handle<AudioSource> = asset_server.load(&path_single);
-        pending.0.push(PendingSeLoad {
-            file: msg.file.clone(),
-            handle_a,
-            handle_b: Some(handle_b),
-            handle_single,
-            kind: SeKind::Loop {
-                channel: msg.channel,
-                volume: vol,
-            },
-            frames_waited: 0,
-        });
+        if asset_path_exists(&path_a) {
+            let path_b = format!("audio/se/{}_b.ogg", msg.file);
+            let handle_a = asset_server.load(&path_a);
+            let handle_b = asset_server.load(&path_b);
+            let handle_single = asset_server.load(&path_single);
+            pending.0.push(PendingSeLoad {
+                file: msg.file.clone(),
+                handle_a,
+                handle_b: Some(handle_b),
+                handle_single,
+                kind: SeKind::Loop {
+                    channel: msg.channel,
+                    volume: vol,
+                },
+                frames_waited: 0,
+            });
+        } else {
+            let handle = asset_server.load(&path_single);
+            pending.0.push(PendingSeLoad {
+                file: msg.file.clone(),
+                handle_a: handle.clone(),
+                handle_b: None,
+                handle_single: handle,
+                kind: SeKind::Loop {
+                    channel: msg.channel,
+                    volume: vol,
+                },
+                frames_waited: 0,
+            });
+        }
     }
 }
 
