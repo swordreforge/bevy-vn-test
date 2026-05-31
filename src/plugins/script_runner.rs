@@ -19,7 +19,10 @@ use crate::resources::{
     PendingVideo, QuakeState, RouteConfig, Settings, SpriteOverlayManager, UnlockState,
 };
 use crate::resources::{SelectedRoute, ViewBlocking, WindowOverride};
-use crate::script::{evaluate_script_expression, ConditionOp, OverlayColor, ScriptCmd, ScriptEngine};
+use crate::script::{
+    evaluate_condition_expression, evaluate_script_expression, ConditionOp, OverlayColor, ScriptCmd,
+    ScriptEngine,
+};
 use crate::state::AppState;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -370,6 +373,12 @@ fn process_advance(
                     Some(ScriptCmd::GetGlobalFlag { index }) => {
                         let val = engine.global_flags.get(&index).copied().unwrap_or(0);
                         engine.flags.insert("tmp".to_string(), val);
+                    }
+                    Some(ScriptCmd::Exif { expression }) => {
+                        // In skip mode, just advance past the next command
+                        if !evaluate_condition_expression(&expression, &engine.flags) {
+                            let _ = engine.advance();
+                        }
                     }
                     Some(ScriptCmd::Halt) => {
                         if let Some(name) = engine.detect_route_completion(config) {
@@ -846,6 +855,11 @@ fn process_advance(
                 Some(ScriptCmd::GetGlobalFlag { index }) => {
                     let val = engine.global_flags.get(&index).copied().unwrap_or(0);
                     engine.flags.insert("tmp".to_string(), val);
+                }
+                Some(ScriptCmd::Exif { expression }) => {
+                    if !evaluate_condition_expression(&expression, &engine.flags) {
+                        let _ = engine.advance();
+                    }
                 }
                 Some(ScriptCmd::Halt) => {
                     if let Some(name) = engine.detect_route_completion(config) {

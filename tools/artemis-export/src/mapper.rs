@@ -509,6 +509,13 @@ fn map_command(
         "WaitToFinishMoviePlayingOnSprite" => {
             Some(vec![ScriptCmd::Wait { duration: 0 }])
         }
+        "TerminateExecutionOfScript" => {
+            Some(vec![ScriptCmd::Halt])
+        }
+        "exif" => {
+            let expression = cmd.attrs.get("exp").cloned().unwrap_or_default();
+            Some(vec![ScriptCmd::Exif { expression }])
+        }
         _ => None,
     }
 }

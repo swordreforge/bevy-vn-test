@@ -258,6 +258,9 @@ pub enum ScriptCmd {
         mode: ValidityMode,
         allowed: bool,
     },
+    Exif {
+        expression: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -411,6 +414,44 @@ impl ScriptEngine {
     pub fn detect_route_completion(&self, config: &RouteConfig) -> Option<String> {
         config.find_by_script(&self.current_script).map(|e| e.name.clone())
     }
+}
+
+pub fn evaluate_condition_expression(expr: &str, flags: &HashMap<String, i32>) -> bool {
+    let expr = expr.trim();
+    let tmp_val = flags.get("tmp").copied().unwrap_or(0);
+
+    if let Some(rhs) = expr.strip_prefix("!=").or_else(|| expr.strip_prefix("=="))
+        .or_else(|| expr.strip_prefix(">=")).or_else(|| expr.strip_prefix("<="))
+        .or_else(|| expr.strip_prefix(">")).or_else(|| expr.strip_prefix("<"))
+    {
+        if let Ok(rhs_val) = rhs.trim().parse::<i32>() {
+            return if expr.starts_with("!=") { tmp_val != rhs_val }
+                else if expr.starts_with("==") { tmp_val == rhs_val }
+                else if expr.starts_with(">=") { tmp_val >= rhs_val }
+                else if expr.starts_with("<=") { tmp_val <= rhs_val }
+                else if expr.starts_with(">") { tmp_val > rhs_val }
+                else { tmp_val < rhs_val };
+        }
+    }
+    // Try split_once for "t.tmp == N" style
+    for op_str in &["!=", "==", ">=", "<=", ">", "<"] {
+        if let Some((_, rhs_str)) = expr.split_once(op_str) {
+            if let Ok(rhs) = rhs_str.trim().parse::<i32>() {
+                return match *op_str {
+                    "!=" => tmp_val != rhs,
+                    "==" => tmp_val == rhs,
+                    ">=" => tmp_val >= rhs,
+                    "<=" => tmp_val <= rhs,
+                    ">" => tmp_val > rhs,
+                    _ => tmp_val < rhs,
+                };
+            }
+        }
+    }
+    if let Ok(val) = expr.parse::<i32>() {
+        return tmp_val == val;
+    }
+    true
 }
 
 pub fn evaluate_script_expression(expr: &str, flags: &HashMap<String, i32>) -> i32 {
