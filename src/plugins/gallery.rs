@@ -340,7 +340,7 @@ fn handle_thumbnail_click(
             let file = &thumbnail.0;
             if unlock_state.cg_unlocked.contains(file) {
                 gallery_state.fullscreen = Some(file.clone());
-                let path = format!("image/ev/{}", file);
+                let path = ev_file_path(file);
                 let handle = cache
                     .cache
                     .entry(path.clone())
