@@ -8,6 +8,9 @@ include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
 use crate::state::AppState;
 use bevy::prelude::*;
 
+#[derive(Resource, Default)]
+pub struct DebugUnlockAll(pub bool);
+
 pub struct GalleryPlugin;
 
 impl Plugin for GalleryPlugin {
@@ -17,6 +20,7 @@ impl Plugin for GalleryPlugin {
             .init_resource::<TextureCache>()
             .init_resource::<AllCgFiles>()
             .init_resource::<SafeMode>()
+            .init_resource::<DebugUnlockAll>()
             .add_systems(OnEnter(AppState::Gallery), setup_gallery)
             .add_systems(
                 Update,
@@ -66,6 +70,7 @@ fn populate_gallery_grid(
     page: usize,
     cg_files: &[String],
     unlock_state: &UnlockState,
+    debug_all_unlocked: bool,
     safe_mode: bool,
     asset_server: &AssetServer,
     cache: &mut TextureCache,
@@ -76,7 +81,7 @@ fn populate_gallery_grid(
     let end = (start + CGS_PER_PAGE).min(filtered.len());
     for i in start..end {
         let file = filtered[i];
-        if unlock_state.cg_unlocked.contains(file.as_str()) {
+        if debug_all_unlocked || unlock_state.cg_unlocked.contains(file.as_str()) {
             let path = ev_file_path(file);
             let handle = cache
                 .cache
@@ -130,6 +135,7 @@ fn setup_gallery(
     game_font: Res<GameFont>,
     cg_files: Res<AllCgFiles>,
     safe_mode: Res<SafeMode>,
+    debug_all: Res<DebugUnlockAll>,
 ) {
     let filtered_count = filtered_cg_files(&cg_files.0, safe_mode.0).len();
     let total_pages = safe_total_pages(filtered_count);
@@ -312,6 +318,7 @@ fn setup_gallery(
                     gallery_state.page,
                     &cg_files.0,
                     &*unlock_state,
+                    debug_all.0,
                     safe_mode.0,
                     &*asset_server,
                     &mut *cache,
@@ -414,6 +421,7 @@ fn handle_gallery_page_nav(
     cg_files: Res<AllCgFiles>,
     game_font: Res<GameFont>,
     safe_mode: Res<SafeMode>,
+    debug_all: Res<DebugUnlockAll>,
 ) {
     if gallery_state.fullscreen.is_some() {
         return;
@@ -463,6 +471,7 @@ fn handle_gallery_page_nav(
                     gallery_state.page,
                     &cg_files.0,
                     &*unlock_state,
+                    debug_all.0,
                     safe_mode.0,
                     &*asset_server,
                     &mut *cache,
@@ -502,13 +511,14 @@ fn handle_gallery_escape(
 
 fn handle_debug_unlock_all(
     keys: Res<ButtonInput<KeyCode>>,
-    mut unlock_state: ResMut<UnlockState>,
+    mut debug_all: ResMut<DebugUnlockAll>,
     cg_files: Res<AllCgFiles>,
     mut gallery_state: ResMut<GalleryState>,
     grid_query: Query<Entity, With<GalleryGridContent>>,
     children_query: Query<&Children, With<GalleryGridContent>>,
     page_text_query: Query<Entity, With<GalleryPageText>>,
     mut commands: Commands,
+    unlock_state: Res<UnlockState>,
     asset_server: Res<AssetServer>,
     mut cache: ResMut<TextureCache>,
     game_font: Res<GameFont>,
@@ -518,14 +528,12 @@ fn handle_debug_unlock_all(
         return;
     }
 
-    for file in &cg_files.0 {
-        unlock_state.cg_unlocked.insert(file.clone());
-    }
+    debug_all.0 = !debug_all.0;
+    info!("Debug unlock all CG: {}", debug_all.0);
 
     let filtered = filtered_cg_files(&cg_files.0, safe_mode.0);
     let total_pages = safe_total_pages(filtered.len());
 
-    // Clamp page to valid range after unlock
     if gallery_state.page >= total_pages && total_pages > 0 {
         gallery_state.page = total_pages - 1;
     }
@@ -543,6 +551,7 @@ fn handle_debug_unlock_all(
                 gallery_state.page,
                 &cg_files.0,
                 &*unlock_state,
+                debug_all.0,
                 safe_mode.0,
                 &*asset_server,
                 &mut *cache,
@@ -574,6 +583,7 @@ fn handle_safe_mode_toggle(
     mut cache: ResMut<TextureCache>,
     cg_files: Res<AllCgFiles>,
     game_font: Res<GameFont>,
+    debug_all: Res<DebugUnlockAll>,
 ) {
     let toggled = interaction_query.iter().any(|i| *i == Interaction::Pressed);
     if !toggled {
@@ -599,6 +609,7 @@ fn handle_safe_mode_toggle(
                 gallery_state.page,
                 &cg_files.0,
                 &*unlock_state,
+                debug_all.0,
                 safe_mode.0,
                 &*asset_server,
                 &mut *cache,
