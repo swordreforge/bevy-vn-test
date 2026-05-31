@@ -1,9 +1,9 @@
 {
-  "version": 1,
-  "timestamp": "1779847512",
+  "version": 2,
+  "timestamp": "1780050006",
   "scene_name": "aiy00010",
   "script_path": "aiy00010.bscript.ron",
-  "script_line": 896,
+  "script_line": 613,
   "call_stack": [
     [
       "main",
@@ -11,11 +11,16 @@
     ]
   ],
   "flags": {},
+  "global_flags": {},
   "affection": {},
   "unlock_state": {
     "cg_unlocked": [],
     "bgm_unlocked": [],
     "scene_cleared": []
   },
-  "play_time": 0
+  "play_time": 0,
+  "window_color_idx": 0,
+  "view_char_id": null,
+  "bgm_id": "0301",
+  "bgmx_id": null
 }

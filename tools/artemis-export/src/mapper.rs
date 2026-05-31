@@ -502,6 +502,13 @@ fn map_command(
                 ScriptCmd::Wait { duration: 5000 },
             ])
         }
+        "PlayMovie" => {
+            let file = cmd.attrs.get("0")?;
+            Some(vec![ScriptCmd::PlayMovie { file: file.to_string() }])
+        }
+        "WaitToFinishMoviePlayingOnSprite" => {
+            Some(vec![ScriptCmd::Wait { duration: 0 }])
+        }
         _ => None,
     }
 }
@@ -1269,5 +1276,35 @@ mod tests {
         assert!(matches!(&cmds[0], ScriptCmd::Window { show: false, .. }));
         assert!(matches!(&cmds[1], ScriptCmd::GameMode { mode: 2 }));
         assert!(matches!(&cmds[2], ScriptCmd::Wait { duration: 5000 }));
+    }
+
+    #[test]
+    fn test_map_play_movie() {
+        let c = cmd("PlayMovie", vec![("0", "movie.mpg")]);
+        let r = map_command("PlayMovie", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::PlayMovie { file } if file == "movie.mpg"));
+    }
+
+    #[test]
+    fn test_map_play_movie_named() {
+        let c = cmd("PlayMovie", vec![("0", "aiy50010mov.mpg")]);
+        let r = map_command("PlayMovie", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::PlayMovie { file } if file == "aiy50010mov.mpg"));
+    }
+
+    #[test]
+    fn test_map_wait_to_finish_movie() {
+        let c = cmd("WaitToFinishMoviePlayingOnSprite", vec![("0", "TRUE")]);
+        let r = map_command("WaitToFinishMoviePlayingOnSprite", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::Wait { duration: 0 }));
     }
 }

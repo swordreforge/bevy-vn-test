@@ -1,0 +1,20 @@
+(
+    heroines: [
+        (index: 1, name: "Fione", script: "aiy10010", unlock_flag: 51, hero_work: Some(1), ending_flags: [151, 152, 153]),
+        (index: 2, name: "Eris", script: "aiy20010", unlock_flag: 52, hero_work: Some(2), ending_flags: [154, 155, 156]),
+        (index: 3, name: "Colette", script: "aiy30010", unlock_flag: 53, hero_work: Some(3), ending_flags: [157, 158, 159]),
+        (index: 4, name: "Lysia", script: "aiy40010", unlock_flag: 54, hero_work: Some(4), ending_flags: [160, 161, 162]),
+        (index: 5, name: "Lavi", script: "aiy50010", unlock_flag: 55, hero_work: Some(5), ending_flags: [163, 164, 165]),
+    ],
+    extra: (
+        index: 6,
+        name: "After Story",
+        script: "aiy00010",
+        always_unlocked: true,
+    ),
+    route_unlock_flags: [103, 105, 107, 108, 110, 111],
+    all_routes_cleared_flag: 113,
+    full_completion_flag: 114,
+    ending_flag_range: (151, 167),
+    ending_count: 22,
+)
