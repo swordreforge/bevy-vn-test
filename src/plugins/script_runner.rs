@@ -12,11 +12,12 @@ use crate::rendering_messages::{
     HideFgMessage, MoveSpriteMessage, ScrollBgMessage, SetBgMessage, ShowCgMessage,
     ShowFaceMessage, ShowFgMessage,
 };
-use crate::plugins::video::spawn_video;
+use crate::plugins::video::{spawn_sprite_video, spawn_video, start_rain_video};
 use crate::resources::{
     save_unlock_state, sync_affection_from_work, map_video_file, AffectionMap, Backlog,
     BacklogEntry, ChoiceState, CompletedRoute, DialogueState, GameRestrictions, IntroPhase,
-    PendingVideo, QuakeState, RouteConfig, Settings, SpriteOverlayManager, UnlockState,
+    PendingSpriteVideoBlock, PendingVideo, QuakeState, RainOverlayState, RouteConfig, Settings,
+    SpriteOverlayManager, SpriteVideoManager, UnlockState,
 };
 use crate::resources::{SelectedRoute, ViewBlocking, WindowOverride};
 use crate::script::{
@@ -81,6 +82,10 @@ pub struct ProcessAdvanceParams<'w, 's> {
     overlay_mgr: ResMut<'w, SpriteOverlayManager>,
     restrictions: ResMut<'w, GameRestrictions>,
     pending_video: ResMut<'w, PendingVideo>,
+    sprite_video_mgr: ResMut<'w, SpriteVideoManager>,
+    rain_state: ResMut<'w, RainOverlayState>,
+    blocked_sprite: ResMut<'w, PendingSpriteVideoBlock>,
+    images: ResMut<'w, Assets<Image>>,
 }
 
 impl Plugin for ScriptRunnerPlugin {
@@ -219,6 +224,10 @@ fn process_advance(
         ref mut overlay_mgr,
         ref mut restrictions,
         ref mut pending_video,
+        ref mut sprite_video_mgr,
+        ref mut rain_state,
+        ref mut blocked_sprite,
+        ref mut images,
     } = &mut params;
 
     for ev in advance_ev.read() {
@@ -234,6 +243,11 @@ fn process_advance(
 
         // If video is playing, block script execution
         if pending_video.playing {
+            continue;
+        }
+
+        // If blocked on sprite video, block script execution
+        if blocked_sprite.0.is_some() {
             continue;
         }
 
@@ -743,6 +757,16 @@ fn process_advance(
                             crate::script::ValidityMode::Input => restrictions.input = allowed,
                         }
                     }
+                    Some(ScriptCmd::MovieInit) => {}
+                    Some(ScriptCmd::DrawSpriteEx { .. }) => {}
+                    Some(ScriptCmd::WaitToFinishMoviePlayingOnSprite { .. }) => {}
+                    Some(ScriptCmd::RainMja { .. }) => {}
+                    Some(ScriptCmd::SetRainValid { .. }) => {}
+                    Some(ScriptCmd::SetRainQuantity { .. }) => {}
+                    Some(ScriptCmd::SetRainColor { .. }) => {}
+                    Some(ScriptCmd::SetRainVector { .. }) => {}
+                    Some(ScriptCmd::SetRainCameraAngle { .. }) => {}
+                    Some(ScriptCmd::SetRainPriority { .. }) => {}
                     Some(cmd) => {
                         info!("Script cmd (no-op): {:?}", cmd);
                     }
@@ -1297,6 +1321,118 @@ fn process_advance(
                         crate::script::ValidityMode::Loading => restrictions.loading = allowed,
                         crate::script::ValidityMode::Input => restrictions.input = allowed,
                     }
+                }
+                Some(ScriptCmd::MovieInit) => {}
+                Some(ScriptCmd::DrawSpriteEx {
+                    ref id,
+                    ref file,
+                    x,
+                    y,
+                    width,
+                    height,
+                    display_mode: _,
+                    priority,
+                    wait,
+                    ..
+                }) => {
+                    let actual = map_video_file(file);
+                    let rel_path = format!("movie/{}", actual);
+                    let abs_path = std::env::current_dir()
+                        .unwrap_or_default()
+                        .join("assets")
+                        .join(&rel_path);
+
+                    // Stop any existing sprite video with this ID
+                    crate::plugins::video::stop_sprite_video(&mut commands, sprite_video_mgr, id);
+
+                    if abs_path.exists() {
+                        spawn_sprite_video(
+                            &mut commands,
+                            images,
+                            sprite_video_mgr,
+                            id.clone(),
+                            &abs_path,
+                            x,
+                            y,
+                            width,
+                            height,
+                            priority,
+                        );
+                    } else {
+                        warn!("Sprite video not found: {:?}", abs_path);
+                    }
+
+                    if wait {
+                        blocked_sprite.0 = Some(id.clone());
+                        break;
+                    }
+                }
+                Some(ScriptCmd::WaitToFinishMoviePlayingOnSprite { ref sprite_id }) => {
+                    blocked_sprite.0 = Some(sprite_id.clone());
+                    break;
+                }
+                Some(ScriptCmd::RainMja {
+                    ref file,
+                    priority,
+                    ..
+                }) => {
+                    let rel_path = format!("movie/{}.ogv", file);
+                    let abs_path = std::env::current_dir()
+                        .unwrap_or_default()
+                        .join("assets")
+                        .join(&rel_path);
+
+                    if abs_path.exists() {
+                        start_rain_video(&mut commands, images, rain_state, &abs_path, priority);
+                    } else {
+                        warn!("Rain video not found: {:?}", abs_path);
+                    }
+                }
+                Some(ScriptCmd::SetRainValid { enabled }) => {
+                    rain_state.enabled = enabled;
+                    if !enabled {
+                        crate::plugins::video::stop_rain_video(&mut commands, &mut *rain_state);
+                    }
+                }
+                Some(ScriptCmd::SetRainQuantity { density }) => {
+                    rain_state.density = density;
+                }
+                Some(ScriptCmd::SetRainColor { r, g, b, a }) => {
+                    rain_state.color = Color::srgba(
+                        r as f32 / 255.0,
+                        g as f32 / 255.0,
+                        b as f32 / 255.0,
+                        a as f32 / 255.0,
+                    );
+                    // Update existing rain entity color if active
+                    if let Some(entity) = rain_state.entity {
+                        if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                            let handle = {
+                                #[cfg(not(target_os = "android"))]
+                                {
+                                    rain_state.gst.as_ref().map_or(Default::default(), |g| g.image_handle.clone())
+                                }
+                                #[cfg(target_os = "android")]
+                                {
+                                    Handle::default()
+                                }
+                            };
+                            entity_commands.insert(ImageNode {
+                                image: handle,
+                                color: rain_state.color,
+                                ..default()
+                            });
+                        }
+                    }
+                }
+                Some(ScriptCmd::SetRainVector { direction }) => {
+                    rain_state.direction = direction;
+                }
+                Some(ScriptCmd::SetRainCameraAngle { x, y, z }) => {
+                    rain_state.camera_angle = (x, y, z);
+                }
+                Some(ScriptCmd::SetRainPriority { priority }) => {
+                    rain_state.priority = priority;
                 }
                 Some(cmd) => {
                     info!("Script cmd (no-op): {:?}", cmd);

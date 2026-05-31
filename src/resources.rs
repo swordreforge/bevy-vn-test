@@ -334,11 +334,30 @@ pub struct SelectedRoute(pub Option<String>);
 #[derive(Resource, Default)]
 pub struct CompletedRoute(pub Option<String>);
 
+#[cfg(not(target_os = "android"))]
+pub struct GstVideoState {
+    pub pipeline: gstreamer::Pipeline,
+    pub appsink: gstreamer_app::AppSink,
+    pub image_handle: Handle<Image>,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Holds data needed for lazy GStreamer pipeline creation.
+/// Inserted by spawn_video, consumed by check_video_completion.
+/// On Android this struct is never inserted, so the resource stays None.
+#[derive(Resource)]
+pub struct PendingVideoInit {
+    pub asset_path: String,
+}
+
 #[derive(Resource, Default)]
 pub struct PendingVideo {
     pub playing: bool,
     pub entity: Option<Entity>,
     pub timer: Option<Timer>,
+    #[cfg(not(target_os = "android"))]
+    pub gst: Option<GstVideoState>,
 }
 
 #[derive(Resource, Default)]
@@ -558,7 +577,69 @@ impl Default for TransitionPhase {
 pub fn map_video_file(asb_path: &str) -> String {
     if asb_path.ends_with(".mpg") {
         asb_path.replacen(".mpg", ".ogv", 1)
+    } else if asb_path.ends_with(".ogv") {
+        asb_path.to_string()
     } else {
         format!("{}.ogv", asb_path)
+    }
+}
+
+/// When Some(sprite_id), script_runner blocks until the sprite video finishes.
+#[derive(Resource, Default)]
+pub struct PendingSpriteVideoBlock(pub Option<String>);
+
+// ── Sprite (DrawSpriteEx) video overlay ──
+
+#[cfg(not(target_os = "android"))]
+pub struct SpriteVideoGstState {
+    pub pipeline: gstreamer::Pipeline,
+    pub appsink: gstreamer_app::AppSink,
+    pub image_handle: Handle<Image>,
+    pub entity: Entity,
+    pub eos: bool,
+}
+
+#[derive(Resource, Default)]
+pub struct SpriteVideoManager {
+    #[cfg(not(target_os = "android"))]
+    pub videos: HashMap<String, SpriteVideoGstState>,
+}
+
+// ── Rain overlay ──
+
+#[cfg(not(target_os = "android"))]
+pub struct RainGstState {
+    pub pipeline: gstreamer::Pipeline,
+    pub appsink: gstreamer_app::AppSink,
+    pub image_handle: Handle<Image>,
+    pub entity: Entity,
+}
+
+#[derive(Resource)]
+pub struct RainOverlayState {
+    pub enabled: bool,
+    pub density: u32,
+    pub color: Color,
+    pub direction: u32,
+    pub camera_angle: (u32, u32, u32),
+    pub priority: u32,
+    pub entity: Option<Entity>,
+    #[cfg(not(target_os = "android"))]
+    pub gst: Option<RainGstState>,
+}
+
+impl Default for RainOverlayState {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            density: 200,
+            color: Color::srgba(194.0 / 255.0, 194.0 / 255.0, 194.0 / 255.0, 194.0 / 255.0),
+            direction: 0,
+            camera_angle: (0, 0, 0),
+            priority: 0,
+            entity: None,
+            #[cfg(not(target_os = "android"))]
+            gst: None,
+        }
     }
 }

@@ -261,6 +261,52 @@ pub enum ScriptCmd {
     Exif {
         expression: String,
     },
+    MovieInit,
+    DrawSpriteEx {
+        id: String,
+        file: String,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        blend_mode: i32,
+        display_mode: i32,
+        priority: i32,
+        visible: bool,
+        wait: bool,
+    },
+    WaitToFinishMoviePlayingOnSprite {
+        sprite_id: String,
+    },
+    RainMja {
+        file: String,
+        loop_file: Option<String>,
+        priority: i32,
+        time: Option<u64>,
+    },
+    SetRainValid {
+        enabled: bool,
+    },
+    SetRainQuantity {
+        density: u32,
+    },
+    SetRainColor {
+        r: u8,
+        g: u8,
+        b: u8,
+        a: u8,
+    },
+    SetRainVector {
+        direction: u32,
+    },
+    SetRainCameraAngle {
+        x: u32,
+        y: u32,
+        z: u32,
+    },
+    SetRainPriority {
+        priority: u32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

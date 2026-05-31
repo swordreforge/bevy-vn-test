@@ -506,8 +506,26 @@ fn map_command(
             let file = cmd.attrs.get("0")?;
             Some(vec![ScriptCmd::PlayMovie { file: file.to_string() }])
         }
+        "MovieInit" => {
+            Some(vec![ScriptCmd::MovieInit])
+        }
+        "DrawSpriteEx" => {
+            let id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let file = cmd.attrs.get("1").cloned().unwrap_or_default();
+            let blend_mode = cmd.attrs.get("2").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+            let x = cmd.attrs.get("4").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+            let y = cmd.attrs.get("5").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+            let width = cmd.attrs.get("7").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+            let height = cmd.attrs.get("8").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+            let visible = cmd.attrs.get("12").map(|s| s == "TRUE").unwrap_or(true);
+            let display_mode = cmd.attrs.get("14").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+            let priority = cmd.attrs.get("16").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+            let wait = cmd.attrs.get("18").map(|s| s == "TRUE").unwrap_or(true);
+            Some(vec![ScriptCmd::DrawSpriteEx { id, file, x, y, width, height, blend_mode, display_mode, priority, visible, wait }])
+        }
         "WaitToFinishMoviePlayingOnSprite" => {
-            Some(vec![ScriptCmd::Wait { duration: 0 }])
+            let sprite_id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            Some(vec![ScriptCmd::WaitToFinishMoviePlayingOnSprite { sprite_id }])
         }
         "TerminateExecutionOfScript" => {
             Some(vec![ScriptCmd::Halt])
@@ -515,6 +533,42 @@ fn map_command(
         "exif" => {
             let expression = cmd.attrs.get("exp").cloned().unwrap_or_default();
             Some(vec![ScriptCmd::Exif { expression }])
+        }
+        "rain_mja" => {
+            let file = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let loop_file = cmd.attrs.get("1").filter(|s| !s.is_empty()).cloned();
+            let priority = cmd.attrs.get("2").and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+            let time = cmd.attrs.get("3").and_then(|s| s.parse::<u64>().ok());
+            Some(vec![ScriptCmd::RainMja { file, loop_file, priority, time }])
+        }
+        "SetValidityOfRainfall" => {
+            let enabled = cmd.attrs.get("0").map(|s| s == "TRUE").unwrap_or(true);
+            Some(vec![ScriptCmd::SetRainValid { enabled }])
+        }
+        "SetQuantityOfRainfall" => {
+            let density = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(100);
+            Some(vec![ScriptCmd::SetRainQuantity { density }])
+        }
+        "SetColorOfRain" => {
+            let r = cmd.attrs.get("0").and_then(|s| s.parse::<u8>().ok()).unwrap_or(255);
+            let g = cmd.attrs.get("1").and_then(|s| s.parse::<u8>().ok()).unwrap_or(255);
+            let b = cmd.attrs.get("2").and_then(|s| s.parse::<u8>().ok()).unwrap_or(255);
+            let a = cmd.attrs.get("3").and_then(|s| s.parse::<u8>().ok()).unwrap_or(255);
+            Some(vec![ScriptCmd::SetRainColor { r, g, b, a }])
+        }
+        "SetVectorOfSightForRainfall" => {
+            let direction = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::SetRainVector { direction }])
+        }
+        "SetCameraAngleOfRainfall" => {
+            let x = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let y = cmd.attrs.get("1").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let z = cmd.attrs.get("2").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::SetRainCameraAngle { x, y, z }])
+        }
+        "SetPriorityOfRainfallScreen" => {
+            let priority = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::SetRainPriority { priority }])
         }
         _ => None,
     }
@@ -1307,11 +1361,105 @@ mod tests {
 
     #[test]
     fn test_map_wait_to_finish_movie() {
-        let c = cmd("WaitToFinishMoviePlayingOnSprite", vec![("0", "TRUE")]);
+        let c = cmd("WaitToFinishMoviePlayingOnSprite", vec![("0", "02")]);
         let r = map_command("WaitToFinishMoviePlayingOnSprite", &c, &GameConfig::default());
         assert!(r.is_some());
         let cmds = r.unwrap();
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(&cmds[0], ScriptCmd::Wait { duration: 0 }));
+        assert!(matches!(&cmds[0], ScriptCmd::WaitToFinishMoviePlayingOnSprite { sprite_id } if sprite_id == "02"));
+    }
+
+    #[test]
+    fn test_map_movie_init() {
+        let c = cmd("MovieInit", vec![]);
+        let r = map_command("MovieInit", &c, &GameConfig::default());
+        assert!(r.is_some());
+        assert!(matches!(&r.unwrap()[0], ScriptCmd::MovieInit));
+    }
+
+    #[test]
+    fn test_map_draw_sprite_ex() {
+        let c = cmd("DrawSpriteEx", vec![
+            ("0", "02"), ("1", "aiy50050mov.mpg"), ("2", "04"),
+            ("4", "000"), ("5", "000"), ("7", "640"), ("8", "360"),
+            ("12", "TRUE"), ("14", "01"), ("16", "02"), ("18", "TRUE"),
+        ]);
+        let r = map_command("DrawSpriteEx", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::DrawSpriteEx { id, file, x, y, width, height, blend_mode, display_mode, priority, visible, wait }
+            if id == "02" && file == "aiy50050mov.mpg" && *x == 0.0 && *y == 0.0
+            && *width == 640.0 && *height == 360.0 && *blend_mode == 4
+            && *display_mode == 1 && *priority == 2 && *visible && *wait));
+    }
+
+    #[test]
+    fn test_map_rain_mja() {
+        let c = cmd("rain_mja", vec![("0", "aiy20120_rain"), ("2", "10")]);
+        let r = map_command("rain_mja", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(&cmds[0], ScriptCmd::RainMja { file, loop_file: None, priority: 10, time: None }
+            if file == "aiy20120_rain"));
+    }
+
+    #[test]
+    fn test_map_rain_mja_with_loop_and_time() {
+        let c = cmd("rain_mja", vec![("0", "aiy20200_rain"), ("1", "aiy20200_rain_2"), ("2", "0"), ("3", "9250")]);
+        let r = map_command("rain_mja", &c, &GameConfig::default());
+        assert!(r.is_some());
+        let cmds = r.unwrap();
+        assert!(matches!(&cmds[0], ScriptCmd::RainMja { file, loop_file: Some(lf), priority: 0, time: Some(9250) }
+            if file == "aiy20200_rain" && lf == "aiy20200_rain_2"));
+    }
+
+    #[test]
+    fn test_map_set_rain_valid() {
+        let c = cmd("SetValidityOfRainfall", vec![("0", "TRUE")]);
+        let r = map_command("SetValidityOfRainfall", &c, &GameConfig::default());
+        assert!(r.is_some());
+        assert!(matches!(&r.unwrap()[0], ScriptCmd::SetRainValid { enabled: true }));
+    }
+
+    #[test]
+    fn test_map_set_rain_quantity() {
+        let c = cmd("SetQuantityOfRainfall", vec![("0", "200")]);
+        let r = map_command("SetQuantityOfRainfall", &c, &GameConfig::default());
+        assert!(r.is_some());
+        assert!(matches!(&r.unwrap()[0], ScriptCmd::SetRainQuantity { density: 200 }));
+    }
+
+    #[test]
+    fn test_map_set_rain_color() {
+        let c = cmd("SetColorOfRain", vec![("0", "194"), ("1", "194"), ("2", "194"), ("3", "194")]);
+        let r = map_command("SetColorOfRain", &c, &GameConfig::default());
+        assert!(r.is_some());
+        assert!(matches!(&r.unwrap()[0], ScriptCmd::SetRainColor { r: 194, g: 194, b: 194, a: 194 }));
+    }
+
+    #[test]
+    fn test_map_set_rain_vector() {
+        let c = cmd("SetVectorOfSightForRainfall", vec![("0", "000")]);
+        let r = map_command("SetVectorOfSightForRainfall", &c, &GameConfig::default());
+        assert!(r.is_some());
+        assert!(matches!(&r.unwrap()[0], ScriptCmd::SetRainVector { direction: 0 }));
+    }
+
+    #[test]
+    fn test_map_set_rain_camera_angle() {
+        let c = cmd("SetCameraAngleOfRainfall", vec![("0", "00"), ("1", "00"), ("2", "20")]);
+        let r = map_command("SetCameraAngleOfRainfall", &c, &GameConfig::default());
+        assert!(r.is_some());
+        assert!(matches!(&r.unwrap()[0], ScriptCmd::SetRainCameraAngle { x: 0, y: 0, z: 20 }));
+    }
+
+    #[test]
+    fn test_map_set_rain_priority() {
+        let c = cmd("SetPriorityOfRainfallScreen", vec![("0", "02")]);
+        let r = map_command("SetPriorityOfRainfallScreen", &c, &GameConfig::default());
+        assert!(r.is_some());
+        assert!(matches!(&r.unwrap()[0], ScriptCmd::SetRainPriority { priority: 2 }));
     }
 }

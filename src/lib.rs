@@ -82,6 +82,9 @@ pub fn build_app() -> App {
     .init_resource::<CompletedRoute>()
     .init_resource::<GameRestrictions>()
     .init_resource::<ObjFileIndex>()
+    .init_resource::<resources::SpriteVideoManager>()
+    .init_resource::<resources::RainOverlayState>()
+    .init_resource::<resources::PendingSpriteVideoBlock>()
     .add_systems(Startup, (startup, load_obj_index));
     app
 }
