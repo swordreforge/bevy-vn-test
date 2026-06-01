@@ -570,6 +570,135 @@ fn map_command(
             let priority = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
             Some(vec![ScriptCmd::SetRainPriority { priority }])
         }
+        // === Phase 3: Group 1 — Game Logic ===
+        "SEStop" => {
+            Some(vec![ScriptCmd::StopAllSe])
+        }
+        "RegisterTextToHistory" => {
+            Some(vec![ScriptCmd::PushHistory])
+        }
+        "WaitToFinishVoicePlaying" => {
+            Some(vec![ScriptCmd::WaitVoice])
+        }
+        "GetExecutionMode" => {
+            let mode = cmd.attrs.get("0").cloned().unwrap_or_default();
+            Some(vec![ScriptCmd::QueryMode { mode }])
+        }
+        "BgmX" => {
+            let attrs_str: String = cmd.attrs.values().cloned().collect::<Vec<_>>().join(" ");
+            if attrs_str.contains("stop") {
+                Some(vec![ScriptCmd::StopBgmX { id: None, fade_out: None }])
+            } else {
+                let id = cmd.attrs.get("0").cloned().unwrap_or_default();
+                let vol = cmd.attrs.get("1").and_then(|s| s.parse::<f32>().ok());
+                Some(vec![ScriptCmd::PlayBgmX { id, volume: vol, fade_in: None }])
+            }
+        }
+        // === Phase 3: Group 2 — Audio ===
+        "ChangeVolumeOfBGM" | "ChangeVolumeOfBGMX" => {
+            let channel = if tag == "ChangeVolumeOfBGMX" { 2 } else { 1 };
+            let volume = cmd.attrs.get("0").cloned().unwrap_or_else(|| "100".to_string());
+            Some(vec![ScriptCmd::BgmVol { channel, volume }])
+        }
+        "FadeOutBGM" | "FadeOutBGMX" => {
+            let id = cmd.attrs.get("0").cloned();
+            let fade = cmd.attrs.get("1").and_then(|s| s.parse::<u64>().ok());
+            Some(vec![ScriptCmd::StopBgm { id, fade_out: fade }])
+        }
+        "ChangeVolumeOfStreamingSE" => {
+            let id = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let vol = cmd.attrs.get("1").and_then(|s| s.parse::<u32>().ok()).unwrap_or(100);
+            Some(vec![ScriptCmd::StreamingSeVol { id, volume: vol }])
+        }
+        "FadeOutStreamingSE" => {
+            let channel = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::StopStreamingSe { channel }])
+        }
+        // === Phase 3: Group 3 — Visuals ===
+        "DrawBG" => {
+            let file = cmd.attrs.get("0").cloned().unwrap_or_default();
+            Some(vec![ScriptCmd::SetBg { file, transition: None, duration: None }])
+        }
+        "ScrollBG" => {
+            let file = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let x1 = cmd.attrs.get("1").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+            let y1 = cmd.attrs.get("2").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+            let x2 = cmd.attrs.get("3").and_then(|s| s.parse::<f32>().ok()).unwrap_or(640.0);
+            let y2 = cmd.attrs.get("4").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+            let fade = cmd.attrs.get("5").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::ScrollBg { file, x1, y1, x2, y2, fade, wait: true }])
+        }
+        "DrawBustshot" | "DrawBustshotWithFiltering" => {
+            let char_id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let expression = cmd.attrs.get("1").cloned().unwrap_or_default();
+            let pos = cmd.attrs.get("2").map(|s| match s.as_str() {
+                "left" => FgPosition::Left,
+                "right" => FgPosition::Right,
+                "center" => FgPosition::Center,
+                _ => FgPosition::Center,
+            }).unwrap_or(FgPosition::Center);
+            Some(vec![ScriptCmd::ShowFg { char_id, expression, position: pos, transition: None }])
+        }
+        "ChangeBustshot" => {
+            let char_id = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let expression = cmd.attrs.get("1").cloned().unwrap_or_default();
+            Some(vec![ScriptCmd::ShowFace { char_id, expression }])
+        }
+        "blur_set" => {
+            let power = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::Blur { power }])
+        }
+        "StartShakingOfAllObjects" => {
+            let power = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let time = cmd.attrs.get("1").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::ShakeScreen { power, time }])
+        }
+        "ShakeScreenSx" => {
+            let power = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let time = cmd.attrs.get("1").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::ShakeScreen { power, time }])
+        }
+        "StartShakingOfSprite" => {
+            let id = cmd.attrs.get("0").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let power = cmd.attrs.get("1").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let time = cmd.attrs.get("2").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::ShakeSprite { id, power, time }])
+        }
+        "TerminateShakingOfAllObjects" | "TerminateShakingOfSprite" => {
+            Some(vec![ScriptCmd::ShakeScreen { power: 0, time: 0 }])
+        }
+        "SetColorOfMonologue" => {
+            let color = cmd.attrs.get("0").cloned().unwrap_or_default();
+            Some(vec![ScriptCmd::MonologueColor { color }])
+        }
+        "tween" => {
+            let args: String = cmd.attrs.values().cloned().collect::<Vec<_>>().join(" ");
+            Some(vec![ScriptCmd::Tween { args }])
+        }
+        "FadeScene" => {
+            let color = cmd.attrs.get("0").cloned().unwrap_or_default();
+            let time = cmd.attrs.get("1").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            Some(vec![ScriptCmd::FadeScene { color, time }])
+        }
+        "MoveBustshot" | "FadeBustshot" | "lytweendel" => {
+            Some(vec![ScriptCmd::Tween { args: format!("{:?} {:?}", tag, cmd.attrs) }])
+        }
+        "DrawMusicTelop" => {
+            Some(vec![ScriptCmd::NoOp { tag: tag.to_string() }])
+        }
+        // === Phase 3: Group 4 — Engine/UI/Legacy (all NoOp) ===
+        "Size" | "flip" | "lyprop" | "lydel" | "lyc" | "lyc2" | "lyevent"
+        | "trans" | "sys_trans" | "CallSavingWindow" | "BgmShow" | "BgmNo"
+        | "ResetSc" | "stop" | "exstop" | "set_vsync" | "push_check"
+        | "tweetmode" | "chgmsg" | "/chgmsg" | "CheckQuickJump"
+        | "CancelSkipping" | "SetValidityOfSkipping" | "WaitToFinishSpriteControlling"
+        | "EnableHorizontalGradation" | "DisableGradation" | "DisableWindowEx"
+        | "WaitForInput" | "script" | "wait" | "st" | "wt" | "btn_stop" | "btnon"
+        | "btn_start" | "allkeystart" | "allkeystop" | "allkeyclick"
+        | "rpx" | "sestop" | "SetEndOfScene" | "shake50300"
+        => {
+            Some(vec![ScriptCmd::NoOp { tag: tag.to_string() }])
+        }
         _ => None,
     }
 }
