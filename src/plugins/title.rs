@@ -11,6 +11,9 @@ pub struct TitlePlugin;
 struct TitleRoot;
 
 #[derive(Component)]
+struct TitleButtons;
+
+#[derive(Component)]
 enum TitleButtonAction {
     NewGame,
     LoadGame,
@@ -30,7 +33,10 @@ impl Plugin for TitlePlugin {
     fn build(&self, app: &mut App) {
         app
             .add_systems(OnEnter(AppState::Title), setup_title)
-            .add_systems(Update, handle_title_buttons.run_if(in_state(AppState::Title)))
+            .add_systems(Update, (
+                reveal_title_buttons,
+                handle_title_buttons,
+            ).chain().run_if(in_state(AppState::Title)))
             .add_systems(OnExit(AppState::Title), cleanup_title);
     }
 }
@@ -58,6 +64,8 @@ fn setup_title(
 
     commands.spawn((
         TitleRoot,
+        TitleButtons,
+        Visibility::Hidden,
         Node {
             width: Val::Percent(100.0),
             height: Val::Percent(100.0),
@@ -100,6 +108,18 @@ fn setup_title(
     });
 
     bgm_writer.write(PlayBgmMessage { id: TITLE_BGM.to_string(), volume: None, fade_in: None });
+}
+
+fn reveal_title_buttons(
+    asset_server: Res<AssetServer>,
+    images: Res<Assets<Image>>,
+    mut query: Query<&mut Visibility, With<TitleButtons>>,
+) {
+    if images.contains(&asset_server.load("image/title/bg.png")) {
+        for mut vis in query.iter_mut() {
+            *vis = Visibility::Visible;
+        }
+    }
 }
 
 fn handle_title_buttons(
