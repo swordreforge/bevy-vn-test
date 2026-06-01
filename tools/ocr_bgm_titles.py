@@ -75,7 +75,7 @@ OVERRIDE_MAP: dict[str, str] = {
     "0304": "Crawler",         # OCR ~Crawler → Disc 1-7
     "0305": "Escualo",         # OCR ? → Disc 1-8
     "0306": "Inertia",         # OCR ~Inertia → Disc 1-9
-    "0307": "Lira",            # OCR ? → Disc 3-9 (guess, needs verify)
+    "0307": "Luce di Luna",    # verified by user → Disc 2-8
     "0308": "Kanon",           # OCR ~Kanon → Disc 1-11
     "0309": "Amaranth",        # OCR ~Amaranth → Disc 1-10
     "0310": "Crossandra",      # OCR ~Crossandra → Disc 1-12
@@ -106,9 +106,9 @@ OVERRIDE_MAP: dict[str, str] = {
     "0502": "Distorted",        # OCR: Distorisd → Disc 4-2
     "0503": "Roots",            # OCR: Rooig/Rools → Disc 4-6
     "0504": "La Rosa",          # OCR: TaRosn/Ta Roaa → Disc 4-8
-    "0505": "Repulsion",        # OCR: Roois/Raprllsion → Disc 4-7
-    "0506": "Refreblue",        # OCR: Ryovulslon/Rafrgbln → Disc 4-5
-    "0507": "Close My Eyes",    # OCR: Rafrsvlus → Disc 3-15 (guess, needs verify)
+    "0505": "",                 # TODO: verify (Repulsion? Roots?)
+    "0506": "",                 # TODO: verify (Repulsion? Roots?)
+    "0507": "Refreblue",        # verified by user → Disc 4-5
 }
 
 

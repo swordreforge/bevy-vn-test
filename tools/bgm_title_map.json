@@ -107,7 +107,7 @@
     {
       "bgm_id": "0307",
       "file": "musname_307.png",
-      "title": "Lira",
+      "title": "Luce di Luna",
       "ocr_raw": "Loes i Ling -y—pe - Fop < g",
       "src": "override",
       "score": 1.0
@@ -339,23 +339,23 @@
     {
       "bgm_id": "0505",
       "file": "musname_505.png",
-      "title": "Repulsion",
+      "title": "Roois / lerrgo var, っ シ ー シ ー",
       "ocr_raw": "Roois / lerrgo var, っ シ ー シ ー",
-      "src": "override",
-      "score": 1.0
+      "src": "ocr_raw",
+      "score": 0.2564102564102564
     },
     {
       "bgm_id": "0506",
       "file": "musname_506.png",
-      "title": "Refreblue",
+      "title": "Ryovulslon -vrmygs-",
       "ocr_raw": "Ryovulslon -vrmygs-",
-      "src": "override",
-      "score": 1.0
+      "src": "ocr_raw",
+      "score": 0.42857142857142855
     },
     {
       "bgm_id": "0507",
       "file": "musname_507.png",
-      "title": "Close My Eyes",
+      "title": "Refreblue",
       "ocr_raw": "Rafrsvlus -voyym—",
       "src": "override",
       "score": 1.0
@@ -375,7 +375,7 @@
     "0304": "Crawler",
     "0305": "Escualo",
     "0306": "Inertia",
-    "0307": "Lira",
+    "0307": "Luce di Luna",
     "0308": "Kanon",
     "0309": "Amaranth",
     "0310": "Crossandra",
@@ -404,9 +404,9 @@
     "0502": "Distorted",
     "0503": "Roots",
     "0504": "La Rosa",
-    "0505": "Repulsion",
-    "0506": "Refreblue",
-    "0507": "Close My Eyes"
+    "0505": "Roois / lerrgo var, っ シ ー シ ー",
+    "0506": "Ryovulslon -vrmygs-",
+    "0507": "Refreblue"
   },
   "title_to_ids": {
     "Far Afield": [
@@ -448,7 +448,7 @@
     "Inertia": [
       "0306"
     ],
-    "Lira": [
+    "Luce di Luna": [
       "0307"
     ],
     "Kanon": [
@@ -535,15 +535,32 @@
     "La Rosa": [
       "0504"
     ],
-    "Repulsion": [
+    "Roois / lerrgo var, っ シ ー シ ー": [
       "0505"
     ],
-    "Refreblue": [
+    "Ryovulslon -vrmygs-": [
       "0506"
     ],
-    "Close My Eyes": [
+    "Refreblue": [
       "0507"
     ]
   },
-  "unmatched_no_override": []
+  "unmatched_no_override": [
+    {
+      "bgm_id": "0505",
+      "file": "musname_505.png",
+      "title": "Roois / lerrgo var, っ シ ー シ ー",
+      "ocr_raw": "Roois / lerrgo var, っ シ ー シ ー",
+      "src": "ocr_raw",
+      "score": 0.2564102564102564
+    },
+    {
+      "bgm_id": "0506",
+      "file": "musname_506.png",
+      "title": "Ryovulslon -vrmygs-",
+      "ocr_raw": "Ryovulslon -vrmygs-",
+      "src": "ocr_raw",
+      "score": 0.42857142857142855
+    }
+  ]
 }
