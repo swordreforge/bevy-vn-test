@@ -339,7 +339,7 @@
     {
       "bgm_id": "0505",
       "file": "musname_505.png",
-      "title": "Roots",
+      "title": "Roots / Largo ver",
       "ocr_raw": "Roois / lerrgo var, っ シ ー シ ー",
       "src": "override",
       "score": 1.0
@@ -404,7 +404,7 @@
     "0502": "Distorted",
     "0503": "Roots",
     "0504": "La Rosa",
-    "0505": "Roots",
+    "0505": "Roots / Largo ver",
     "0506": "Repulsion",
     "0507": "Refreblue"
   },
@@ -530,11 +530,13 @@
       "0502"
     ],
     "Roots": [
-      "0503",
-      "0505"
+      "0503"
     ],
     "La Rosa": [
       "0504"
+    ],
+    "Roots / Largo ver": [
+      "0505"
     ],
     "Repulsion": [
       "0506"
