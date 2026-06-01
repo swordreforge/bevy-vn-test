@@ -106,8 +106,8 @@ OVERRIDE_MAP: dict[str, str] = {
     "0502": "Distorted",        # OCR: Distorisd → Disc 4-2
     "0503": "Roots",            # OCR: Rooig/Rools → Disc 4-6
     "0504": "La Rosa",          # OCR: TaRosn/Ta Roaa → Disc 4-8
-    "0505": "",                 # TODO: verify (Repulsion? Roots?)
-    "0506": "",                 # TODO: verify (Repulsion? Roots?)
+    "0505": "Roots",            # verified by user → Disc 4-6 (title image shows "Roots / Largo ver")
+    "0506": "Repulsion",        # verified by user → Disc 4-7
     "0507": "Refreblue",        # verified by user → Disc 4-5
 }
 

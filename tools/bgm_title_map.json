@@ -339,18 +339,18 @@
     {
       "bgm_id": "0505",
       "file": "musname_505.png",
-      "title": "Roois / lerrgo var, っ シ ー シ ー",
+      "title": "Roots",
       "ocr_raw": "Roois / lerrgo var, っ シ ー シ ー",
-      "src": "ocr_raw",
-      "score": 0.2564102564102564
+      "src": "override",
+      "score": 1.0
     },
     {
       "bgm_id": "0506",
       "file": "musname_506.png",
-      "title": "Ryovulslon -vrmygs-",
+      "title": "Repulsion",
       "ocr_raw": "Ryovulslon -vrmygs-",
-      "src": "ocr_raw",
-      "score": 0.42857142857142855
+      "src": "override",
+      "score": 1.0
     },
     {
       "bgm_id": "0507",
@@ -404,8 +404,8 @@
     "0502": "Distorted",
     "0503": "Roots",
     "0504": "La Rosa",
-    "0505": "Roois / lerrgo var, っ シ ー シ ー",
-    "0506": "Ryovulslon -vrmygs-",
+    "0505": "Roots",
+    "0506": "Repulsion",
     "0507": "Refreblue"
   },
   "title_to_ids": {
@@ -530,37 +530,18 @@
       "0502"
     ],
     "Roots": [
-      "0503"
+      "0503",
+      "0505"
     ],
     "La Rosa": [
       "0504"
     ],
-    "Roois / lerrgo var, っ シ ー シ ー": [
-      "0505"
-    ],
-    "Ryovulslon -vrmygs-": [
+    "Repulsion": [
       "0506"
     ],
     "Refreblue": [
       "0507"
     ]
   },
-  "unmatched_no_override": [
-    {
-      "bgm_id": "0505",
-      "file": "musname_505.png",
-      "title": "Roois / lerrgo var, っ シ ー シ ー",
-      "ocr_raw": "Roois / lerrgo var, っ シ ー シ ー",
-      "src": "ocr_raw",
-      "score": 0.2564102564102564
-    },
-    {
-      "bgm_id": "0506",
-      "file": "musname_506.png",
-      "title": "Ryovulslon -vrmygs-",
-      "ocr_raw": "Ryovulslon -vrmygs-",
-      "src": "ocr_raw",
-      "score": 0.42857142857142855
-    }
-  ]
+  "unmatched_no_override": []
 }
