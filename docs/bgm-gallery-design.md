@@ -1,5 +1,7 @@
 # BGM Gallery 设计文档
 
+**重要**: BGM 画廊不创建独立 `AppState`/标题按钮。而是在现有 Gallery (`AppState::Gallery`) 内添加一个 CG ↔ BGM 模式切换滑块，共用同一套 UI 框架（返回按钮、翻页导航、背景），切换时只替换网格内容。
+
 ## 1. 数据来源
 
 ### 1.1 BGM 文件
@@ -44,47 +46,41 @@ audio/bgm/bgm_{id}_b.ogg
 
 ### 2.1 新增文件
 
-- `src/plugins/music_gallery.rs` — BGM Gallery 主插件
 - `docs/bgm-gallery-design.md` — 本文档
 
 ### 2.2 现有文件修改
 
 | 文件 | 修改内容 |
 |------|---------|
-| `src/state.rs` | 新增 `AppState::MusicGallery` 变体 |
-| `src/lib.rs` | 注册 `MusicGalleryPlugin` |
-| `src/resources.rs` | `UnlockState.bgm_unlocked` 已存在，加相关结构 |
-| `src/plugins/menu.rs` | `MenuButtonAction` 新增 `MusicGallery` + 按钮 + 跳转 |
-| `src/plugins/title.rs` | `TitleButtonAction` 新增 `MusicGallery` + 按钮 + 跳转 |
-| `src/script.rs` | 新增 `ScriptCmd::BgmUnlock { id }` |
-| `src/plugins/script_runner.rs` | 处理 `BgmUnlock` |
+| `src/plugins/gallery.rs` | Gallery 内加模式切换开关 (CG ↔ BGM)，BGM 视图的网格/分页/播放逻辑全部内聚在此 |
+| `src/resources.rs` | `GalleryState` 加 `GalleryMode` 枚举；`UnlockState.bgm_unlocked` 不再 `allow(dead_code)` |
+| `src/components.rs` | 新增 `GalleryModeToggle`、`BgmCard`、`BgmPlaying`、`GalleryCgGrid`、`GalleryBgmGrid` 等组件 |
+| `src/script.rs` | 新增 `ScriptCmd::BgmUnlock { id }`（可选，后期） |
+| `src/plugins/script_runner.rs` | 处理 `BgmUnlock`（可选，后期） |
 | `build.rs` | 新增 `all_bgm_ids()` 函数，扫描 `audio/bgm/` 生成唯一 ID 列表 |
 | `unlock_state.json`（运行时） | `bgm_unlocked` 字段会自动被序列化 |
 
 ## 3. UI 层级设计
 
 ```
-ZIndex 5: MusicGalleryRoot (全屏半透明背景, srgba(0.05, 0.05, 0.1, 0.95))
+AppState::Gallery (保持不变，内部通过 mode 切换两套视图)
+
+ZIndex 5: GalleryRoot (全屏半透明背景, srgba(0.05, 0.05, 0.1, 0.95))
 │
 ├── ZIndex 5a: ← Back 按钮 (左上, 80x36)
-├── ZIndex 5b: "BGM Gallery" 标题 (28px, 白色, 居中)
-├── ZIndex 5c: 翻页导航
-│   ├── ◀ 左箭头 (GalleryPageLeftBtn)
-│   ├── "Page X / Y" 文本
-│   └── ▶ 右箭头 (GalleryPageRightBtn)
+├── ZIndex 5b: 标题区域
+│   ├── "CG Gallery" / "BGM Gallery" (根据 mode 切换)
+│   └── [CG] ──●── [BGM]  模式切换滑块
+├── ZIndex 5c: 翻页导航 (◀ Page X / Y ▶)
 │
-└── ZIndex 5d: BGM 卡片网格 (FlexWrap Row, column_gap: 16, row_gap: 12)
+├── ZIndex 5d: [CG mode]  CG 网格 (现有逻辑，GalleryGridContent)
+│
+└── ZIndex 5d: [BGM mode] BGM 卡片网格 (FlexWrap Row)
     ├── 卡片 1 (300x80, Button)
     │   ├── [musname.png / 标题文字 / "[LOCKED]"]
-    │   └── [▶ 状态图标]
+    │   └── [▶ / ⏹ 状态图标]
     ├── 卡片 2
     └── ...
-
-ZIndex 6: BgmFullscreen (当前播放中, 可选全屏界面)
-    ├── 大号 BGM 标题 (musname 或文字)
-    ├── BGM ID 显示
-    ├── ⏹ 停止按钮
-    └── ← 关闭按钮
 ```
 
 ## 4. 卡片状态机
@@ -181,26 +177,41 @@ ZIndex 6: BgmFullscreen (当前播放中, 可选全屏界面)
 Step 1: build.rs — 扫描 audio/bgm/，生成 all_bgm_ids()
         (新增函数，返回 Vec<&'static str>)
 
-Step 2: state.rs — 新增 AppState::MusicGallery
+Step 2: resources.rs — GalleryState 增加 mode: GalleryMode + bgm_page 字段
+        (GalleryMode 枚举: Cg, Bgm)
 
-Step 3: music_gallery.rs — 基本 UI 框架
-        setup / grid / pagination / cleanup
-        不播放音频，只显示列表
+Step 3: components.rs — 新增组件:
+        - GalleryModeToggle (模式切换容器)
+        - GalleryCgGrid (CG 网格标识)
+        - GalleryBgmGrid (BGM 网格标识)
+        - BgmCard (BGM 卡片标记)
+        - BgmPlaying (当前播放的 BGM 卡片标记)
 
-Step 4: 播放控制集成
-        点击卡片 → PlayBgmMessage / StopBgmMessage
+Step 4: gallery.rs — 重构 setup_gallery 为多模式
+        - 标题栏显示 "CG Gallery" / "BGM Gallery"
+        - 模式切换滑块 (两个按钮或 slider 样式)
+        - 根据 mode 渲染 CG 网格或 BGM 网格
+        - 分页导航共用同一套 UI 但数据独立 (cg_page / bgm_page)
 
-Step 5: 解锁状态集成
-        bgm_unlocked 检查，锁定/解锁显示
+Step 5: gallery.rs — BGM 卡片渲染
+        - 读取 bgm_index.ron (通过 include_str!)
+        - 分页 (每页 12 个)
+        - 解锁状态: 已解锁 → 显示标题 + ▶; 锁定 → "[LOCKED]"
+        - musname 图片: asset_server.load 后显示; fallback to 标题文字
 
-Step 6: musname 图片显示
-        检查 musname_{id}.png 是否存在，显示或 fallback
+Step 6: gallery.rs — 播放控制
+        - 点击已解锁卡片 → PlayBgmMessage { id }
+        - 再次点击同一卡片 → StopBgmMessage { id: Some(id) }
+        - 点击不同卡片 → 自动停止前一个, 播放新的
+        - 离开 Gallery → StopBgmMessage { id: None }
 
-Step 7: 入口按钮
-        title.rs + menu.rs 添加 BGM Gallery 按钮
+Step 7: gallery.rs — 切换模式逻辑
+        - CG ↔ BGM 时清除网格
+        - 停止 BGM 播放
+        - 切换到对应 mode 的分页数据
+        - 不影响 safe_mode / debug_unlock 等
 
-Step 8: 脚本解锁 (ScriptCmd::BgmUnlock)
-        如果需要游戏内自动解锁
+Step 8: (可选) 脚本解锁 — ScriptCmd::BgmUnlock
 ```
 
 ## 9. 相关问题
@@ -211,12 +222,15 @@ Step 8: 脚本解锁 (ScriptCmd::BgmUnlock)
 
 ### 9.2 Gallery 返回逻辑
 
-参考 CG gallery: 如果有对话文本 → 回 `Menu`，否则回 `Title`。
+不变（与现有 CG gallery 一致）: 如果有对话文本 → 回 `Menu`，否则回 `Title`。
 
 ### 9.3 与现有 BGM 系统的冲突
 
-Gallery 播放 BGM 时会中断当前正在播放的 BGM（如 title BGM `0401`）。离开 Gallery 时需要：
-- 如果是从 Title 进来的，离开后恢复 title BGM
-- 如果是从 Menu 进来的（游戏内），离开后恢复 gameplay BGM
+Gallery 内切换 BGM 会中断 title/gameplay BGM。离开 Gallery 时停止所有 BGM（`StopBgmMessage { id: None }`），让目标 state 的 OnEnter 重新播放自己的 BGM。
 
-或者简单处理：离开后停止 BGM，让目标 state 的 OnEnter 重新播放自己的 BGM。
+### 9.4 模式切换行为
+
+- 切换 CG ↔ BGM 时清除当前网格内容，重绘对应视图
+- 切换模式时停止正在播放的 BGM
+- `GalleryState.page` 分别存储 `cg_page` 和 `bgm_page`（避免切换后丢失页码）
+- 分页数量不同: CG 每页 9 个，BGM 每页 12 个

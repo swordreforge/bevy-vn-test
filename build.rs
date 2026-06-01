@@ -11,6 +11,7 @@ fn main() {
 
     println!("cargo:rerun-if-changed=assets/scripts/");
     println!("cargo:rerun-if-changed=assets/image/ev/");
+    println!("cargo:rerun-if-changed=assets/audio/bgm/");
 
     let mut f = fs::File::create(&dest_path).unwrap();
 
@@ -107,6 +108,36 @@ fn main() {
 
     writeln!(f, "pub fn ev_file_path(file: &str) -> String {{").unwrap();
     writeln!(f, "    format!(\"image/ev/{{}}{{}}\", file, ev_file_ext(file))").unwrap();
+    writeln!(f, "}}").unwrap();
+
+    // ---- BGM IDs: scan audio/bgm/ ----
+    let bgm_dir = Path::new(&manifest_dir).join("assets/audio/bgm");
+    let mut bgm_ids: Vec<String> = Vec::new();
+    if let Ok(entries) = fs::read_dir(&bgm_dir) {
+        let mut seen = std::collections::HashSet::new();
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if let Some(id) = name.strip_prefix("bgm_").and_then(|s| s.strip_suffix("_a.ogg")) {
+                    if seen.insert(id.to_string()) {
+                        bgm_ids.push(id.to_string());
+                    }
+                }
+            }
+        }
+    }
+    bgm_ids.sort_by(|a, b| {
+        let an: u32 = a.parse().unwrap_or(0);
+        let bn: u32 = b.parse().unwrap_or(0);
+        an.cmp(&bn)
+    });
+
+    writeln!(f, "pub fn all_bgm_ids() -> Vec<&'static str> {{").unwrap();
+    writeln!(f, "    vec![").unwrap();
+    for id in &bgm_ids {
+        writeln!(f, "        \"{}\",", id).unwrap();
+    }
+    writeln!(f, "    ]").unwrap();
     writeln!(f, "}}").unwrap();
 }
 

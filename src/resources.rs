@@ -270,7 +270,6 @@ impl Default for AllCgFiles {
 #[derive(Debug, Resource, Default, Clone, Serialize, Deserialize)]
 pub struct UnlockState {
     pub cg_unlocked: HashSet<String>,
-    #[allow(dead_code)]
     pub bgm_unlocked: HashSet<String>,
     #[allow(dead_code)]
     pub scene_cleared: HashSet<String>,
@@ -569,10 +568,34 @@ pub struct SaveLoadMode(pub bool); // true = Save, false = Load
 #[derive(Resource, Default)]
 pub struct SaveLoadPage(pub usize);
 
-#[derive(Resource, Default)]
+#[derive(Clone, Copy, PartialEq, Default)]
+pub enum GalleryMode {
+    #[default]
+    Cg,
+    Bgm,
+}
+
+#[derive(Resource)]
 pub struct GalleryState {
     pub fullscreen: Option<String>,
-    pub page: usize,
+    pub cg_page: usize,
+    pub bgm_page: usize,
+    pub mode: GalleryMode,
+    pub playing_bgm: Option<String>,
+    pub clear_mode: bool,
+}
+
+impl Default for GalleryState {
+    fn default() -> Self {
+        Self {
+            fullscreen: None,
+            cg_page: 0,
+            bgm_page: 0,
+            mode: GalleryMode::Cg,
+            playing_bgm: None,
+            clear_mode: false,
+        }
+    }
 }
 
 #[derive(Resource)]

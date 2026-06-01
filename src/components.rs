@@ -82,6 +82,22 @@ pub struct GallerySafeModeBtn;
 #[derive(Component)]
 pub struct SafeModeLabel;
 
+// === Gallery mode toggle ===
+#[derive(Component)]
+pub struct GalleryModeToggle;
+
+#[derive(Component)]
+pub struct GalleryCgGrid;
+
+#[derive(Component)]
+pub struct GalleryBgmGrid;
+
+#[derive(Component)]
+pub struct BgmCard(pub String);
+
+#[derive(Component)]
+pub struct BgmPlaying;
+
 // === Settings UI Components ===
 #[derive(Component)]
 pub struct SettingsBackButton;
