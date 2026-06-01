@@ -98,6 +98,9 @@ pub struct BgmCard(pub String);
 #[derive(Component)]
 pub struct BgmPlaying;
 
+#[derive(Component)]
+pub struct GalleryModeUi;
+
 // === Settings UI Components ===
 #[derive(Component)]
 pub struct SettingsBackButton;

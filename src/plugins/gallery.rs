@@ -47,6 +47,7 @@ impl Plugin for GalleryPlugin {
                 Update,
                 (
                     handle_mode_toggle,
+                    sync_gallery_mode_ui.after(handle_mode_toggle),
                     handle_clear_mode_toggle,
                     handle_bgm_card_click,
                 )
@@ -455,77 +456,83 @@ fn setup_gallery(
                     ));
                 });
 
-            if is_cg {
-                root.spawn((Node {
+            root.spawn((
+                GalleryModeUi,
+                Node {
+                    display: if is_cg { Display::Flex } else { Display::None },
                     flex_direction: FlexDirection::Row,
                     justify_content: JustifyContent::Center,
                     margin: UiRect::bottom(Val::Px(4.0)),
                     ..default()
-                },))
-                    .with_children(|row| {
-                        row.spawn((
-                            GallerySafeModeBtn,
-                            Button,
-                            Node {
-                                width: Val::Px(140.0),
-                                height: Val::Px(30.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
-                        ))
-                        .with_child((
-                            Text::new(if safe_mode.0 {
-                                "[x] Safe Mode"
-                            } else {
-                                "[ ] Safe Mode"
-                            }),
-                            TextFont {
-                                font: game_font.0.clone(),
-                                font_size: 16.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgb(0.7, 0.7, 0.8)),
-                            SafeModeLabel,
-                        ));
-                    });
-            } else {
-                root.spawn((Node {
+                },
+            ))
+                .with_children(|row| {
+                    row.spawn((
+                        GallerySafeModeBtn,
+                        Button,
+                        Node {
+                            width: Val::Px(140.0),
+                            height: Val::Px(30.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+                    ))
+                    .with_child((
+                        Text::new(if safe_mode.0 {
+                            "[x] Safe Mode"
+                        } else {
+                            "[ ] Safe Mode"
+                        }),
+                        TextFont {
+                            font: game_font.0.clone(),
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.7, 0.7, 0.8)),
+                        SafeModeLabel,
+                    ));
+                });
+
+            root.spawn((
+                GalleryModeUi,
+                Node {
+                    display: if is_cg { Display::None } else { Display::Flex },
                     flex_direction: FlexDirection::Row,
                     justify_content: JustifyContent::Center,
                     margin: UiRect::bottom(Val::Px(4.0)),
                     ..default()
-                },))
-                    .with_children(|row| {
-                        row.spawn((
-                            GalleryClearModeBtn,
-                            Button,
-                            Node {
-                                width: Val::Px(150.0),
-                                height: Val::Px(30.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
-                        ))
-                        .with_child((
-                            Text::new(if gallery_state.clear_mode {
-                                "[x] Clear Mode"
-                            } else {
-                                "[ ] Clear Mode"
-                            }),
-                            TextFont {
-                                font: game_font.0.clone(),
-                                font_size: 16.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgb(0.7, 0.7, 0.8)),
-                            ClearModeLabel,
-                        ));
-                    });
-            }
+                },
+            ))
+                .with_children(|row| {
+                    row.spawn((
+                        GalleryClearModeBtn,
+                        Button,
+                        Node {
+                            width: Val::Px(150.0),
+                            height: Val::Px(30.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.2, 0.2, 0.3, 0.8)),
+                    ))
+                    .with_child((
+                        Text::new(if gallery_state.clear_mode {
+                            "[x] Clear Mode"
+                        } else {
+                            "[ ] Clear Mode"
+                        }),
+                        TextFont {
+                            font: game_font.0.clone(),
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.7, 0.7, 0.8)),
+                        ClearModeLabel,
+                    ));
+                });
 
             if is_cg {
                 root.spawn((
@@ -1004,18 +1011,6 @@ fn handle_safe_mode_toggle(
 fn handle_mode_toggle(
     interaction_query: Query<(&GalleryModeBtn, &Interaction), Changed<Interaction>>,
     mut gallery_state: ResMut<GalleryState>,
-    grid_query: Query<Entity, With<GalleryGridContent>>,
-    children_query: Query<&Children, With<GalleryGridContent>>,
-    page_text_query: Query<Entity, With<GalleryPageText>>,
-    title_text_query: Query<Entity, With<GalleryTitleText>>,
-    mut commands: Commands,
-    unlock_state: Res<UnlockState>,
-    asset_server: Res<AssetServer>,
-    mut cache: ResMut<TextureCache>,
-    cg_files: Res<AllCgFiles>,
-    game_font: Res<GameFont>,
-    safe_mode: Res<SafeMode>,
-    debug_all: Res<DebugUnlockAll>,
     mut stop_bgm: MessageWriter<StopBgmMessage>,
 ) {
     for (btn_mode, interaction) in &interaction_query {
@@ -1025,33 +1020,138 @@ fn handle_mode_toggle(
         if gallery_state.mode == btn_mode.0 {
             continue;
         }
-
         stop_bgm.write(StopBgmMessage {
             id: None,
             fade_out: None,
         });
         gallery_state.playing_bgm = None;
         gallery_state.mode = btn_mode.0;
+    }
+}
 
-        repopulate_grid(
-            gallery_state.mode,
-            gallery_state.bgm_page,
-            gallery_state.cg_page,
-            &grid_query,
-            &children_query,
-            &page_text_query,
-            &title_text_query,
-            &mut commands,
-            &*unlock_state,
-            debug_all.0,
-            &*safe_mode,
-            &*asset_server,
-            &mut *cache,
-            &*cg_files,
-            &*game_font,
-            &gallery_state.playing_bgm,
-            gallery_state.clear_mode,
-        );
+fn sync_gallery_mode_ui(
+    mut prev_mode: Local<Option<GalleryMode>>,
+    gallery_state: Res<GalleryState>,
+    grid_query: Query<(Entity, &Children), With<GalleryGridContent>>,
+    page_text_query: Query<Entity, With<GalleryPageText>>,
+    title_text_query: Query<Entity, With<GalleryTitleText>>,
+    mode_btn_query: Query<(Entity, &GalleryModeBtn)>,
+    safe_btn_query: Query<&ChildOf, With<GallerySafeModeBtn>>,
+    clear_btn_query: Query<&ChildOf, With<GalleryClearModeBtn>>,
+    mut commands: Commands,
+    unlock_state: Res<UnlockState>,
+    asset_server: Res<AssetServer>,
+    mut cache: ResMut<TextureCache>,
+    cg_files: Res<AllCgFiles>,
+    game_font: Res<GameFont>,
+    safe_mode: Res<SafeMode>,
+    debug_all: Res<DebugUnlockAll>,
+) {
+    match *prev_mode {
+        None => *prev_mode = Some(gallery_state.mode),
+        Some(prev) if prev == gallery_state.mode => return,
+        _ => {}
+    }
+    *prev_mode = Some(gallery_state.mode);
+
+    let is_cg = gallery_state.mode == GalleryMode::Cg;
+    let current_page = if is_cg {
+        gallery_state.cg_page
+    } else {
+        gallery_state.bgm_page
+    };
+    let total_pages = if is_cg {
+        let filtered = filtered_cg_files(&cg_files.0, safe_mode.0);
+        cg_total_pages(filtered.len())
+    } else {
+        bgm_total_pages(gallery_state.clear_mode)
+    };
+
+    // Despawn children + repopulate grid
+    for (_, children) in &grid_query {
+        for child in children.iter() {
+            commands.entity(child).despawn();
+        }
+    }
+    for (entity, _) in &grid_query {
+        commands.entity(entity).with_children(|grid| {
+            if is_cg {
+                populate_cg_grid(
+                    grid,
+                    gallery_state.cg_page,
+                    &cg_files.0,
+                    &*unlock_state,
+                    debug_all.0,
+                    safe_mode.0,
+                    &*asset_server,
+                    &mut *cache,
+                    &*game_font,
+                );
+            } else {
+                populate_bgm_grid(
+                    grid,
+                    gallery_state.bgm_page,
+                    &*unlock_state,
+                    debug_all.0,
+                    &*game_font,
+                    &gallery_state.playing_bgm,
+                    gallery_state.clear_mode,
+                );
+            }
+        });
+    }
+
+    // Update page text and title
+    for entity in &page_text_query {
+        commands.entity(entity).insert(Text::new(format!(
+            "Page {}/{}",
+            current_page + 1,
+            total_pages.max(1)
+        )));
+    }
+    for entity in &title_text_query {
+        commands.entity(entity).insert(Text::new(if is_cg {
+            "CG Gallery"
+        } else {
+            "BGM Gallery"
+        }));
+    }
+
+    // Update toggle button visuals
+    for (entity, mode) in &mode_btn_query {
+        let active = gallery_state.mode == mode.0;
+        commands.entity(entity).insert((
+            BackgroundColor(if active {
+                Color::srgba(0.3, 0.5, 0.3, 0.9)
+            } else {
+                Color::srgba(0.15, 0.15, 0.2, 0.8)
+            }),
+            TextColor(if active {
+                Color::WHITE
+            } else {
+                Color::srgb(0.5, 0.5, 0.6)
+            }),
+        ));
+    }
+
+    // Toggle safe/clear mode UI visibility
+    for parent in &safe_btn_query {
+        commands.entity(parent.0).insert(Node {
+            display: if is_cg { Display::Flex } else { Display::None },
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::Center,
+            margin: UiRect::bottom(Val::Px(4.0)),
+            ..default()
+        });
+    }
+    for parent in &clear_btn_query {
+        commands.entity(parent.0).insert(Node {
+            display: if is_cg { Display::None } else { Display::Flex },
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::Center,
+            margin: UiRect::bottom(Val::Px(4.0)),
+            ..default()
+        });
     }
 }
 
@@ -1165,12 +1265,6 @@ fn handle_bgm_card_click(
             });
             gallery_state.playing_bgm = None;
         } else {
-            if gallery_state.playing_bgm.is_some() {
-                stop_bgm.write(StopBgmMessage {
-                    id: gallery_state.playing_bgm.clone(),
-                    fade_out: None,
-                });
-            }
             play_bgm.write(PlayBgmMessage {
                 id: id.clone(),
                 volume: None,
