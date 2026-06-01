@@ -222,6 +222,7 @@ fn handle_set_bg(
     asset_server: Res<AssetServer>,
     mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor, &mut Node)>,
     mut commands: Commands,
+    obj_index: Res<ObjFileIndex>,
 ) {
     for msg in msg.read() {
         // Auto-cleanup CG if active (CG covers bg, so changing bg needs CG gone)
@@ -248,8 +249,10 @@ fn handle_set_bg(
 
         let file = if msg.file.contains('.') { msg.file.clone() } else { format!("{}.jpg", msg.file) };
         let path = format!("image/bg/{}", file);
-        let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
-            asset_server.load(&path)
+        let stem = msg.file.trim_end_matches(".png").trim_end_matches(".jpg");
+        let resolved = obj_index.0.get(stem).cloned().unwrap_or(path);
+        let handle = cache.cache.entry(resolved.clone()).or_insert_with(|| {
+            asset_server.load(&resolved)
         }).clone();
 
         for &entity in &bg_state.entities {
@@ -296,12 +299,15 @@ fn handle_scroll_bg(
     images: Res<Assets<Image>>,
     mut commands: Commands,
     mut query: Query<(Entity, &mut Node, &mut ImageNode, &mut Visibility, &mut BackgroundColor)>,
+    obj_index: Res<ObjFileIndex>,
 ) {
     for msg in msg.read() {
         let file = if msg.file.contains('.') { msg.file.clone() } else { format!("{}.jpg", msg.file) };
         let path = format!("image/bg/{}", file);
-        let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
-            asset_server.load(&path)
+        let stem = msg.file.trim_end_matches(".png").trim_end_matches(".jpg");
+        let resolved = obj_index.0.get(stem).cloned().unwrap_or(path);
+        let handle = cache.cache.entry(resolved.clone()).or_insert_with(|| {
+            asset_server.load(&resolved)
         }).clone();
 
         for &entity in &bg_state.entities {
