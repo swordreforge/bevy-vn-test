@@ -332,19 +332,19 @@ fn process_advance(
                         dialogue.is_displaying = false;
                     }
                     Some(ScriptCmd::Jump { target }) => {
-                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
+                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                         engine.finished = false;
                         if !engine.jump_to_label(&target) {
                             warn!("Jump target not found: {}", target);
                         }
                     }
                     Some(ScriptCmd::Call { target }) => {
-                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
+                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                         engine.finished = false;
                         engine.call_label(&target);
                     }
                     Some(ScriptCmd::CallScript { script, label }) => {
-                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
+                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                         engine.finished = false;
                         engine.call_script(&script, label.as_deref());
                     }
@@ -367,8 +367,11 @@ fn process_advance(
                             ConditionOp::GreaterEqual => flag_val >= value,
                             ConditionOp::LessEqual => flag_val <= value,
                         };
-                        if met && !engine.jump_to_label(&goto) {
-                            warn!("Condition jump target not found: {}", goto);
+                        if met {
+                            clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
+                            if !engine.jump_to_label(&goto) {
+                                warn!("Condition jump target not found: {}", goto);
+                            }
                         }
                     }
                     Some(ScriptCmd::SetFlag { name, value }) => {
@@ -436,8 +439,11 @@ fn process_advance(
                             ConditionOp::GreaterEqual => affection_val >= value,
                             ConditionOp::LessEqual => affection_val <= value,
                         };
-                        if met && !engine.jump_to_label(&goto) {
-                            warn!("AffectionCondition jump target not found: {}", goto);
+                        if met {
+                            clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
+                            if !engine.jump_to_label(&goto) {
+                                warn!("AffectionCondition jump target not found: {}", goto);
+                            }
                         }
                     }
                     Some(ScriptCmd::SavePoint) => {}
@@ -841,19 +847,19 @@ fn process_advance(
                     dialogue.is_displaying = false;
                 }
                 Some(ScriptCmd::Jump { target }) => {
-                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
+                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                     engine.finished = false;
                     if !engine.jump_to_label(&target) {
                         warn!("Jump target not found: {}", target);
                     }
                 }
                 Some(ScriptCmd::Call { target }) => {
-                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
+                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                     engine.finished = false;
                     engine.call_label(&target);
                 }
                 Some(ScriptCmd::CallScript { script, label }) => {
-                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
+                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                     engine.finished = false;
                     engine.call_script(&script, label.as_deref());
                 }
@@ -876,8 +882,11 @@ fn process_advance(
                         ConditionOp::GreaterEqual => flag_val >= value,
                         ConditionOp::LessEqual => flag_val <= value,
                     };
-                    if met && !engine.jump_to_label(&goto) {
-                        warn!("Condition jump target not found: {}", goto);
+                    if met {
+                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
+                        if !engine.jump_to_label(&goto) {
+                            warn!("Condition jump target not found: {}", goto);
+                        }
                     }
                 }
                 Some(ScriptCmd::SetFlag { name, value }) => {
@@ -941,8 +950,11 @@ fn process_advance(
                         ConditionOp::GreaterEqual => affection_val >= value,
                         ConditionOp::LessEqual => affection_val <= value,
                     };
-                    if met && !engine.jump_to_label(&goto) {
-                        warn!("AffectionCondition jump target not found: {}", goto);
+                    if met {
+                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
+                        if !engine.jump_to_label(&goto) {
+                            warn!("AffectionCondition jump target not found: {}", goto);
+                        }
                     }
                 }
                 Some(ScriptCmd::SavePoint) => {}
@@ -1590,6 +1602,8 @@ fn clear_scene_sprites(
     overlay_mgr: &mut SpriteOverlayManager,
     commands: &mut Commands,
     hide_fg_writer: &mut MessageWriter<HideFgMessage>,
+    hide_cg_writer: &mut MessageWriter<HideCgMessage>,
+    overlay_query: &mut Query<(Entity, &mut BackgroundColor, &mut Visibility), With<ScreenOverlayRoot>>,
 ) {
     for (_, entity) in overlay_mgr.sprites.drain() {
         commands.entity(entity).despawn();
@@ -1599,4 +1613,13 @@ fn clear_scene_sprites(
         transition: None,
         duration: None,
     });
+    hide_cg_writer.write(HideCgMessage {
+        transition: None,
+        duration: None,
+    });
+    for (entity, mut bg, mut vis) in overlay_query.iter_mut() {
+        *vis = Visibility::Hidden;
+        bg.0.set_alpha(0.0);
+        commands.entity(entity).remove::<OverlayTween>();
+    }
 }

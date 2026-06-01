@@ -593,7 +593,7 @@ impl Default for GalleryState {
             bgm_page: 0,
             mode: GalleryMode::Cg,
             playing_bgm: None,
-            clear_mode: false,
+            clear_mode: true,
         }
     }
 }
