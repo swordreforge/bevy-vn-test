@@ -154,8 +154,8 @@ fn populate_cg_grid(
                 GalleryThumbnail(file.clone()),
                 Button,
                 Node {
-                    width: Val::Px(360.0),
-                    height: Val::Px(200.0),
+                    width: Val::Px(260.0),
+                    height: Val::Px(144.0),
                     ..default()
                 },
                 ImageNode::new(handle),
@@ -166,8 +166,8 @@ fn populate_cg_grid(
                 GalleryThumbnail(file.clone()),
                 GalleryLocked,
                 Node {
-                    width: Val::Px(360.0),
-                    height: Val::Px(200.0),
+                    width: Val::Px(260.0),
+                    height: Val::Px(144.0),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     ..default()
