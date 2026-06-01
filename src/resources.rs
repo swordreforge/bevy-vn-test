@@ -316,6 +316,8 @@ pub struct RouteConfig {
     pub ending_count: u32,
     #[serde(default)]
     pub extra_after_stories: Vec<AfterStoryEntry>,
+    #[serde(default)]
+    pub bonus_skits: Vec<AfterStoryEntry>,
 }
 
 impl RouteConfig {
@@ -330,7 +332,10 @@ impl RouteConfig {
     }
 
     pub fn find_by_script(&self, script: &str) -> Option<&RouteEntry> {
-        self.heroines_including_extra().find(|e| script.starts_with(&e.script))
+        self.heroines_including_extra().find(|e| {
+            let prefix = &e.script[..5.min(e.script.len())];
+            script.starts_with(prefix)
+        })
     }
 }
 

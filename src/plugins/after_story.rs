@@ -73,19 +73,23 @@ fn build_ui(
             Node { margin: UiRect::bottom(Val::Px(24.0)), ..default() },
         ));
 
-        if let Some(idx) = group_idx {
+            if let Some(idx) = group_idx {
             let entries: Vec<&AfterStoryEntry> = if idx < config.heroines.len() {
                 config.heroines[idx].after_stories.iter().collect()
-            } else {
+            } else if idx == config.heroines.len() {
                 config.extra_after_stories.iter().collect()
+            } else {
+                config.bonus_skits.iter().collect()
             };
 
             let unlocked = if idx < config.heroines.len() {
                 let entry = &config.heroines[idx];
                 entry.always_unlocked
                     || engine.global_flags.get(&entry.unlock_flag).copied().unwrap_or(0) >= 1
-            } else {
+            } else if idx == config.heroines.len() {
                 engine.global_flags.get(&config.all_routes_cleared_flag).copied().unwrap_or(0) >= 1
+            } else {
+                engine.global_flags.get(&config.full_completion_flag).copied().unwrap_or(0) >= 1
             };
 
             root.spawn(Node {
@@ -215,6 +219,47 @@ fn build_ui(
                         ));
                     });
                 }
+
+                if !config.bonus_skits.is_empty() {
+                    let unlocked = engine.global_flags.get(&config.full_completion_flag).copied().unwrap_or(0) >= 1;
+                    let status = if unlocked { "PLAY" } else { "LOCKED" };
+                    let bg = if unlocked {
+                        Color::srgba(0.5, 0.2, 0.4, 0.9)
+                    } else {
+                        Color::srgba(0.2, 0.2, 0.25, 0.9)
+                    };
+                    let bonus_idx = config.heroines.len() + 1;
+
+                    let mut entity = list.spawn((
+                        AfterStoryGroupButton(bonus_idx),
+                        Node {
+                            width: Val::Px(280.0),
+                            height: Val::Px(48.0),
+                            flex_direction: FlexDirection::Row,
+                            justify_content: JustifyContent::SpaceBetween,
+                            align_items: AlignItems::Center,
+                            padding: UiRect::horizontal(Val::Px(16.0)),
+                            ..default()
+                        },
+                        BackgroundColor(bg),
+                    ));
+                    if unlocked {
+                        entity.insert(Button);
+                    }
+                    entity.with_children(|btn| {
+                        btn.spawn((
+                            Text::new("小劇場"),
+                            TextFont { font: font.clone(), font_size: 20.0, ..default() },
+                            TextColor(Color::srgb(0.9, 0.9, 0.95)),
+                        ));
+                        btn.spawn((
+                            Text::new(status),
+                            TextFont { font: font.clone(), font_size: 16.0, ..default() },
+                            TextColor(if unlocked { Color::srgb(0.7, 1.0, 0.7) } else { Color::srgb(0.4, 0.4, 0.5) }),
+                            Node::default(),
+                        ));
+                    });
+                }
             });
         }
 
@@ -256,8 +301,10 @@ fn handle_group_buttons(
             let entry = &config.heroines[idx];
             entry.always_unlocked
                 || engine.global_flags.get(&entry.unlock_flag).copied().unwrap_or(0) >= 1
-        } else {
+        } else if idx == config.heroines.len() {
             engine.global_flags.get(&config.all_routes_cleared_flag).copied().unwrap_or(0) >= 1
+        } else {
+            engine.global_flags.get(&config.full_completion_flag).copied().unwrap_or(0) >= 1
         };
         if !unlocked { continue; }
         group.0 = Some(idx);
@@ -280,8 +327,10 @@ fn handle_entry_buttons(
         let group_idx = match group.0 { Some(idx) => idx, None => continue };
         let entries: Vec<&AfterStoryEntry> = if group_idx < config.heroines.len() {
             config.heroines[group_idx].after_stories.iter().collect()
-        } else {
+        } else if group_idx == config.heroines.len() {
             config.extra_after_stories.iter().collect()
+        } else {
+            config.bonus_skits.iter().collect()
         };
         if btn.0 >= entries.len() { continue; }
         selected_route.0 = Some(entries[btn.0].script.clone());

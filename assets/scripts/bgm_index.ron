@@ -1,4 +1,9 @@
-[
+[  
+    (id: "0101", title: "Abgrund"),
+    (id: "0102", title: "Asphodelus"),
+    (id: "0103", title: "Tears of Hope"),
+    (id: "0104", title: "Close My Eyes"),
+    (id: "0105", title: "Shinnai naru Sekaie"),
     (id: "0201", title: "Far Afield"),
     (id: "0202", title: "Una Atadura"),
     (id: "0203", title: "Saint Twinkle"),
@@ -44,4 +49,6 @@
     (id: "0505", title: "Roots / Largo ver"),
     (id: "0506", title: "Repulsion"),
     (id: "0507", title: "Refreblue"),
+    (id: "0909", title: "Lira"),
+    (id: "0510", title: "Musa"),
 ]

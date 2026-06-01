@@ -128,6 +128,7 @@ fn start_script_execution(
         engine.dialogue_idx = 0;
         engine.finished = false;
         engine.call_stack.clear();
+        engine.current_route = Some(script.clone());
         engine.current_script = script;
         engine.current_line = 0;
         info!("Starting route script: {}", engine.current_script);
@@ -161,6 +162,7 @@ fn start_intro_bgm(
 
 fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
     engine.current_line = 0;
+    engine.current_route = None;
     engine.call_stack.clear();
     engine.flags.clear();
     engine.global_flags.clear();
@@ -348,6 +350,9 @@ fn process_advance(
                     Some(ScriptCmd::CallScript { script, label }) => {
                         clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                         engine.finished = false;
+                        if config.find_by_script(&script).is_some() {
+                            engine.current_route = Some(script.clone());
+                        }
                         engine.call_script(&script, label.as_deref());
                     }
                     Some(ScriptCmd::Return) => {
@@ -419,6 +424,7 @@ fn process_advance(
                             completed_route.0 = Some(name);
                             next_state.set(AppState::RouteEnd);
                         }
+                        engine.current_route = None;
                         engine.call_stack.clear();
                         engine.current_script.clear();
                         engine.current_line = 0;
@@ -809,6 +815,15 @@ fn process_advance(
                     engine.finished = false;
                 } else if engine.next_script() {
                     info!("Script finished: advancing to {}", engine.current_script);
+                } else if engine.current_route.is_some() {
+                    info!("Route script finished, detecting completion");
+                    if let Some(name) = engine.detect_route_completion(config) {
+                        unlock_state.mark_route_cleared(&name);
+                        completed_route.0 = Some(name);
+                        next_state.set(AppState::RouteEnd);
+                    } else {
+                        next_state.set(AppState::Title);
+                    }
                 } else {
                     info!("Script finished (no next): returning to title");
                     next_state.set(AppState::Title);
@@ -867,6 +882,9 @@ fn process_advance(
                 Some(ScriptCmd::CallScript { script, label }) => {
                     clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                     engine.finished = false;
+                    if config.find_by_script(&script).is_some() {
+                        engine.current_route = Some(script.clone());
+                    }
                     engine.call_script(&script, label.as_deref());
                 }
                 Some(ScriptCmd::Return) => {
@@ -937,6 +955,7 @@ fn process_advance(
                         completed_route.0 = Some(name);
                         next_state.set(AppState::RouteEnd);
                     }
+                    engine.current_route = None;
                     engine.call_stack.clear();
                     engine.current_script.clear();
                     engine.current_line = 0;
@@ -1501,6 +1520,15 @@ fn process_advance(
                 engine.finished = false;
             } else if engine.next_script() {
                 info!("Script finished: advancing to {}", engine.current_script);
+            } else if engine.current_route.is_some() {
+                info!("Route script finished, detecting completion");
+                if let Some(name) = engine.detect_route_completion(config) {
+                    unlock_state.mark_route_cleared(&name);
+                    completed_route.0 = Some(name);
+                    next_state.set(AppState::RouteEnd);
+                } else {
+                    next_state.set(AppState::Title);
+                }
             } else {
                 info!("Script finished (no next): returning to title");
                 next_state.set(AppState::Title);

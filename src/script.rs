@@ -390,6 +390,7 @@ pub struct ScriptEngine {
     pub scripts: HashMap<String, Vec<ScriptCmd>>,
     pub dialogue_idx: usize,
     pub finished: bool,
+    pub current_route: Option<String>,
 }
 
 impl ScriptEngine {
@@ -494,7 +495,8 @@ impl ScriptEngine {
     }
 
     pub fn detect_route_completion(&self, config: &RouteConfig) -> Option<String> {
-        config.find_by_script(&self.current_script).map(|e| e.name.clone())
+        let script = self.current_route.as_deref().unwrap_or(&self.current_script);
+        config.find_by_script(script).map(|e| e.name.clone())
     }
 }
 

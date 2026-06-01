@@ -43,4 +43,13 @@
         (script: "aiy71510", name: "终章 后日谈 2", order: 2),
         (script: "aiy71610", name: "终章 后日谈 3", order: 3),
     ],
+    bonus_skits: [
+        (script: "aiy70310", name: "小劇場 1", order: 1),
+        (script: "aiy70330", name: "小劇場 2", order: 2),
+        (script: "aiy80010", name: "小劇場 3", order: 3),
+        (script: "aiy80020", name: "小劇場 4", order: 4),
+        (script: "aiy80030", name: "小劇場 5", order: 5),
+        (script: "aiy80040", name: "小劇場 6", order: 6),
+        (script: "aiy81010", name: "小劇場 7", order: 7),
+    ],
 )
