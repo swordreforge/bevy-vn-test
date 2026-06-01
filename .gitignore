@@ -3,3 +3,4 @@ target/
 assets/scripts/*.bscript.ron
 andriod/
 error.log
+andriod/*

@@ -343,6 +343,38 @@ pub struct GstVideoState {
     pub height: u32,
 }
 
+// ── Android FFmpeg decoder state ──
+
+/// Wraps all ffmpeg-the-third state for single-video decoding.
+#[cfg(target_os = "android")]
+pub struct FFmpegPipeline {
+    pub packets: Vec<ffmpeg_the_third::Packet>,
+    pub packet_cursor: usize,
+    pub stream_index: usize,
+    pub decoder: ffmpeg_the_third::codec::decoder::video::Video,
+    pub scaler: ffmpeg_the_third::software::scaling::Context,
+    pub flushed: bool,
+    pub eos: bool,
+}
+
+// SAFETY: Each FFmpegPipeline is used from a single thread
+// (exclusive access via ResMut). The ffmpeg C types inside
+// (SwsContext*, AVCodecContext*) are not Send/Sync by default
+// but are safe to move between threads as long as they aren't
+// accessed concurrently, which our design guarantees.
+#[cfg(target_os = "android")]
+unsafe impl Send for FFmpegPipeline {}
+#[cfg(target_os = "android")]
+unsafe impl Sync for FFmpegPipeline {}
+
+#[cfg(target_os = "android")]
+pub struct FFmpegVideoState {
+    pub pipeline: FFmpegPipeline,
+    pub image_handle: Handle<Image>,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Holds data needed for lazy GStreamer pipeline creation.
 /// Inserted by spawn_video, consumed by check_video_completion.
 /// On Android this struct is never inserted, so the resource stays None.
@@ -358,6 +390,8 @@ pub struct PendingVideo {
     pub timer: Option<Timer>,
     #[cfg(not(target_os = "android"))]
     pub gst: Option<GstVideoState>,
+    #[cfg(target_os = "android")]
+    pub ffmpeg: Option<FFmpegVideoState>,
 }
 
 #[derive(Resource, Default)]
@@ -590,6 +624,16 @@ pub struct PendingSpriteVideoBlock(pub Option<String>);
 
 // ── Sprite (DrawSpriteEx) video overlay ──
 
+#[cfg(target_os = "android")]
+pub struct SpriteVideoFFmpegState {
+    pub pipeline: FFmpegPipeline,
+    pub image_handle: Handle<Image>,
+    pub entity: Entity,
+    pub eos: bool,
+    pub width: u32,
+    pub height: u32,
+}
+
 #[cfg(not(target_os = "android"))]
 pub struct SpriteVideoGstState {
     pub pipeline: gstreamer::Pipeline,
@@ -603,9 +647,20 @@ pub struct SpriteVideoGstState {
 pub struct SpriteVideoManager {
     #[cfg(not(target_os = "android"))]
     pub videos: HashMap<String, SpriteVideoGstState>,
+    #[cfg(target_os = "android")]
+    pub videos: HashMap<String, SpriteVideoFFmpegState>,
 }
 
 // ── Rain overlay ──
+
+#[cfg(target_os = "android")]
+pub struct RainFFmpegState {
+    pub pipeline: FFmpegPipeline,
+    pub image_handle: Handle<Image>,
+    pub entity: Entity,
+    pub width: u32,
+    pub height: u32,
+}
 
 #[cfg(not(target_os = "android"))]
 pub struct RainGstState {
@@ -626,6 +681,8 @@ pub struct RainOverlayState {
     pub entity: Option<Entity>,
     #[cfg(not(target_os = "android"))]
     pub gst: Option<RainGstState>,
+    #[cfg(target_os = "android")]
+    pub ffmpeg: Option<RainFFmpegState>,
 }
 
 impl Default for RainOverlayState {
@@ -640,6 +697,8 @@ impl Default for RainOverlayState {
             entity: None,
             #[cfg(not(target_os = "android"))]
             gst: None,
+            #[cfg(target_os = "android")]
+            ffmpeg: None,
         }
     }
 }
