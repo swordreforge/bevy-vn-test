@@ -32,6 +32,13 @@ impl Plugin for GalleryPlugin {
             .add_systems(OnEnter(AppState::Gallery), setup_gallery)
             .add_systems(
                 Update,
+                detect_tap_unlock_all
+                    .before(handle_thumbnail_click)
+                    .before(handle_bgm_card_click)
+                    .run_if(in_state(AppState::Gallery)),
+            )
+            .add_systems(
+                Update,
                 (
                     handle_thumbnail_click,
                     handle_back_button,
@@ -876,6 +883,28 @@ fn handle_gallery_escape(
             gallery_state.playing_bgm = None;
             next_state.set(AppState::Menu);
         }
+    }
+}
+
+fn detect_tap_unlock_all(
+    cg_query: Query<&Interaction, (Changed<Interaction>, With<GalleryThumbnail>, With<Button>)>,
+    bgm_query: Query<&Interaction, (Changed<Interaction>, With<BgmCard>, With<Button>)>,
+    mut debug_all: ResMut<DebugUnlockAll>,
+    mut tap_times: Local<Vec<f64>>,
+    time: Res<Time>,
+) {
+    let now = time.elapsed_secs_f64();
+    let tapped = cg_query.iter().any(|i| *i == Interaction::Pressed)
+        || bgm_query.iter().any(|i| *i == Interaction::Pressed);
+    if !tapped {
+        return;
+    }
+    tap_times.push(now);
+    tap_times.retain(|t| now - *t <= 1.5);
+    if tap_times.len() >= 7 {
+        debug_all.0 = !debug_all.0;
+        info!("Tap 7x unlock all: {}", debug_all.0);
+        tap_times.clear();
     }
 }
 
