@@ -767,6 +767,20 @@ fn process_advance(
                     Some(ScriptCmd::SetRainVector { .. }) => {}
                     Some(ScriptCmd::SetRainCameraAngle { .. }) => {}
                     Some(ScriptCmd::SetRainPriority { .. }) => {}
+                    Some(ScriptCmd::StopAllSe) => {}
+                    Some(ScriptCmd::PushHistory) => {}
+                    Some(ScriptCmd::WaitVoice) => {}
+                    Some(ScriptCmd::QueryMode { .. }) => {
+                        engine.flags.insert("tmp".to_string(), 0);
+                    }
+                    Some(ScriptCmd::StreamingSeVol { .. }) => {}
+                    Some(ScriptCmd::Blur { .. })
+                    | Some(ScriptCmd::ShakeScreen { .. })
+                    | Some(ScriptCmd::ShakeSprite { .. })
+                    | Some(ScriptCmd::MonologueColor { .. })
+                    | Some(ScriptCmd::Tween { .. })
+                    | Some(ScriptCmd::FadeScene { .. })
+                    | Some(ScriptCmd::NoOp { .. }) => {}
                     Some(cmd) => {
                         info!("Script cmd (no-op): {:?}", cmd);
                     }
@@ -1434,6 +1448,25 @@ fn process_advance(
                 Some(ScriptCmd::SetRainPriority { priority }) => {
                     rain_state.priority = priority;
                 }
+                Some(ScriptCmd::StopAllSe) => {
+                    stop_streaming_se_writer.write(StopStreamingSeMessage { channel: 0 });
+                }
+                Some(ScriptCmd::PushHistory) => {}
+                Some(ScriptCmd::WaitVoice) => {
+                    auto_skip.auto_timer = Some(Timer::from_seconds(2.0, TimerMode::Once));
+                    break;
+                }
+                Some(ScriptCmd::QueryMode { .. }) => {
+                    engine.flags.insert("tmp".to_string(), 0);
+                }
+                Some(ScriptCmd::StreamingSeVol { .. }) => {}
+                Some(ScriptCmd::Blur { .. })
+                | Some(ScriptCmd::ShakeScreen { .. })
+                | Some(ScriptCmd::ShakeSprite { .. })
+                | Some(ScriptCmd::MonologueColor { .. })
+                | Some(ScriptCmd::Tween { .. })
+                | Some(ScriptCmd::FadeScene { .. })
+                | Some(ScriptCmd::NoOp { .. }) => {}
                 Some(cmd) => {
                     info!("Script cmd (no-op): {:?}", cmd);
                 }
