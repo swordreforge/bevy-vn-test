@@ -14,4 +14,5 @@ pub enum AppState {
     Gallery,
     Settings,
     Backlog,
+    AfterStory,
 }

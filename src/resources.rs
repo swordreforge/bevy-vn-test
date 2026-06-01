@@ -300,22 +300,29 @@ pub struct RouteEntry {
     pub ending_flags: Vec<u32>,
     #[serde(default)]
     pub always_unlocked: bool,
+    #[serde(default)]
+    pub after_stories: Vec<AfterStoryEntry>,
 }
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct RouteConfig {
+    pub common: RouteEntry,
     pub heroines: Vec<RouteEntry>,
-    pub extra: RouteEntry,
+    pub extra: Option<RouteEntry>,
     pub route_unlock_flags: Vec<u32>,
     pub all_routes_cleared_flag: u32,
     pub full_completion_flag: u32,
     pub ending_flag_range: (u32, u32),
     pub ending_count: u32,
+    #[serde(default)]
+    pub extra_after_stories: Vec<AfterStoryEntry>,
 }
 
 impl RouteConfig {
     pub fn heroines_including_extra(&self) -> impl Iterator<Item = &RouteEntry> {
-        self.heroines.iter().chain(std::iter::once(&self.extra))
+        std::iter::once(&self.common)
+            .chain(self.heroines.iter())
+            .chain(self.extra.iter())
     }
 
     pub fn find_by_index(&self, index: u32) -> Option<&RouteEntry> {
@@ -328,7 +335,17 @@ impl RouteConfig {
 }
 
 #[derive(Resource, Default)]
-pub struct SelectedRoute(pub Option<String>);
+pub struct SelectedRoute(pub Option<String>, pub bool);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AfterStoryEntry {
+    pub script: String,
+    pub name: String,
+    pub order: u32,
+}
+
+#[derive(Resource, Default)]
+pub struct AfterStoryGroup(pub Option<usize>);
 
 #[derive(Resource, Default)]
 pub struct CompletedRoute(pub Option<String>);

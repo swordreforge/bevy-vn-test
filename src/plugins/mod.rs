@@ -18,3 +18,4 @@ pub mod splash;
 pub mod backlog;
 pub mod event_system;
 pub mod video;
+pub mod after_story;

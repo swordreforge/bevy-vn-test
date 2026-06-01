@@ -19,7 +19,7 @@ use crate::resources::{
     PendingSpriteVideoBlock, PendingVideo, QuakeState, RainOverlayState, RouteConfig, Settings,
     SpriteOverlayManager, SpriteVideoManager, UnlockState,
 };
-use crate::resources::{SelectedRoute, ViewBlocking, WindowOverride};
+use crate::resources::{AfterStoryGroup, SelectedRoute, ViewBlocking, WindowOverride};
 use crate::script::{
     evaluate_condition_expression, evaluate_script_expression, ConditionOp, OverlayColor, ScriptCmd,
     ScriptEngine,
@@ -187,6 +187,8 @@ fn process_advance(
     mut window_query: Query<&mut Visibility, (With<DialogueUiRoot>, Without<ScreenOverlayRoot>)>,
     mut window_override: ResMut<WindowOverride>,
     view_blocking: Res<ViewBlocking>,
+    mut selected_route: ResMut<SelectedRoute>,
+    mut after_story_group: ResMut<AfterStoryGroup>,
 ) {
     let ProcessAdvanceParams {
         ref mut advance_ev,
@@ -408,7 +410,11 @@ fn process_advance(
                         }
                     }
                     Some(ScriptCmd::Halt) => {
-                        if let Some(name) = engine.detect_route_completion(config) {
+                        if selected_route.1 {
+                            selected_route.1 = false;
+                            after_story_group.0 = None;
+                            next_state.set(AppState::AfterStory);
+                        } else if let Some(name) = engine.detect_route_completion(config) {
                             unlock_state.mark_route_cleared(&name);
                             completed_route.0 = Some(name);
                             next_state.set(AppState::RouteEnd);
@@ -922,7 +928,11 @@ fn process_advance(
                     }
                 }
                 Some(ScriptCmd::Halt) => {
-                    if let Some(name) = engine.detect_route_completion(config) {
+                    if selected_route.1 {
+                        selected_route.1 = false;
+                        after_story_group.0 = None;
+                        next_state.set(AppState::AfterStory);
+                    } else if let Some(name) = engine.detect_route_completion(config) {
                         unlock_state.mark_route_cleared(&name);
                         completed_route.0 = Some(name);
                         next_state.set(AppState::RouteEnd);

@@ -15,7 +15,7 @@ use bevy::camera::ScalingMode;
 use bevy::window::{PresentMode, WindowResolution};
 
 use state::AppState;
-use resources::{CompletedRoute, GameFont, GameRestrictions, ObjFileIndex, RouteConfig, SelectedRoute};
+use resources::{AfterStoryGroup, CompletedRoute, GameFont, GameRestrictions, ObjFileIndex, RouteConfig, SelectedRoute};
 use script::ScriptEngine;
 use plugins::audio::AudioPlugin;
 use plugins::title::TitlePlugin;
@@ -37,6 +37,7 @@ use plugins::event_system::EventSystemPlugin;
 use plugins::route_end::RouteEndPlugin;
 use plugins::routing::RoutePlugin;
 use plugins::video::VideoPlugin;
+use plugins::after_story::AfterStoryPlugin;
 use bevy_scrollbar::ScrollbarPlugin;
 
 pub fn build_app() -> App {
@@ -73,6 +74,7 @@ pub fn build_app() -> App {
     .add_plugins(RoutePlugin)
     .add_plugins(RouteEndPlugin)
     .add_plugins(VideoPlugin)
+    .add_plugins(AfterStoryPlugin)
     .add_plugins(ScrollbarPlugin)
     .insert_resource(ClearColor(Color::BLACK))
     .insert_resource(
@@ -81,6 +83,7 @@ pub fn build_app() -> App {
     )
     .init_resource::<SelectedRoute>()
     .init_resource::<CompletedRoute>()
+    .init_resource::<AfterStoryGroup>()
     .init_resource::<GameRestrictions>()
     .init_resource::<ObjFileIndex>()
     .init_resource::<resources::SpriteVideoManager>()
