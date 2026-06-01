@@ -6,6 +6,8 @@ use rodio::{self, Source};
 use std::io::Cursor;
 use std::sync::Arc;
 
+include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
+
 pub struct AudioPlugin;
 
 impl Plugin for AudioPlugin {
@@ -39,24 +41,6 @@ impl Plugin for AudioPlugin {
                 apply_audio_settings,
                 update_bgm_fade,
             ).chain());
-    }
-}
-
-fn asset_path_exists(relative: &str) -> bool {
-    let path = std::path::Path::new("assets").join(relative);
-    if path.exists() {
-        return true;
-    }
-    // Android: assets are inside APK, not on filesystem.
-    // Fall back to _a.ogg naming convention; if the file is truly missing,
-    // process_pending_bgm's 60-frame timeout will handle it.
-    #[cfg(target_os = "android")]
-    {
-        relative.contains("_a.ogg")
-    }
-    #[cfg(not(target_os = "android"))]
-    {
-        false
     }
 }
 
@@ -96,7 +80,7 @@ fn handle_play_bgm(
         let path_a = format!("audio/bgm/bgm_{}_a.ogg", msg.id);
         let path_b = format!("audio/bgm/bgm_{}_b.ogg", msg.id);
 
-        let (handle_a, handle_b) = if asset_path_exists(&path_a) {
+        let (handle_a, handle_b) = if bgm_has_split(&msg.id) {
             (asset_server.load(&path_a), asset_server.load(&path_b))
         } else {
             let single = asset_server.load(format!("audio/bgm/bgm_{}.ogg", msg.id));
@@ -326,7 +310,7 @@ fn handle_play_se(
     for msg in reader.read() {
         let path_a = format!("audio/se/{}_a.ogg", msg.file);
         let path_single = format!("audio/se/{}.ogg", msg.file);
-        if asset_path_exists(&path_a) {
+        if se_has_split(&msg.file) {
             let handle_a = asset_server.load(&path_a);
             let handle_b = asset_server.load(format!("audio/se/{}_b.ogg", msg.file));
             pending.0.push(PendingSeLoad {
@@ -367,7 +351,7 @@ fn handle_loop_se(
         let vol = msg.volume.unwrap_or(1.0);
         let path_a = format!("audio/se/{}_a.ogg", msg.file);
         let path_single = format!("audio/se/{}.ogg", msg.file);
-        if asset_path_exists(&path_a) {
+        if se_has_split(&msg.file) {
             let handle_a = asset_server.load(&path_a);
             let handle_b = asset_server.load(format!("audio/se/{}_b.ogg", msg.file));
             pending.0.push(PendingSeLoad {

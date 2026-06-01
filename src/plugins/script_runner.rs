@@ -1365,22 +1365,18 @@ fn process_advance(
                     // Stop any existing sprite video with this ID
                     crate::plugins::video::stop_sprite_video(&mut commands, sprite_video_mgr, id);
 
-                    if abs_path.exists() {
-                        spawn_sprite_video(
-                            &mut commands,
-                            images,
-                            sprite_video_mgr,
-                            id.clone(),
-                            &abs_path,
-                            x,
-                            y,
-                            width,
-                            height,
-                            priority,
-                        );
-                    } else {
-                        warn!("Sprite video not found: {:?}", abs_path);
-                    }
+                    spawn_sprite_video(
+                        &mut commands,
+                        images,
+                        sprite_video_mgr,
+                        id.clone(),
+                        &abs_path,
+                        x,
+                        y,
+                        width,
+                        height,
+                        priority,
+                    );
 
                     if wait {
                         blocked_sprite.0 = Some(id.clone());
@@ -1402,11 +1398,7 @@ fn process_advance(
                         .join("assets")
                         .join(&rel_path);
 
-                    if abs_path.exists() {
-                        start_rain_video(&mut commands, images, rain_state, &abs_path, priority);
-                    } else {
-                        warn!("Rain video not found: {:?}", abs_path);
-                    }
+                    start_rain_video(&mut commands, images, rain_state, &abs_path, priority);
                 }
                 Some(ScriptCmd::SetRainValid { enabled }) => {
                     rain_state.enabled = enabled;

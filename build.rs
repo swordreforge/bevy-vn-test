@@ -12,6 +12,7 @@ fn main() {
     println!("cargo:rerun-if-changed=assets/scripts/");
     println!("cargo:rerun-if-changed=assets/image/ev/");
     println!("cargo:rerun-if-changed=assets/audio/bgm/");
+    println!("cargo:rerun-if-changed=assets/audio/se/");
 
     let mut f = fs::File::create(&dest_path).unwrap();
 
@@ -113,6 +114,7 @@ fn main() {
     // ---- BGM IDs: scan audio/bgm/ ----
     let bgm_dir = Path::new(&manifest_dir).join("assets/audio/bgm");
     let mut bgm_ids: Vec<String> = Vec::new();
+    let mut split_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
     if let Ok(entries) = fs::read_dir(&bgm_dir) {
         let mut seen = std::collections::HashSet::new();
         for entry in entries.filter_map(|e| e.ok()) {
@@ -121,6 +123,7 @@ fn main() {
                 if let Some(id) = name.strip_prefix("bgm_").and_then(|s| s.strip_suffix("_a.ogg")) {
                     if seen.insert(id.to_string()) {
                         bgm_ids.push(id.to_string());
+                        split_ids.insert(id.to_string());
                     }
                 }
             }
@@ -138,6 +141,45 @@ fn main() {
         writeln!(f, "        \"{}\",", id).unwrap();
     }
     writeln!(f, "    ]").unwrap();
+    writeln!(f, "}}").unwrap();
+
+    writeln!(f, "pub fn bgm_has_split(id: &str) -> bool {{").unwrap();
+    if split_ids.is_empty() {
+        writeln!(f, "    false").unwrap();
+    } else {
+        writeln!(f, "    match id {{").unwrap();
+        for id in &split_ids {
+            writeln!(f, "        \"{}\" => true,", id).unwrap();
+        }
+        writeln!(f, "        _ => false,").unwrap();
+        writeln!(f, "    }}").unwrap();
+    }
+    writeln!(f, "}}").unwrap();
+
+    // ---- SE split detection: scan audio/se/ ----
+    let se_dir = Path::new(&manifest_dir).join("assets/audio/se");
+    let mut se_split_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    if let Ok(entries) = fs::read_dir(&se_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            if let Some(name) = entry.path().file_name().and_then(|n| n.to_str()) {
+                if let Some(id) = name.strip_suffix("_a.ogg") {
+                    se_split_ids.insert(id.to_string());
+                }
+            }
+        }
+    }
+
+    writeln!(f, "pub fn se_has_split(file: &str) -> bool {{").unwrap();
+    if se_split_ids.is_empty() {
+        writeln!(f, "    false").unwrap();
+    } else {
+        writeln!(f, "    match file {{").unwrap();
+        for id in &se_split_ids {
+            writeln!(f, "        \"{}\" => true,", id).unwrap();
+        }
+        writeln!(f, "        _ => false,").unwrap();
+        writeln!(f, "    }}").unwrap();
+    }
     writeln!(f, "}}").unwrap();
 }
 
