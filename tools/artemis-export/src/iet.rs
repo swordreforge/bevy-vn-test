@@ -197,14 +197,84 @@ fn parse_iet_content(text: &str, verbose: bool) -> Result<Script> {
                     name: frame.endif_label.clone(),
                 });
             }
-            _ => {
-                if verbose {
-                    let preview = if rest.len() > 60 {
-                        format!("{}...", &rest[..60])
+            // === Phase 3: IET unmapped commands ===
+            "SEStop" => {
+                output.push(ScriptCmd::StopAllSe);
+            }
+            "RegisterTextToHistory" => {
+                output.push(ScriptCmd::PushHistory);
+            }
+            "WaitToFinishVoicePlaying" => {
+                output.push(ScriptCmd::WaitVoice);
+            }
+            "GetExecutionMode" => {
+                let mode = parse_iet_attr(rest, 0).unwrap_or_default();
+                output.push(ScriptCmd::QueryMode { mode });
+            }
+            "exif" => {
+                let exp = parse_iet_named_attr(rest, "exp").unwrap_or_default();
+                output.push(ScriptCmd::Exif { expression: exp });
+            }
+            "DrawBG" => {
+                let file = parse_iet_attr(rest, 0).unwrap_or_default();
+                output.push(ScriptCmd::SetBg { file, transition: None, duration: None });
+            }
+            "blur_set" => {
+                let power = parse_iet_attr(rest, 0).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                output.push(ScriptCmd::Blur { power });
+            }
+            "ChangeVolumeOfBGM" => {
+                let vol = parse_iet_attr(rest, 0).unwrap_or_else(|| "100".to_string());
+                output.push(ScriptCmd::BgmVol { channel: 1, volume: vol });
+            }
+            "FadeOutBGM" => {
+                output.push(ScriptCmd::StopBgm { id: None, fade_out: None });
+            }
+            "ChangeVolumeOfStreamingSE" => {
+                let id = parse_iet_attr(rest, 0).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                let vol = parse_iet_attr(rest, 1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(100);
+                output.push(ScriptCmd::StreamingSeVol { id, volume: vol });
+            }
+            "FadeOutStreamingSE" => {
+                let channel = parse_iet_attr(rest, 0).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                output.push(ScriptCmd::StopStreamingSe { channel });
+            }
+            "SetColorOfMonologue" => {
+                let color = parse_iet_attr(rest, 0).unwrap_or_default();
+                output.push(ScriptCmd::MonologueColor { color });
+            }
+            "StartShakingOfAllObjects" | "ShakeScreenSx" => {
+                let power = parse_iet_attr(rest, 0).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                let time = parse_iet_attr(rest, 1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                output.push(ScriptCmd::ShakeScreen { power, time });
+            }
+            "StartShakingOfSprite" => {
+                let id = parse_iet_attr(rest, 0).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                let power = parse_iet_attr(rest, 1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                let time = parse_iet_attr(rest, 2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                output.push(ScriptCmd::ShakeSprite { id, power, time });
+            }
+            "TerminateShakingOfAllObjects" | "TerminateShakingOfSprite" => {
+                output.push(ScriptCmd::ShakeScreen { power: 0, time: 0 });
+            }
+            "calllua" => {
+                let first = parse_iet_attr(rest, 0).unwrap_or_default();
+                if first.parse::<i32>().is_ok() {
+                    output.push(ScriptCmd::NoOp { tag: format!("calllua ({})", first) });
+                } else if verbose {
+                    eprintln!("  [iet] skip: calllua ({})", rest);
+                }
+            }
+            // Group 4 (IET) — remaining unknown IET commands as NoOp
+            cmd_name => {
+                if let Some(iet_func) = parse_iet_attr(rest, 0) {
+                    if iet_func.parse::<i32>().is_ok() {
+                        output.push(ScriptCmd::NoOp { tag: format!("{} ({})", cmd_name, iet_func) });
                     } else {
-                        rest.to_string()
-                    };
-                    eprintln!("  [iet] skip: {} {}", cmd_name, preview);
+                        output.push(ScriptCmd::NoOp { tag: format!("{} {}", cmd_name, rest) });
+                    }
+                } else if verbose {
+                    eprintln!("  [iet] skip: {} ({})", cmd_name, rest);
                 }
             }
         }
@@ -226,6 +296,21 @@ struct IfFrame {
 fn is_label_line(line: &str) -> bool {
     let trimmed = line.trim();
     trimmed.starts_with('*') && !trimmed.starts_with("*/") && trimmed.len() > 1
+}
+
+fn parse_iet_attr(rest: &str, index: usize) -> Option<String> {
+    let parts: Vec<&str> = rest.trim().split_whitespace().collect();
+    parts.get(index).map(|s| s.to_string())
+}
+
+fn parse_iet_named_attr(cmd_rest: &str, name: &str) -> Option<String> {
+    let pattern = format!("{}=", name);
+    for part in cmd_rest.split_whitespace() {
+        if let Some(val) = part.strip_prefix(&pattern) {
+            return Some(val.trim_matches('"').to_string());
+        }
+    }
+    None
 }
 
 fn split_cmd(inner: &str) -> (&str, &str) {
