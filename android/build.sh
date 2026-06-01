@@ -8,6 +8,11 @@ JNILIBS_DIR="$SCRIPT_DIR/app/src/main/jniLibs"
 ASSETS_DIR="$SCRIPT_DIR/app/src/main/assets"
 BUILD_TYPE="${1:-release}"
 
+# ── NDK toolchain paths ──
+NDK_BIN="/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+NDK_SYSROOT="/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+PATH="/tmp/android-toolchain:$NDK_BIN:$PATH"
+
 cd "$PROJECT_DIR"
 
 echo "=== Step 0: Generating launcher icons ==="
@@ -34,7 +39,20 @@ else
 fi
 
 echo "=== Step 1: Cross-compiling Rust to aarch64-linux-android ==="
-cargo ndk -t aarch64-linux-android build "--$BUILD_TYPE" --features android
+CARGO_FLAGS="--target aarch64-linux-android --features android"
+if [ "$BUILD_TYPE" = "release" ]; then
+    CARGO_FLAGS="$CARGO_FLAGS --release"
+fi
+
+env \
+    CC_aarch64-linux-android="$NDK_BIN/aarch64-linux-android21-clang" \
+    CXX_aarch64-linux-android="$NDK_BIN/aarch64-linux-android21-clang++" \
+    AR_aarch64-linux-android="$NDK_BIN/llvm-ar" \
+    CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_BIN/aarch64-linux-android21-clang" \
+    ANDROID_NDK_HOME="/opt/android-ndk" \
+    ANDROID_HOME="/opt/android-sdk" \
+    BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android="--sysroot=$NDK_SYSROOT --target=aarch64-linux-android21" \
+    cargo build $CARGO_FLAGS
 
 echo "=== Step 2: Copying .so to jniLibs ==="
 mkdir -p "$JNILIBS_DIR/arm64-v8a"
