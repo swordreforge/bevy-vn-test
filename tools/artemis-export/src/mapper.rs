@@ -587,11 +587,11 @@ fn map_command(
         "BgmX" => {
             let attrs_str: String = cmd.attrs.values().cloned().collect::<Vec<_>>().join(" ");
             if attrs_str.contains("stop") {
-                Some(vec![ScriptCmd::StopBgmX { id: None, fade_out: None }])
+                Some(vec![ScriptCmd::StopBgm { id: None, fade_out: None }])
             } else {
                 let id = cmd.attrs.get("0").cloned().unwrap_or_default();
                 let vol = cmd.attrs.get("1").and_then(|s| s.parse::<f32>().ok());
-                Some(vec![ScriptCmd::PlayBgmX { id, volume: vol, fade_in: None }])
+                Some(vec![ScriptCmd::PlayBgm { id, volume: vol, fade_in: None }])
             }
         }
         // === Phase 3: Group 2 — Audio ===

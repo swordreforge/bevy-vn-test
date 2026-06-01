@@ -517,7 +517,7 @@ pub struct PendingSeLoad {
     pub file: String,
     pub handle_a: Handle<AudioSource>,
     pub handle_b: Option<Handle<AudioSource>>,
-    pub handle_single: Handle<AudioSource>,
+    pub handle_single: Option<Handle<AudioSource>>,
     pub kind: SeKind,
     pub frames_waited: u32,
 }

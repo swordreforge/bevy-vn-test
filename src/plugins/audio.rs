@@ -327,15 +327,13 @@ fn handle_play_se(
         let path_a = format!("audio/se/{}_a.ogg", msg.file);
         let path_single = format!("audio/se/{}.ogg", msg.file);
         if asset_path_exists(&path_a) {
-            let path_b = format!("audio/se/{}_b.ogg", msg.file);
             let handle_a = asset_server.load(&path_a);
-            let handle_b = asset_server.load(&path_b);
-            let handle_single = asset_server.load(&path_single);
+            let handle_b = asset_server.load(format!("audio/se/{}_b.ogg", msg.file));
             pending.0.push(PendingSeLoad {
                 file: msg.file.clone(),
-                handle_a,
+                handle_a: handle_a.clone(),
                 handle_b: Some(handle_b),
-                handle_single,
+                handle_single: Some(handle_a),
                 kind: SeKind::OneShot,
                 frames_waited: 0,
             });
@@ -345,7 +343,7 @@ fn handle_play_se(
                 file: msg.file.clone(),
                 handle_a: handle.clone(),
                 handle_b: None,
-                handle_single: handle,
+                handle_single: Some(handle),
                 kind: SeKind::OneShot,
                 frames_waited: 0,
             });
@@ -370,15 +368,13 @@ fn handle_loop_se(
         let path_a = format!("audio/se/{}_a.ogg", msg.file);
         let path_single = format!("audio/se/{}.ogg", msg.file);
         if asset_path_exists(&path_a) {
-            let path_b = format!("audio/se/{}_b.ogg", msg.file);
             let handle_a = asset_server.load(&path_a);
-            let handle_b = asset_server.load(&path_b);
-            let handle_single = asset_server.load(&path_single);
+            let handle_b = asset_server.load(format!("audio/se/{}_b.ogg", msg.file));
             pending.0.push(PendingSeLoad {
                 file: msg.file.clone(),
-                handle_a,
+                handle_a: handle_a.clone(),
                 handle_b: Some(handle_b),
-                handle_single,
+                handle_single: Some(handle_a),
                 kind: SeKind::Loop {
                     channel: msg.channel,
                     volume: vol,
@@ -391,7 +387,7 @@ fn handle_loop_se(
                 file: msg.file.clone(),
                 handle_a: handle.clone(),
                 handle_b: None,
-                handle_single: handle,
+                handle_single: Some(handle),
                 kind: SeKind::Loop {
                     channel: msg.channel,
                     volume: vol,
@@ -446,16 +442,20 @@ fn process_pending_se(
                 }
             }
             None => {
-                if let Some(single) = assets.get(&p.handle_single) {
+                let loaded_single = p.handle_single.as_ref().and_then(|h| assets.get(h));
+                if let Some(single) = loaded_single {
                     let cloned_bytes = single.bytes.clone();
                     let handle = assets.add(AudioSource { bytes: cloned_bytes });
                     spawn_se(&mut commands, &mut se, &p.kind, handle);
                     info!("SE single (no _a/_b): {}", p.file);
                     pending.0.swap_remove(i);
                 } else if p.frames_waited >= 30 {
-                    let handle = p.handle_single.clone();
-                    spawn_se(&mut commands, &mut se, &p.kind, handle);
-                    warn!("SE fallback (not yet loaded): {}", p.file);
+                    if let Some(h) = p.handle_single.clone() {
+                        spawn_se(&mut commands, &mut se, &p.kind, h);
+                        warn!("SE fallback (not yet loaded): {}", p.file);
+                    } else {
+                        warn!("SE files not found, skipping: {}", p.file);
+                    }
                     pending.0.swap_remove(i);
                 } else {
                     p.frames_waited += 1;

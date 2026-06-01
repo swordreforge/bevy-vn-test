@@ -332,16 +332,19 @@ fn process_advance(
                         dialogue.is_displaying = false;
                     }
                     Some(ScriptCmd::Jump { target }) => {
+                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
                         engine.finished = false;
                         if !engine.jump_to_label(&target) {
                             warn!("Jump target not found: {}", target);
                         }
                     }
                     Some(ScriptCmd::Call { target }) => {
+                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
                         engine.finished = false;
                         engine.call_label(&target);
                     }
                     Some(ScriptCmd::CallScript { script, label }) => {
+                        clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
                         engine.finished = false;
                         engine.call_script(&script, label.as_deref());
                     }
@@ -838,16 +841,19 @@ fn process_advance(
                     dialogue.is_displaying = false;
                 }
                 Some(ScriptCmd::Jump { target }) => {
+                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
                     engine.finished = false;
                     if !engine.jump_to_label(&target) {
                         warn!("Jump target not found: {}", target);
                     }
                 }
                 Some(ScriptCmd::Call { target }) => {
+                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
                     engine.finished = false;
                     engine.call_label(&target);
                 }
                 Some(ScriptCmd::CallScript { script, label }) => {
+                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer);
                     engine.finished = false;
                     engine.call_script(&script, label.as_deref());
                 }
@@ -1586,4 +1592,19 @@ fn handle_auto_skip(
 fn persist_gameplay(unlock_state: Res<UnlockState>, settings: Res<Settings>) {
     save_unlock_state(&unlock_state);
     crate::resources::save_settings(&settings);
+}
+
+fn clear_scene_sprites(
+    overlay_mgr: &mut SpriteOverlayManager,
+    commands: &mut Commands,
+    hide_fg_writer: &mut MessageWriter<HideFgMessage>,
+) {
+    for (_, entity) in overlay_mgr.sprites.drain() {
+        commands.entity(entity).despawn();
+    }
+    hide_fg_writer.write(HideFgMessage {
+        char_id: "all".to_string(),
+        transition: None,
+        duration: None,
+    });
 }
