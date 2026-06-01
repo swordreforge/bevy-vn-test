@@ -307,6 +307,42 @@ pub enum ScriptCmd {
     SetRainPriority {
         priority: u32,
     },
+    // --- Phase 3 unmapped tags ---
+    StopAllSe,
+    PushHistory,
+    WaitVoice,
+    QueryMode {
+        mode: String,
+    },
+    StreamingSeVol {
+        id: u32,
+        volume: u32,
+    },
+    Blur {
+        power: u32,
+    },
+    ShakeScreen {
+        power: u32,
+        time: u32,
+    },
+    ShakeSprite {
+        id: u32,
+        power: u32,
+        time: u32,
+    },
+    MonologueColor {
+        color: String,
+    },
+    Tween {
+        args: String,
+    },
+    FadeScene {
+        color: String,
+        time: u32,
+    },
+    NoOp {
+        tag: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
