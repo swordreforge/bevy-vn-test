@@ -47,6 +47,8 @@ fn setup_title(
             width: Val::Percent(100.0),
             height: Val::Percent(100.0),
             position_type: PositionType::Absolute,
+            top: Val::Px(0.0),
+            left: Val::Px(0.0),
             ..default()
         },
         ImageNode::new(asset_server.load("image/title/bg.png")),

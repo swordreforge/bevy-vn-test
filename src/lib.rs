@@ -74,6 +74,7 @@ pub fn build_app() -> App {
     .add_plugins(RouteEndPlugin)
     .add_plugins(VideoPlugin)
     .add_plugins(ScrollbarPlugin)
+    .insert_resource(ClearColor(Color::BLACK))
     .insert_resource(
         ron::from_str::<RouteConfig>(include_str!("../assets/routes.ron"))
             .expect("Failed to parse routes.ron")
