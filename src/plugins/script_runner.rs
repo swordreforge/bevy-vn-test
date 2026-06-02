@@ -1619,8 +1619,22 @@ fn process_advance(
                         }
                     }
                 }
+                Some(ScriptCmd::ShakeScreen { power, time }) => {
+                    if power == 0 {
+                        commands.insert_resource(QuakeState {
+                            timer: None,
+                            intensity: 0.0,
+                        });
+                    } else {
+                        let secs = time.max(1) as f32 / 60.0;
+                        let intensity = (power as f32 / 255.0) * 20.0;
+                        commands.insert_resource(QuakeState {
+                            timer: Some(Timer::from_seconds(secs, TimerMode::Once)),
+                            intensity,
+                        });
+                    }
+                }
                 Some(ScriptCmd::Blur { .. })
-                | Some(ScriptCmd::ShakeScreen { .. })
                 | Some(ScriptCmd::ShakeSprite { .. })
                 | Some(ScriptCmd::MonologueColor { .. })
                 | Some(ScriptCmd::NoOp { .. }) => {}
