@@ -1,6 +1,7 @@
 target/
 *.pdb
 assets/scripts/*.bscript.ron
-andriod/
+android/
 error.log
-andriod/*
+scripts.zip
+*.apk

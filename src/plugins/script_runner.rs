@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::audio_messages::{
     LoopSeMessage, PlayBgmMessage, PlayBgmXMessage, PlaySeMessage, PlayVoiceMessage,
     StopBgmMessage, StopBgmXMessage, StopStreamingSeMessage,
@@ -21,8 +23,8 @@ use crate::resources::{
 };
 use crate::resources::{AfterStoryGroup, SelectedRoute, ViewBlocking, WindowOverride};
 use crate::script::{
-    evaluate_condition_expression, evaluate_script_expression, ConditionOp, OverlayColor, ScriptCmd,
-    ScriptEngine,
+    evaluate_condition_expression, evaluate_script_expression, ConditionOp, FgPosition, OverlayColor,
+    ScriptCmd, ScriptEngine, Transition,
 };
 use crate::state::AppState;
 use bevy::ecs::system::SystemParam;
@@ -175,6 +177,46 @@ fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
     } else if engine.scripts.contains_key("aiy00010") {
         engine.current_script = "aiy00010".to_string();
     }
+}
+
+fn parse_tween_debug_args(args: &str) -> Option<(&str, HashMap<String, String>)> {
+    let args = args.trim();
+    if !args.starts_with('"') {
+        return None;
+    }
+    let args = args.strip_prefix('"')?;
+    let (tag, rest) = args.split_once("\" ")?;
+    let rest = rest.trim();
+    let inner = rest.strip_prefix('{')?.strip_suffix('}')?;
+    if inner.trim().is_empty() {
+        return Some((tag, HashMap::new()));
+    }
+    let mut map = HashMap::new();
+    for pair in inner.split(',') {
+        let pair = pair.trim();
+        if pair.is_empty() {
+            continue;
+        }
+        let (k, v) = pair.split_once(':')?;
+        let k = k.trim().trim_matches('"');
+        let v = v.trim().trim_matches('"');
+        map.insert(k.to_string(), v.to_string());
+    }
+    Some((tag, map))
+}
+
+fn x_to_fg_position(x: f32) -> FgPosition {
+    if x < 427.0 {
+        FgPosition::Left
+    } else if x < 854.0 {
+        FgPosition::Center
+    } else {
+        FgPosition::Right
+    }
+}
+
+fn strip_tati_prefix(s: &str) -> &str {
+    s.strip_prefix("tati_").unwrap_or(s)
 }
 
 fn process_advance(
@@ -1503,11 +1545,52 @@ fn process_advance(
                     engine.flags.insert("tmp".to_string(), 0);
                 }
                 Some(ScriptCmd::StreamingSeVol { .. }) => {}
+                Some(ScriptCmd::Tween { ref args }) => {
+                    if let Some((tag, attrs)) = parse_tween_debug_args(args) {
+                        match tag {
+                            "MoveBustshot" => {
+                                let sprite = attrs.get("1").map(|s| s.as_str()).unwrap_or("");
+                                if !sprite.is_empty() && sprite != "NULL" && sprite != "FALSE" {
+                                    let char_id = strip_tati_prefix(sprite).to_string();
+                                    let x = attrs.get("2").and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+                                    let position = x_to_fg_position(x);
+                                    let time = attrs.get("6").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+                                    let fade_dur = if time > 0 { Some(time as f64 / 1000.0) } else { None };
+                                    hide_fg_writer.write(HideFgMessage {
+                                        char_id: char_id.clone(),
+                                        transition: Some(Transition::Fade),
+                                        duration: fade_dur,
+                                    });
+                                    show_fg_writer.write(ShowFgMessage {
+                                        char_id,
+                                        expression: String::new(),
+                                        position,
+                                        transition: Some(Transition::Fade),
+                                        duration: fade_dur,
+                                    });
+                                }
+                            }
+                            "FadeBustshot" => {
+                                let sprite = attrs.get("1").map(|s| s.as_str()).unwrap_or("");
+                                if !sprite.is_empty() && sprite != "FALSE" && sprite != "NULL" {
+                                    let char_id = strip_tati_prefix(sprite).to_string();
+                                    let time = attrs.get("6").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+                                    let fade_dur = if time > 0 { Some(time as f64 / 1000.0) } else { None };
+                                    hide_fg_writer.write(HideFgMessage {
+                                        char_id,
+                                        transition: Some(Transition::Fade),
+                                        duration: fade_dur,
+                                    });
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
                 Some(ScriptCmd::Blur { .. })
                 | Some(ScriptCmd::ShakeScreen { .. })
                 | Some(ScriptCmd::ShakeSprite { .. })
                 | Some(ScriptCmd::MonologueColor { .. })
-                | Some(ScriptCmd::Tween { .. })
                 | Some(ScriptCmd::FadeScene { .. })
                 | Some(ScriptCmd::NoOp { .. }) => {}
                 Some(cmd) => {
