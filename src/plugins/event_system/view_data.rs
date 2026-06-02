@@ -76,4 +76,4 @@ pub fn lookup_tween_entry(pen_type: u8) -> Option<&'static ViewTweenEntry> {
     VIEW_TWEEN_TABLE.get(pen_type as usize - 1)
 }
 
-pub const VIEW_PATH_PREFIX: &str = "view/";
+pub const VIEW_PATH_PREFIX: &str = "image/view/";
