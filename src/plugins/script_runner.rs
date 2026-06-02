@@ -567,6 +567,7 @@ fn process_advance(
                         fade_in,
                     }) => {
                         if !intro.0 {
+                            unlock_state.bgm_unlocked.insert(id.clone());
                             play_bgm_writer.write(PlayBgmMessage {
                                 id,
                                 volume,
@@ -585,6 +586,7 @@ fn process_advance(
                         fade_in,
                     }) => {
                         if !intro.0 {
+                            unlock_state.bgm_unlocked.insert(id.clone());
                             play_bgmx_writer.write(PlayBgmXMessage {
                                 id,
                                 volume,
@@ -1103,6 +1105,7 @@ fn process_advance(
                     fade_in,
                 }) => {
                     if !intro.0 {
+                        unlock_state.bgm_unlocked.insert(id.clone());
                         play_bgm_writer.write(PlayBgmMessage {
                             id,
                             volume,
@@ -1121,6 +1124,7 @@ fn process_advance(
                     fade_in,
                 }) => {
                     if !intro.0 {
+                        unlock_state.bgm_unlocked.insert(id.clone());
                         play_bgmx_writer.write(PlayBgmXMessage {
                             id,
                             volume,

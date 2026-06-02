@@ -1,6 +1,6 @@
 use crate::asb::{AsbCommand, AsbScript};
 use bevy_vn::script::{ChoiceOption, FgPosition, OverlayColor, Script, ScriptCmd, Transition, ValidityMode};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub fn map_script(
     asb: &AsbScript,
@@ -13,8 +13,24 @@ pub fn map_script(
     let mut pending_choice_opts: Vec<ChoiceOption> = Vec::new();
     let mut pending_exp_values: Vec<i32> = Vec::new();
     let mut last_choice_idx: Option<usize> = None;
+    let mut branch_targets: HashSet<String> = HashSet::new();
+    let mut default_target: Option<String> = None;
+    let mut prev_was_non_default_branch = false;
 
     for block in &asb.blocks {
+        if prev_was_non_default_branch {
+            if let Some(ref default) = default_target {
+                if block.label != *default {
+                    output.push(ScriptCmd::Jump { target: default.clone() });
+                }
+            }
+            prev_was_non_default_branch = false;
+        }
+        if branch_targets.contains(&block.label) {
+            if default_target.as_deref() != Some(&block.label) {
+                output.push(ScriptCmd::Halt);
+            }
+        }
         output.push(ScriptCmd::Label {
             name: block.label.clone(),
         });
@@ -66,6 +82,8 @@ pub fn map_script(
                             &mut last_choice_idx,
                             data,
                             &pending_exp_values,
+                            &mut branch_targets,
+                            &mut default_target,
                         );
                     }
                     pending_exp_values.clear();
@@ -76,12 +94,117 @@ pub fn map_script(
                     } else if verbose {
                         eprintln!("  [skip] {} ({})", tag, cmd.attrs.len());
                     }
+            }
+            }
+        }
+
+    }
+
+    if prev_was_non_default_branch {
+        if let Some(ref default) = default_target {
+            output.push(ScriptCmd::Jump { target: default.clone() });
+        }
+    }
+
+    fix_choice_branches(&mut output);
+
+    output
+}
+
+fn fix_choice_branches(output: &mut Script) {
+    let goto_targets: HashSet<String> = output
+        .iter()
+        .filter_map(|cmd| {
+            if let ScriptCmd::Choice { options } = cmd {
+                Some(options.iter().filter_map(|o| o.goto.clone()))
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect();
+
+    if goto_targets.is_empty() {
+        return;
+    }
+
+    let labels: Vec<(usize, String)> = output
+        .iter()
+        .enumerate()
+        .filter_map(|(i, cmd)| {
+            if let ScriptCmd::Label { name } = cmd {
+                Some((i, name.clone()))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let label_names: Vec<&str> = labels.iter().map(|(_, n)| n.as_str()).collect();
+
+    let mut runs: Vec<Vec<(usize, String)>> = Vec::new();
+    let mut current_run: Vec<(usize, String)> = Vec::new();
+
+    for &(ref idx, ref name) in &labels {
+        if !goto_targets.contains(name.as_str()) {
+            continue;
+        }
+        if current_run.is_empty() {
+            current_run.push((*idx, name.clone()));
+        } else {
+            let last_name = &current_run.last().unwrap().1;
+            let last_pos = label_names.iter().position(|n| *n == last_name.as_str()).unwrap();
+            let curr_pos = label_names.iter().position(|n| *n == name.as_str()).unwrap();
+
+            let has_separator = label_names[last_pos + 1..curr_pos]
+                .iter()
+                .any(|n| !goto_targets.contains(*n) && !n.starts_with("qjlabel"));
+
+            if has_separator {
+                runs.push(std::mem::take(&mut current_run));
+                current_run.push((*idx, name.clone()));
+            } else {
+                current_run.push((*idx, name.clone()));
+            }
+        }
+    }
+    if !current_run.is_empty() {
+        runs.push(current_run);
+    }
+
+    for run in &runs {
+        if run.is_empty() {
+            continue;
+        }
+
+        let last_target_name = &run.last().unwrap().1;
+        let last_pos = label_names
+            .iter()
+            .position(|n| *n == last_target_name.as_str())
+            .unwrap();
+
+        let convergence = label_names[last_pos + 1..]
+            .iter()
+            .find(|n| !goto_targets.contains(**n) && !n.starts_with("qjlabel"))
+            .map(|s| s.to_string());
+
+        let convergence = match convergence {
+            Some(c) => c,
+            None => continue,
+        };
+
+        // First branch: mapper already inserted Halt, keep it
+        // Subsequent branches: replace mapper's Halt at idx-1 with Jump(convergence)
+        for &(idx, _) in &run[1..] {
+            if idx > 0 {
+                if matches!(output[idx - 1], ScriptCmd::Halt) {
+                    output[idx - 1] = ScriptCmd::Jump { target: convergence.clone() };
+                } else {
+                    output.insert(idx, ScriptCmd::Jump { target: convergence.clone() });
                 }
             }
         }
     }
-
-    output
 }
 
 fn update_choice_gotos(
@@ -89,6 +212,8 @@ fn update_choice_gotos(
     last_choice_idx: &mut Option<usize>,
     data: &str,
     exp_values: &[i32],
+    branch_targets: &mut HashSet<String>,
+    default_target: &mut Option<String>,
 ) {
     let parts: Vec<&str> = data.split("<>").collect();
     if parts.len() < 2 {
@@ -96,14 +221,15 @@ fn update_choice_gotos(
     }
 
     let mut branch_map: HashMap<i32, String> = HashMap::new();
-    let mut default_target: Option<String> = None;
 
     for part in &parts[1..] {
         if let Some((key, target)) = part.split_once(':') {
             if key == "default" {
-                default_target = Some(target.to_string());
+                *default_target = Some(target.to_string());
+                branch_targets.insert(target.to_string());
             } else if let Ok(val) = key.parse::<i32>() {
                 branch_map.insert(val, target.to_string());
+                branch_targets.insert(target.to_string());
             }
         }
     }
@@ -115,14 +241,15 @@ fn update_choice_gotos(
                     let exp_val = exp_values.get(i).copied().unwrap_or(i as i32);
                     if let Some(target) = branch_map.get(&exp_val) {
                         opt.goto = Some(target.clone());
-                    } else if let Some(ref default) = default_target {
+                    } else if let Some(ref default) = *default_target {
                         opt.goto = Some(default.clone());
                     }
                 }
             }
+            }
         }
+
     }
-}
 
 fn map_command(
     tag: &str,
@@ -1590,5 +1717,80 @@ mod tests {
         let r = map_command("SetPriorityOfRainfallScreen", &c, &GameConfig::default());
         assert!(r.is_some());
         assert!(matches!(&r.unwrap()[0], ScriptCmd::SetRainPriority { priority: 2 }));
+    }
+
+    #[test]
+    fn test_fix_choice_branches_halt_jump() {
+        let asb = AsbScript {
+            blocks: vec![
+                crate::asb::AsbBlock {
+                    label: "main".into(),
+                    commands: vec![
+                        cmd("sel_init", vec![]),
+                        cmd("sel_text", vec![("text", "是"), ("exp", "t.ens:0")]),
+                        cmd("sel_text", vec![("text", "否"), ("exp", "t.ens:1")]),
+                        cmd("select", vec![]),
+                    ],
+                },
+                crate::asb::AsbBlock {
+                    label: "SelectItem000001".into(),
+                    commands: vec![
+                        cmd("Select", vec![]),
+                        cmd("exswitch", vec![("data", "t.tmp<>0:yes_branch<>1:no_branch<>default:common")]),
+                    ],
+                },
+                crate::asb::AsbBlock {
+                    label: "yes_branch".into(),
+                    commands: vec![
+                        cmd("print", vec![("data", "yes")]),
+                    ],
+                },
+                crate::asb::AsbBlock {
+                    label: "no_branch".into(),
+                    commands: vec![
+                        cmd("print", vec![("data", "no")]),
+                    ],
+                },
+                crate::asb::AsbBlock {
+                    label: "common".into(),
+                    commands: vec![
+                        cmd("print", vec![("data", "continue")]),
+                    ],
+                },
+            ],
+        };
+        let result = map_script(&asb, &GameConfig::default(), false);
+
+        let halts: Vec<usize> = result.iter().enumerate()
+            .filter(|(_, c)| matches!(c, ScriptCmd::Halt))
+            .map(|(i, _)| i)
+            .collect();
+        let jumps: Vec<&str> = result.iter().filter_map(|c| {
+            if let ScriptCmd::Jump { target } = c { Some(target.as_str()) } else { None }
+        }).collect();
+
+        // Should have 1 Halt (mapper's, before yes_branch — first branch)
+        assert_eq!(halts.len(), 1, "Expected 1 Halt before first branch, got: {:?}", halts);
+
+        // Should have 1 Jump(common) replacing the Halt before no_branch
+        assert_eq!(jumps.len(), 1, "Expected 1 Jump, got: {:?}", jumps);
+        assert_eq!(jumps[0], "common", "Jump target should be convergence label 'common'");
+
+        // Verify Halt is before yes_branch and Jump is before no_branch
+        let yes_pos = result.iter().position(|c| matches!(c, ScriptCmd::Label { name } if name == "yes_branch")).unwrap();
+        let no_pos = result.iter().position(|c| matches!(c, ScriptCmd::Label { name } if name == "no_branch")).unwrap();
+        let common_pos = result.iter().position(|c| matches!(c, ScriptCmd::Label { name } if name == "common")).unwrap();
+
+        // Halt should be right before yes_branch label (mapper inserted it)
+        assert!(matches!(result[yes_pos - 1], ScriptCmd::Halt),
+            "Expected Halt before yes_branch");
+
+        // Jump should be right before no_branch label (replacing mapper's Halt)
+        assert!(matches!(&result[no_pos - 1], ScriptCmd::Jump { target } if target == "common"),
+            "Expected Jump(common) before no_branch, got: {:?}", result[no_pos - 1]);
+
+        // common should NOT have Halt or Jump before it (it's convergence)
+        assert!(!matches!(result[common_pos - 1], ScriptCmd::Halt | ScriptCmd::Jump { .. }),
+            "Expected no Halt/Jump before convergence label 'common'");
     }
 }

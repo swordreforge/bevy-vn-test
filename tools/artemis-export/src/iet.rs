@@ -257,14 +257,6 @@ fn parse_iet_content(text: &str, verbose: bool) -> Result<Script> {
             "TerminateShakingOfAllObjects" | "TerminateShakingOfSprite" => {
                 output.push(ScriptCmd::ShakeScreen { power: 0, time: 0 });
             }
-            "calllua" => {
-                let first = parse_iet_attr(rest, 0).unwrap_or_default();
-                if first.parse::<i32>().is_ok() {
-                    output.push(ScriptCmd::NoOp { tag: format!("calllua ({})", first) });
-                } else if verbose {
-                    eprintln!("  [iet] skip: calllua ({})", rest);
-                }
-            }
             // Group 4 (IET) — remaining unknown IET commands as NoOp
             cmd_name => {
                 if let Some(iet_func) = parse_iet_attr(rest, 0) {
