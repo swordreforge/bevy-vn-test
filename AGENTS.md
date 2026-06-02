@@ -75,10 +75,12 @@ This project uses Bevy 0.18 which has breaking API changes from earlier versions
 - **Scene transition cleanup** — `clear_scene_sprites` extended; sprites cleared on `Jump`/`Call`/`CallScript`/`Condition`/`AffectionCondition` transitions.
 - **StoreValueToLocalWork expression eval** + **affection sync** — runtime `t.tmp+N` arithmetic, `sync_affection_from_work()` keeps `AffectionMap` current.
 - **Choice tag handling** — `sel_init`/`sel_text`/`select`/`Select`/`exswitch` → `ChoiceOption` + `Choice` + `update_choice_gotos()`.
+- **FadeScene** — reuses `ScreenOverlayRoot` entity with `OverlayTween` for fade-in/fade-out. Color `"0"` or empty clears overlay; other values (`White`/`Black`) set overlay color. Time in ms.
+- **ShakeScreen** — reuses existing `QuakeState`/`quake_update` system. `power: 0` stops; `power > 0` normalized from 0-255 to pixel amplitude, time in 60fps frames.
+- **RainMja** + 6 rain sub-commands — fully implemented via video pipeline (GStreamer/FFmpeg rain overlay).
+- **Video playback** — GStreamer pipeline via `spawn_video`/`spawn_sprite_video`; 6 sprite videos + 6 rain overlays have assets; `PlayMovie` (OP movies) files missing.
 
 ### Empty match arms in `script_runner.rs` (need implementation)
-
-These `ScriptCmd` variants have empty handlers in normal mode (skip mode may also be empty):
 
 | Variant | Mapped from | Notes |
 |---------|-------------|-------|
@@ -86,12 +88,9 @@ These `ScriptCmd` variants have empty handlers in normal mode (skip mode may als
 | `PushHistory` | ASB/IET `RegisterTextToHistory` | History registry stub |
 | `WaitVoice` | ASB/IET `WaitToFinishVoicePlaying` | Audio sync stub |
 | `StreamingSeVol` | ASB/IET `ChangeVolumeOfStreamingSE` | Streaming SE volume |
-| `Blur` | ASB/IET `blur_set` | Blur visual effect |
-| `ShakeScreen` | ASB `StartShakingOfAllObjects`/`ShakeScreenSx`, IET same | Screen shake effect |
+| `Blur` | ASB/IET `blur_set` | Blur visual effect (all usages `power: 0 = off`) |
 | `ShakeSprite` | ASB/IET `StartShakingOfSprite` | Per-sprite shake |
 | `MonologueColor` | ASB/IET `SetColorOfMonologue` | Text color for monologue |
 | `Tween` | ASB `tween`/`MoveBustshot`/`FadeBustshot`/`lytweendel` | MoveBustshot/FadeBustshot implemented; generic tween/lytweendel no-op |
-| `FadeScene` | ASB `FadeScene` | Full-scene fade |
-| `MovieInit` | ASB `MovieInit` | Video playback init |
-| `RainMja` + 6 rain sub-commands | ASB rain tags | Rain particle system |
+| `MovieInit` | ASB `MovieInit` | Video playback init (historical no-op; PlayMovie handles all init) |
 | `StopAllSe` | ASB/IET `SEStop` | Stop all sound effects |
