@@ -2,6 +2,9 @@ target/
 *.pdb
 assets/scripts/*.bscript.ron
 android/
+!android/build.sh
 error.log
 scripts.zip
 *.apk
+assets_pak/
+*.pak

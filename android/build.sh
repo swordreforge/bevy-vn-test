@@ -11,7 +11,29 @@ BUILD_TYPE="${1:-release}"
 # ── NDK toolchain paths ──
 NDK_BIN="/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
 NDK_SYSROOT="/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
-PATH="/tmp/android-toolchain:$NDK_BIN:$PATH"
+# ffmpeg-sys-the-third uses target-prefixed tools (aarch64-linux-android21-*) for configure/make.
+# Create wrappers for any that are missing in modern NDK.
+WRAPPER_DIR="/tmp/android-toolchain"
+mkdir -p "$WRAPPER_DIR"
+for tool in ar nm strings objdump dlltool; do
+    wrapper="$WRAPPER_DIR/aarch64-linux-android21-$tool"
+    if [ ! -f "$wrapper" ]; then
+        if [ -f "$NDK_BIN/llvm-$tool" ]; then
+            ln -sf "$NDK_BIN/llvm-$tool" "$wrapper"
+        else
+            ln -sf "$NDK_BIN/llvm-ar" "$wrapper"
+        fi
+    fi
+done
+# ranlib needs special handling: llvm-ar -s
+if [ ! -f "$WRAPPER_DIR/aarch64-linux-android21-ranlib" ]; then
+    cat > "$WRAPPER_DIR/aarch64-linux-android21-ranlib" << 'WRAPEOF'
+#!/bin/bash
+exec llvm-ar -s "$@"
+WRAPEOF
+    chmod +x "$WRAPPER_DIR/aarch64-linux-android21-ranlib"
+fi
+PATH="$WRAPPER_DIR:$NDK_BIN:$PATH"
 
 cd "$PROJECT_DIR"
 
@@ -67,12 +89,27 @@ else
     echo "WARNING: libc++_shared.so not found at $CXX_SHARED"
 fi
 
-echo "=== Step 3: Copying assets ==="
-rm -rf "$ASSETS_DIR"
-mkdir -p "$ASSETS_DIR"
-cp -r "$PROJECT_DIR/assets/"* "$ASSETS_DIR/"
+echo "=== Step 3: Stripping .so ==="
+"$NDK_BIN/llvm-strip" "$JNILIBS_DIR/arm64-v8a/libbevy_vn.so"
 
-echo "=== Step 4: Building APK ==="
+echo "=== Step 4: Packing assets into PAK bundles ==="
+rm -rf "$ASSETS_DIR"
+mkdir -p "$ASSETS_DIR/assets_pak"
+
+CACHE_DIR="$PROJECT_DIR/zstd_tmp"
+if [ -d "$CACHE_DIR" ] && ls "$CACHE_DIR"/*.pak 2>/dev/null | head -1 | grep -q .; then
+    echo "       Using cached PAK bundles from zstd_tmp/"
+    cp "$CACHE_DIR"/*.pak "$ASSETS_DIR/assets_pak/"
+else
+    cd "$PROJECT_DIR"
+    cargo run --package asset-packer -- \
+        --input assets \
+        --output "$ASSETS_DIR/assets_pak" \
+        --config pack_config.ron \
+        --compression-level 3
+fi
+
+echo "=== Step 5: Building APK ==="
 cd "$SCRIPT_DIR"
 gradle assemble"$(echo "$BUILD_TYPE" | sed 's/.*/\u&/')"
 
