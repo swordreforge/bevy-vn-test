@@ -1,7 +1,11 @@
 use std::collections::{BTreeSet, HashMap};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::Read;
+#[cfg(feature = "android")]
+use std::io::Seek;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+#[cfg(feature = "android")]
+use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 use bevy::asset::io::{
@@ -28,13 +32,55 @@ struct LocatedEntry {
     inner: PakEntry,
 }
 
-struct PakSource {
-    mmap: Mmap,
+enum PakSourceKind {
+    Mmap(Mmap),
+    #[cfg(feature = "android")]
+    Android(Mutex<AndroidAsset>),
 }
+
+struct PakSource {
+    kind: PakSourceKind,
+}
+
+#[cfg(feature = "android")]
+struct AndroidAsset {
+    inner: ndk::asset::Asset,
+}
+
+#[cfg(feature = "android")]
+unsafe impl Send for AndroidAsset {}
+#[cfg(feature = "android")]
+unsafe impl Sync for AndroidAsset {}
 
 pub struct PakAssetReader {
     sources: Vec<PakSource>,
     entries: HashMap<String, LocatedEntry>,
+}
+
+impl PakSource {
+    fn read_compressed(&self, offset: u64, size: u64) -> Result<Vec<u8>, AssetReaderError> {
+        match &self.kind {
+            PakSourceKind::Mmap(m) => {
+                let start = offset as usize;
+                let end = start + size as usize;
+                Ok(m[start..end].to_vec())
+            }
+            #[cfg(feature = "android")]
+            PakSourceKind::Android(asset_mutex) => {
+                let mut guard = asset_mutex.lock().unwrap();
+                guard
+                    .inner
+                    .seek(std::io::SeekFrom::Start(offset))
+                    .map_err(|e| AssetReaderError::Io(e.into()))?;
+                let mut buf = vec![0u8; size as usize];
+                guard
+                    .inner
+                    .read_exact(&mut buf)
+                    .map_err(|e| AssetReaderError::Io(e.into()))?;
+                Ok(buf)
+            }
+        }
+    }
 }
 
 impl PakAssetReader {
@@ -77,37 +123,25 @@ impl PakAssetReader {
 
     fn decompress(&self, entry: &LocatedEntry) -> Result<Vec<u8>, AssetReaderError> {
         let source = &self.sources[entry.source_index];
-        let start = entry.inner.offset as usize;
-        let end = start + entry.inner.compressed_size as usize;
-        let compressed = &source.mmap[start..end];
+        let compressed =
+            source.read_compressed(entry.inner.offset, entry.inner.compressed_size)?;
 
         let mut decompressed = Vec::with_capacity(entry.inner.uncompressed_size as usize);
         let mut decoder = ZstdDecoder::new(std::io::Cursor::new(compressed))
             .map_err(|e| AssetReaderError::Io(std::io::Error::new(std::io::ErrorKind::Other, e).into()))?;
-        std::io::Read::read_to_end(&mut decoder, &mut decompressed)
+        let _ = decoder.read_to_end(&mut decompressed)
             .map_err(|e| AssetReaderError::Io(e.into()))?;
         Ok(decompressed)
     }
 }
 
-fn load_single_pak(path: &Path) -> Result<(PakSource, HashMap<String, PakEntry>), String> {
-    let mut file =
-        std::fs::File::open(path).map_err(|e| format!("Failed to open PAK: {e}"))?;
-    let file_len = file
-        .metadata()
-        .map_err(|e| format!("Failed to get PAK metadata: {e}"))?
-        .len();
-
+fn parse_pak_entries(data: &[u8]) -> Result<HashMap<String, PakEntry>, String> {
+    let file_len = data.len();
     if file_len < 20 {
         return Err("PAK file too small".into());
     }
 
-    let mut footer = [0u8; 20];
-    file.seek(SeekFrom::End(-20))
-        .map_err(|e| format!("Failed to seek to PAK footer: {e}"))?;
-    file.read_exact(&mut footer)
-        .map_err(|e| format!("Failed to read PAK footer: {e}"))?;
-
+    let footer = &data[file_len - 20..];
     let magic = &footer[0..4];
     if magic != PAK_MAGIC {
         return Err(format!("Invalid PAK magic: {:?}", magic));
@@ -116,31 +150,22 @@ fn load_single_pak(path: &Path) -> Result<(PakSource, HashMap<String, PakEntry>)
     if version != PAK_VERSION {
         return Err(format!("Unsupported PAK version: {version}"));
     }
-    let index_offset = u64::from_le_bytes(footer[8..16].try_into().unwrap());
+    let index_offset = u64::from_le_bytes(footer[8..16].try_into().unwrap()) as usize;
     let entry_count = u32::from_le_bytes(footer[16..20].try_into().unwrap());
 
-    file.seek(SeekFrom::Start(index_offset))
-        .map_err(|e| format!("Failed to seek to PAK index: {e}"))?;
-
     let mut entries = HashMap::with_capacity(entry_count as usize);
+    let mut cursor = index_offset;
     for _ in 0..entry_count {
-        let mut path_len_buf = [0u8; 4];
-        file.read_exact(&mut path_len_buf)
-            .map_err(|_| "Failed to read entry path_len".to_string())?;
-        let path_len = u32::from_le_bytes(path_len_buf) as usize;
-
-        let mut path_bytes = vec![0u8; path_len];
-        file.read_exact(&mut path_bytes)
-            .map_err(|_| "Failed to read entry path".to_string())?;
-        let path = String::from_utf8_lossy(&path_bytes).to_string();
-
-        let mut entry_data = [0u8; 24];
-        file.read_exact(&mut entry_data)
-            .map_err(|_| "Failed to read entry data".to_string())?;
-        let offset = u64::from_le_bytes(entry_data[0..8].try_into().unwrap());
-        let compressed_size = u64::from_le_bytes(entry_data[8..16].try_into().unwrap());
-        let uncompressed_size = u64::from_le_bytes(entry_data[16..24].try_into().unwrap());
-
+        let path_len = u32::from_le_bytes(data[cursor..cursor + 4].try_into().unwrap()) as usize;
+        cursor += 4;
+        let path = String::from_utf8_lossy(&data[cursor..cursor + path_len]).to_string();
+        cursor += path_len;
+        let offset = u64::from_le_bytes(data[cursor..cursor + 8].try_into().unwrap());
+        cursor += 8;
+        let compressed_size = u64::from_le_bytes(data[cursor..cursor + 8].try_into().unwrap());
+        cursor += 8;
+        let uncompressed_size = u64::from_le_bytes(data[cursor..cursor + 8].try_into().unwrap());
+        cursor += 8;
         entries.insert(
             path,
             PakEntry {
@@ -150,11 +175,19 @@ fn load_single_pak(path: &Path) -> Result<(PakSource, HashMap<String, PakEntry>)
             },
         );
     }
+    Ok(entries)
+}
+
+fn load_single_pak(path: &Path) -> Result<(PakSource, HashMap<String, PakEntry>), String> {
+    let file =
+        std::fs::File::open(path).map_err(|e| format!("Failed to open PAK: {e}"))?;
 
     let mmap = unsafe { Mmap::map(&file) }
         .map_err(|e| format!("Failed to mmap PAK: {e}"))?;
 
-    Ok((PakSource { mmap }, entries))
+    let entries = parse_pak_entries(&mmap)?;
+
+    Ok((PakSource { kind: PakSourceKind::Mmap(mmap) }, entries))
 }
 
 // ── Reader implementation ──
@@ -258,38 +291,114 @@ impl AssetReader for PakAssetReader {
     }
 }
 
-// ── Android PAK extraction from APK assets ──
+// ── Android PAK loading from APK assets directly ──
 
 #[cfg(feature = "android")]
-use std::sync::OnceLock;
+use std::sync::{Mutex as StdMutex, OnceLock};
 #[cfg(feature = "android")]
-static ANDROID_PAK_DIR: OnceLock<String> = OnceLock::new();
+static ANDROID_PAK_READER: OnceLock<StdMutex<Option<PakAssetReader>>> = OnceLock::new();
 
 #[cfg(feature = "android")]
-pub fn ensure_android_paks() -> Option<String> {
+fn read_pak_entries_from_asset(
+    asset: &mut ndk::asset::Asset,
+) -> Result<HashMap<String, PakEntry>, String> {
+    use std::io::{Read, Seek};
+
+    let file_len = asset
+        .seek(std::io::SeekFrom::End(0))
+        .map_err(|e| format!("seek end: {e}"))?;
+    if file_len < 20 {
+        return Err("PAK file too small".into());
+    }
+
+    let mut footer = [0u8; 20];
+    asset
+        .seek(std::io::SeekFrom::End(-20))
+        .map_err(|e| format!("seek footer: {e}"))?;
+    asset
+        .read_exact(&mut footer)
+        .map_err(|e| format!("read footer: {e}"))?;
+
+    let magic = &footer[0..4];
+    if magic != PAK_MAGIC {
+        return Err(format!("Invalid PAK magic: {:?}", magic));
+    }
+    let version = u32::from_le_bytes(footer[4..8].try_into().unwrap());
+    if version != PAK_VERSION {
+        return Err(format!("Unsupported PAK version: {version}"));
+    }
+    let index_offset = u64::from_le_bytes(footer[8..16].try_into().unwrap());
+    let entry_count = u32::from_le_bytes(footer[16..20].try_into().unwrap());
+
+    asset
+        .seek(std::io::SeekFrom::Start(index_offset))
+        .map_err(|e| format!("seek index: {e}"))?;
+
+    let mut entries = HashMap::with_capacity(entry_count as usize);
+    for _ in 0..entry_count {
+        let mut path_len_buf = [0u8; 4];
+        asset
+            .read_exact(&mut path_len_buf)
+            .map_err(|_| "Failed to read entry path_len".to_string())?;
+        let path_len = u32::from_le_bytes(path_len_buf) as usize;
+
+        let mut path_bytes = vec![0u8; path_len];
+        asset
+            .read_exact(&mut path_bytes)
+            .map_err(|_| "Failed to read entry path".to_string())?;
+        let path = String::from_utf8_lossy(&path_bytes).to_string();
+
+        let mut entry_data = [0u8; 24];
+        asset
+            .read_exact(&mut entry_data)
+            .map_err(|_| "Failed to read entry data".to_string())?;
+        let offset = u64::from_le_bytes(entry_data[0..8].try_into().unwrap());
+        let compressed_size = u64::from_le_bytes(entry_data[8..16].try_into().unwrap());
+        let uncompressed_size = u64::from_le_bytes(entry_data[16..24].try_into().unwrap());
+
+        entries.insert(
+            path,
+            PakEntry {
+                offset,
+                compressed_size,
+                uncompressed_size,
+            },
+        );
+    }
+    Ok(entries)
+}
+
+#[cfg(feature = "android")]
+pub fn ensure_android_paks() {
     use std::ffi::CString;
-    use std::io::Write;
 
-    let android_app = bevy_android::ANDROID_APP.get()?;
-    let internal_path = android_app.internal_data_path()?;
-    let pak_dir = internal_path.join("assets_pak");
+    let android_app = match bevy_android::ANDROID_APP.get() {
+        Some(a) => a,
+        None => return,
+    };
 
-    // Reuse if already extracted
-    if pak_dir.join("data.pak").exists() {
-        let s = pak_dir.to_string_lossy().to_string();
-        ANDROID_PAK_DIR.set(s.clone()).ok()?;
-        return Some(s);
+    // Already loaded?
+    {
+        let lock = ANDROID_PAK_READER.get_or_init(|| StdMutex::new(None));
+        let guard = lock.lock().unwrap();
+        if guard.is_some() {
+            return;
+        }
     }
 
     show_loading_screen();
-    std::fs::create_dir_all(&pak_dir).ok()?;
 
     let asset_manager = android_app.asset_manager();
     let bundle_names = ["data", "bgm", "voice", "se", "image", "video"];
+    let mut sources = Vec::new();
+    let mut all_entries = HashMap::new();
 
-    for name in &bundle_names {
+    for (source_idx, name) in bundle_names.iter().enumerate() {
         let filename = format!("assets_pak/{}.pak", name);
-        let c_filename = CString::new(filename.as_str()).ok()?;
+        let c_filename = match CString::new(filename.as_str()) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
 
         let mut asset = match asset_manager.open(&c_filename) {
             Some(a) => a,
@@ -299,31 +408,42 @@ pub fn ensure_android_paks() -> Option<String> {
             }
         };
 
-        let buf = match asset.buffer() {
-            Ok(b) => b,
-            Err(e) => {
-                warn!("Failed to buffer asset {}: {}", filename, e);
+        let entries = match read_pak_entries_from_asset(&mut asset) {
+            Ok(e) => e,
+            Err(err) => {
+                warn!("Failed to parse PAK {}: {}", filename, err);
                 continue;
             }
         };
 
-        let target_path = pak_dir.join(format!("{}.pak", name));
-        let mut f = match std::fs::File::create(&target_path) {
-            Ok(f) => f,
-            Err(e) => {
-                warn!("Failed to write {}: {}", target_path.display(), e);
-                continue;
-            }
-        };
-        if let Err(e) = f.write_all(buf) {
-            warn!("Failed to write {}: {}", target_path.display(), e);
+        let count = entries.len();
+        for (path_str, entry) in entries {
+            all_entries.entry(path_str).or_insert(LocatedEntry {
+                source_index: source_idx,
+                inner: entry,
+            });
         }
-        info!("Extracted PAK: {} ({} bytes)", name, buf.len());
+
+        sources.push(PakSource {
+            kind: PakSourceKind::Android(Mutex::new(AndroidAsset { inner: asset })),
+        });
+
+        info!("  PAK[{}] {} — {} entries", source_idx, name, count);
     }
 
-    let s = pak_dir.to_string_lossy().to_string();
-    ANDROID_PAK_DIR.set(s.clone()).ok();
-    Some(s)
+    info!(
+        "Loaded {} PAK bundles from APK assets, {} total entries",
+        sources.len(),
+        all_entries.len()
+    );
+
+    let reader = PakAssetReader {
+        sources,
+        entries: all_entries,
+    };
+
+    let lock = ANDROID_PAK_READER.get_or_init(|| StdMutex::new(None));
+    *lock.lock().unwrap() = Some(reader);
 }
 
 // ── Android loading hint ──
@@ -391,26 +511,14 @@ fn show_toast(message: &str) {
 // ── ErasedAssetReader factory ──
 
 pub fn create_asset_reader(pak_dir: &str) -> Box<dyn ErasedAssetReader> {
-    // Android: check extracted path first
-    #[cfg(target_os = "android")]
-    if let Some(android_path) = ANDROID_PAK_DIR.get() {
-        let android_dir = Path::new(android_path);
-        if android_dir.is_dir() {
-            let bundle_names = ["data", "bgm", "voice", "se", "image", "video"];
-            let pak_paths: Vec<PathBuf> = bundle_names
-                .iter()
-                .map(|name| android_dir.join(format!("{name}.pak")))
-                .filter(|p| p.exists())
-                .collect();
-            if !pak_paths.is_empty() {
-                match PakAssetReader::load_many(&pak_paths) {
-                    Ok(reader) => {
-                        info!("Using Android PAK asset reader from: {}", android_path);
-                        return Box::new(reader);
-                    }
-                    Err(e) => warn!("Failed to load Android PAKs: {e}"),
-                }
-            }
+    // Android: use pre-loaded APK-direct reader
+    #[cfg(feature = "android")]
+    {
+        let lock = ANDROID_PAK_READER.get_or_init(|| StdMutex::new(None));
+        let mut guard = lock.lock().unwrap();
+        if let Some(reader) = guard.take() {
+            info!("Using APK-direct PAK asset reader");
+            return Box::new(reader);
         }
     }
 

@@ -3,6 +3,7 @@ pub mod state;
 pub mod components;
 pub mod resources;
 pub mod events;
+pub mod asset_pak;
 pub mod plugins;
 pub mod rendering_messages;
 pub mod audio_messages;
@@ -10,9 +11,15 @@ pub mod choice_messages;
 
 pub use script::Transition;
 
+use std::time::Duration;
+
+use bevy::asset::io::{AssetSourceBuilder, AssetSourceBuilders, AssetSourceId};
 use bevy::prelude::*;
 use bevy::camera::ScalingMode;
 use bevy::window::{PresentMode, WindowResolution};
+use bevy::winit::{UpdateMode, WinitSettings};
+
+use bevy_framepace::{FramepacePlugin, FramepaceSettings, Limiter};
 
 use state::AppState;
 use resources::{AfterStoryGroup, CompletedRoute, GameFont, GameRestrictions, ObjFileIndex, RouteConfig, SelectedRoute};
@@ -42,6 +49,15 @@ use bevy_scrollbar::ScrollbarPlugin;
 
 pub fn build_app() -> App {
     let mut app = App::new();
+
+    // Pre-configure asset reader: try PAK bundles in assets_pak/, then monolithic assets.pak, then filesystem
+    let mut sources = AssetSourceBuilders::default();
+    sources.insert(
+        AssetSourceId::Default,
+        AssetSourceBuilder::new(|| asset_pak::create_asset_reader("assets_pak")),
+    );
+    app.insert_resource(sources);
+
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             resolution: WindowResolution::new(1280, 720).with_scale_factor_override(1.0),
@@ -51,6 +67,14 @@ pub fn build_app() -> App {
         }),
         ..default()
     }))
+    .add_plugins(FramepacePlugin)
+    .insert_resource(FramepaceSettings {
+        limiter: Limiter::from_framerate(60.0),
+    })
+    .insert_resource(WinitSettings {
+        focused_mode: UpdateMode::reactive(Duration::from_secs_f64(1.0 / 60.0)),
+        ..default()
+    })
     .init_state::<AppState>()
     .init_resource::<ScriptEngine>()
     .add_systems(PostStartup, setup_display_scaling)
@@ -142,5 +166,6 @@ fn load_obj_index(mut index: ResMut<ObjFileIndex>) {
 #[no_mangle]
 pub fn android_main(app: android_activity::AndroidApp) {
     let _ = bevy_android::ANDROID_APP.set(app);
+    asset_pak::ensure_android_paks();
     build_app().run();
 }
