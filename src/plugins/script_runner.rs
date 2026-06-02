@@ -1587,11 +1587,42 @@ fn process_advance(
                         }
                     }
                 }
+                Some(ScriptCmd::FadeScene { color, time }) => {
+                    let duration = time as f32 / 1000.0;
+                    if color == "0" || color.is_empty() {
+                        for (entity, bg, mut vis) in overlay_query.iter_mut() {
+                            if duration > 0.0 {
+                                let current_alpha = bg.0.alpha();
+                                commands.entity(entity).insert(OverlayTween {
+                                    timer: Timer::from_seconds(duration, TimerMode::Once),
+                                    start_alpha: current_alpha,
+                                    end_alpha: 0.0,
+                                });
+                            } else {
+                                *vis = Visibility::Hidden;
+                                commands.entity(entity).remove::<OverlayTween>();
+                            }
+                        }
+                    } else {
+                        let base = match color.as_str() {
+                            "White" | "white" | "2" => Color::srgba(1.0, 1.0, 1.0, 0.0),
+                            _ => Color::srgba(0.0, 0.0, 0.0, 0.0),
+                        };
+                        for (entity, mut bg, mut vis) in overlay_query.iter_mut() {
+                            *bg = BackgroundColor(base);
+                            *vis = Visibility::Visible;
+                            commands.entity(entity).insert(OverlayTween {
+                                timer: Timer::from_seconds(duration, TimerMode::Once),
+                                start_alpha: 0.0,
+                                end_alpha: 1.0,
+                            });
+                        }
+                    }
+                }
                 Some(ScriptCmd::Blur { .. })
                 | Some(ScriptCmd::ShakeScreen { .. })
                 | Some(ScriptCmd::ShakeSprite { .. })
                 | Some(ScriptCmd::MonologueColor { .. })
-                | Some(ScriptCmd::FadeScene { .. })
                 | Some(ScriptCmd::NoOp { .. }) => {}
                 Some(cmd) => {
                     info!("Script cmd (no-op): {:?}", cmd);
