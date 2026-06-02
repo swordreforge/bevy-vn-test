@@ -88,6 +88,7 @@ impl Plugin for RenderingPlugin {
                 center_sprite_overlays,
                 update_overlay_tween,
                 quake_update,
+                update_sprite_shake,
                 update_bg_scroll,
                 handle_scroll_bg,
                 handle_animate_sprite,
@@ -1068,8 +1069,38 @@ fn quake_update(
             transform.translation.y = offset_y;
         } else {
             transform.translation.x = 0.0;
+            transform.translation.x = 0.0;
             transform.translation.y = 0.0;
             quake.timer = None;
+        }
+    }
+}
+
+fn update_sprite_shake(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut SpriteShake, &mut Node)>,
+) {
+    for (entity, mut shake, mut node) in query.iter_mut() {
+        if !shake.initialized {
+            shake.base_x = match node.left { Val::Px(v) => v, _ => 0.0 };
+            shake.base_y = match node.top { Val::Px(v) => v, _ => 0.0 };
+            shake.initialized = true;
+        }
+
+        shake.timer.tick(time.delta());
+        let decay = 1.0 - shake.timer.fraction();
+        let intensity = shake.intensity * decay;
+
+        if intensity > 0.5 {
+            let offset_x = (rand::random::<f32>() - 0.5) * 2.0 * intensity;
+            let offset_y = (rand::random::<f32>() - 0.5) * 2.0 * intensity;
+            node.left = Val::Px(shake.base_x + offset_x);
+            node.top = Val::Px(shake.base_y + offset_y);
+        } else {
+            node.left = Val::Px(shake.base_x);
+            node.top = Val::Px(shake.base_y);
+            commands.entity(entity).remove::<SpriteShake>();
         }
     }
 }

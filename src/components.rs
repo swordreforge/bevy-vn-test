@@ -234,6 +234,15 @@ pub struct BgScroll {
 }
 
 #[derive(Component)]
+pub struct SpriteShake {
+    pub timer: Timer,
+    pub intensity: f32,
+    pub base_x: f32,
+    pub base_y: f32,
+    pub initialized: bool,
+}
+
+#[derive(Component)]
 pub struct AnimatedSprite {
     pub frames: Vec<Handle<Image>>,
     pub current_frame: usize,

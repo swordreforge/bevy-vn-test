@@ -5,7 +5,7 @@ use crate::audio_messages::{
     StopBgmMessage, StopBgmXMessage, StopStreamingSeMessage,
 };
 use crate::choice_messages::ChoiceSelectedMessage;
-use crate::components::{DialogueUiRoot, OverlayTween, ScreenOverlayRoot};
+use crate::components::{DialogueUiRoot, OverlayTween, ScreenOverlayRoot, SpriteShake};
 use crate::plugins::event_system::view_data;
 use crate::plugins::event_system::{ViewPhase, ViewState};
 use crate::plugins::inputs::{AdvanceEvent, AdvanceSource};
@@ -1634,8 +1634,25 @@ fn process_advance(
                         });
                     }
                 }
+                Some(ScriptCmd::ShakeSprite { id, power, time }) => {
+                    let sprite_id = format!("{:02}", id);
+                    if let Some(&entity) = overlay_mgr.sprites.get(&sprite_id) {
+                        if power == 0 {
+                            commands.entity(entity).remove::<SpriteShake>();
+                        } else {
+                            let secs = time.max(1) as f32 / 60.0;
+                            let intensity = (power as f32 / 255.0) * 10.0;
+                            commands.entity(entity).insert(SpriteShake {
+                                timer: Timer::from_seconds(secs, TimerMode::Once),
+                                intensity,
+                                base_x: 0.0,
+                                base_y: 0.0,
+                                initialized: false,
+                            });
+                        }
+                    }
+                }
                 Some(ScriptCmd::Blur { .. })
-                | Some(ScriptCmd::ShakeSprite { .. })
                 | Some(ScriptCmd::MonologueColor { .. })
                 | Some(ScriptCmd::NoOp { .. }) => {}
                 Some(cmd) => {

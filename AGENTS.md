@@ -89,7 +89,7 @@ This project uses Bevy 0.18 which has breaking API changes from earlier versions
 | `WaitVoice` | ASB/IET `WaitToFinishVoicePlaying` | Audio sync stub |
 | `StreamingSeVol` | ASB/IET `ChangeVolumeOfStreamingSE` | Streaming SE volume |
 | `Blur` | ASB/IET `blur_set` | Blur visual effect (all usages `power: 0 = off`) |
-| `ShakeSprite` | ASB/IET `StartShakingOfSprite` | Per-sprite shake |
+| ~~`ShakeSprite`~~ | ~~ASB/IET `StartShakingOfSprite`~~ | ~~Per-sprite shake~~ |
 | `MonologueColor` | ASB/IET `SetColorOfMonologue` | Text color for monologue |
 | `Tween` | ASB `tween`/`MoveBustshot`/`FadeBustshot`/`lytweendel` | MoveBustshot/FadeBustshot implemented; generic tween/lytweendel no-op |
 | `MovieInit` | ASB `MovieInit` | Video playback init (historical no-op; PlayMovie handles all init) |
