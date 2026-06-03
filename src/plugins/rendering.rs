@@ -543,6 +543,7 @@ fn handle_show_cg(
         cg_state.active = true;
         cg_state.entity = Some(entity);
         cg_state.texture = Some(handle);
+        cg_state.current_file = Some(msg.file.clone());
 
         match msg.transition {
             Some(Transition::Fade) => {
@@ -577,6 +578,7 @@ fn handle_hide_cg(
                 if let Some(entity) = cg_state.entity.take() {
                     commands.entity(entity).despawn();
                 }
+                cg_state.current_file = None;
                 cg_state.active = false;
                 cg_state.texture = None;
             }

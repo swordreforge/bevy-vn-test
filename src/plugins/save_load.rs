@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 use crate::components::*;
-use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, DialogueState, GameFont, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, UnlockState, BgState};
+use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, CgState, DialogueState, GameFont, PendingDialogueRestore, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, UnlockState, BgState};
 use crate::state::AppState;
 use crate::script::{ScriptCmd, ScriptEngine};
 use crate::rendering_messages::{
@@ -12,6 +12,8 @@ use crate::audio_messages::{
 };
 use crate::plugins::event_system::{ViewPhase, ViewState};
 use crate::plugins::event_system::view_data;
+
+include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
 
 pub struct SaveLoadPlugin;
 
@@ -133,9 +135,15 @@ fn setup_save_load_ui(
                         if idx >= save_mgr.slots.len() { continue; }
                         let has_data = save_mgr.slots[idx].is_some();
                         let clickable = mode.0 || has_data;
-                        let bg_handle = save_mgr.slots[idx].as_ref()
-                            .and_then(|d| d.bg_file.as_ref())
-                            .map(|f| asset_server.load::<Image>(format!("image/bg/{}.jpg", f)));
+                        let thumb_handle = save_mgr.slots[idx].as_ref().and_then(|d| {
+                            if let Some(ref cg) = d.cg_file {
+                                Some(asset_server.load::<Image>(ev_file_path(cg)))
+                            } else if let Some(ref bg) = d.bg_file {
+                                Some(asset_server.load::<Image>(format!("image/bg/{}.jpg", bg)))
+                            } else {
+                                None
+                            }
+                        });
                         let mut slot = row_parent.spawn((
                             SaveSlot(idx),
                             Button,
@@ -148,7 +156,7 @@ fn setup_save_load_ui(
                             },
                             BackgroundColor(if has_data { SLOT_FILLED } else { SLOT_EMPTY }),
                         ));
-                        if let Some(handle) = bg_handle {
+                        if let Some(handle) = thumb_handle {
                             slot.insert(ImageNode::new(handle));
                         }
                         if !clickable {
@@ -390,6 +398,7 @@ fn handle_confirm(
                         .unwrap_or_default();
                     let dialogue = world.resource::<DialogueState>();
                     let bg_state = world.resource::<BgState>();
+                    let cg_state = world.resource::<CgState>();
                     let data = SaveData {
                         version: 2,
                         timestamp: ts,
@@ -411,6 +420,7 @@ fn handle_confirm(
                         dialogue_text: dialogue.current_text.clone(),
                         dialogue_speaker: dialogue.current_speaker.clone(),
                         bg_file: bg_state.current_bg.clone(),
+                        cg_file: cg_state.current_file.clone(),
                     };
                     let dir = world.resource::<SaveDir>().clone();
                     let mut mgr = world.resource_mut::<SaveManager>();
@@ -449,6 +459,10 @@ fn handle_confirm(
                 if !cmds.is_empty() {
                     commands.insert_resource(PendingSceneRestore(cmds));
                 }
+                commands.insert_resource(PendingDialogueRestore {
+                    text: data.dialogue_text.clone(),
+                    speaker: data.dialogue_speaker.clone(),
+                });
             }
             commands.remove_resource::<ConfirmState>();
             if mode.0 {
@@ -535,9 +549,15 @@ fn handle_save_load_page_nav(
                             if idx >= save_mgr.slots.len() { continue; }
                             let has_data = save_mgr.slots[idx].is_some();
                             let clickable = mode.0 || has_data;
-                            let bg_handle = save_mgr.slots[idx].as_ref()
-                                .and_then(|d| d.bg_file.as_ref())
-                                .map(|f| asset_server.load::<Image>(format!("image/bg/{}.jpg", f)));
+                            let thumb_handle = save_mgr.slots[idx].as_ref().and_then(|d| {
+                                if let Some(ref cg) = d.cg_file {
+                                    Some(asset_server.load::<Image>(ev_file_path(cg)))
+                                } else if let Some(ref bg) = d.bg_file {
+                                    Some(asset_server.load::<Image>(format!("image/bg/{}.jpg", bg)))
+                                } else {
+                                    None
+                                }
+                            });
                             let mut slot = row_parent.spawn((
                                 SaveSlot(idx),
                                 Button,
@@ -550,7 +570,7 @@ fn handle_save_load_page_nav(
                                 },
                                 BackgroundColor(if has_data { SLOT_FILLED } else { SLOT_EMPTY }),
                             ));
-                            if let Some(handle) = bg_handle {
+                            if let Some(handle) = thumb_handle {
                                 slot.insert(ImageNode::new(handle));
                             }
                             if !clickable {
@@ -779,6 +799,7 @@ fn build_save_data(
     view_state: Option<&ViewState>,
     dialogue: &DialogueState,
     bg_state: &BgState,
+    cg_state: &CgState,
 ) -> SaveData {
     use std::time::SystemTime;
     let timestamp = SystemTime::now()
@@ -806,6 +827,7 @@ fn build_save_data(
         dialogue_text: dialogue.current_text.clone(),
         dialogue_speaker: dialogue.current_speaker.clone(),
         bg_file: bg_state.current_bg.clone(),
+        cg_file: cg_state.current_file.clone(),
     }
 }
 
@@ -828,6 +850,7 @@ fn handle_auto_save(
     view_query: Query<&ViewState>,
     dialogue: Res<DialogueState>,
     bg_state: Res<BgState>,
+    cg_state: Res<CgState>,
     mut save_mgr: ResMut<SaveManager>,
     save_dir: Res<SaveDir>,
 ) {
@@ -840,7 +863,7 @@ fn handle_auto_save(
         &script_engine, &affection, &unlock_state,
         &settings, &bgm, &bgmx,
         view_query.single().ok(),
-        &dialogue, &bg_state,
+        &dialogue, &bg_state, &cg_state,
     );
     save_mgr.save_slot(0, data, &save_dir);
 }

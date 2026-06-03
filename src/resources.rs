@@ -76,6 +76,8 @@ pub struct SaveData {
     pub dialogue_speaker: Option<String>,
     #[serde(default)]
     pub bg_file: Option<String>,
+    #[serde(default)]
+    pub cg_file: Option<String>,
 }
 
 #[derive(Resource, Clone)]
@@ -424,6 +426,12 @@ pub struct PendingVideo {
     pub ffmpeg: Option<FFmpegVideoState>,
 }
 
+#[derive(Resource)]
+pub struct PendingDialogueRestore {
+    pub text: String,
+    pub speaker: Option<String>,
+}
+
 #[derive(Resource, Default)]
 pub struct DialogueState {
     pub current_text: String,
@@ -492,6 +500,7 @@ pub struct CgState {
     pub entity: Option<Entity>,
     pub texture: Option<Handle<Image>>,
     pub fade: Option<CgFade>,
+    pub current_file: Option<String>,
 }
 
 /// On-demand texture cache

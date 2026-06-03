@@ -17,7 +17,7 @@ use crate::rendering_messages::{
 use crate::plugins::video::{spawn_sprite_video, spawn_video, start_rain_video};
 use crate::resources::{
     save_unlock_state, sync_affection_from_work, map_video_file, AffectionMap, AutoSaveRequested,
-    Backlog, BacklogEntry, ChoiceState, CompletedRoute, DialogueState, GameRestrictions, IntroPhase,
+    Backlog, BacklogEntry, ChoiceState, CompletedRoute, DialogueState, GameRestrictions, IntroPhase, PendingDialogueRestore,
     PendingSpriteVideoBlock, PendingVideo, QuakeState, RainOverlayState, RouteConfig, Settings,
     SpriteOverlayManager, SpriteVideoManager, UnlockState, VoiceManager,
 };
@@ -121,11 +121,21 @@ fn start_script_execution(
     mut engine: ResMut<ScriptEngine>,
     mut selected_route: ResMut<SelectedRoute>,
     mut advance_ev: MessageWriter<AdvanceEvent>,
+    pending_dialogue: Option<Res<PendingDialogueRestore>>,
+    mut commands: Commands,
 ) {
-    dialogue.current_text.clear();
-    dialogue.current_speaker = None;
-    dialogue.text_progress = 0;
-    dialogue.is_displaying = false;
+    if let Some(restore) = pending_dialogue {
+        dialogue.current_text = restore.text.clone();
+        dialogue.current_speaker = restore.speaker.clone();
+        dialogue.text_progress = restore.text.len();
+        dialogue.is_displaying = !restore.text.is_empty();
+        commands.remove_resource::<PendingDialogueRestore>();
+    } else {
+        dialogue.current_text.clear();
+        dialogue.current_speaker = None;
+        dialogue.text_progress = 0;
+        dialogue.is_displaying = false;
+    }
 
     if let Some(script) = selected_route.0.take() {
         engine.flags.clear();
