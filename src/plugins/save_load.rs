@@ -78,7 +78,7 @@ fn setup_save_load_ui(
             flex_direction: FlexDirection::Column,
             ..default()
         },
-        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.85)),
         ZIndex(5),
     )).with_children(|parent| {
         parent.spawn((
