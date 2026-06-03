@@ -140,7 +140,8 @@ fn setup_save_load_ui(
                             if let Some(ref cg) = d.cg_file {
                                 Some(asset_server.load::<Image>(ev_file_path(cg)))
                             } else if let Some(ref bg) = d.bg_file {
-                                Some(asset_server.load::<Image>(format!("image/bg/{}.jpg", bg)))
+                                let stem = bg.trim_end_matches(".png").trim_end_matches(".jpg");
+                                Some(asset_server.load::<Image>(format!("image/bg/{}.jpg", stem)))
                             } else {
                                 None
                             }
@@ -559,7 +560,8 @@ fn handle_save_load_page_nav(
                                 if let Some(ref cg) = d.cg_file {
                                     Some(asset_server.load::<Image>(ev_file_path(cg)))
                                 } else if let Some(ref bg) = d.bg_file {
-                                    Some(asset_server.load::<Image>(format!("image/bg/{}.jpg", bg)))
+                                    let stem = bg.trim_end_matches(".png").trim_end_matches(".jpg");
+                                    Some(asset_server.load::<Image>(format!("image/bg/{}.jpg", stem)))
                                 } else {
                                     None
                                 }
@@ -713,14 +715,15 @@ fn process_scene_restore(
     for cmd in &pending.0 {
         match cmd {
             ScriptCmd::SetBg { file, .. } => {
-                let path = format!("image/bg/{}.jpg", file);
+                let stem = file.trim_end_matches(".png").trim_end_matches(".jpg");
+                let path = format!("image/bg/{}.jpg", stem);
                 let handle = asset_server.load::<Image>(&path);
                 for &entity in &bg_state.entities {
                     if let Ok(mut image_node) = bg_query.get_mut(entity) {
                         image_node.image = handle.clone();
                     }
                 }
-                bg_state.current_bg = Some(file.clone());
+                bg_state.current_bg = Some(stem.to_string());
             }
             ScriptCmd::ShowFg { char_id, expression, position, .. } => {
                 show_fg_writer.write(ShowFgMessage {
