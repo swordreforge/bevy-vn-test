@@ -124,6 +124,8 @@ fn start_script_execution(
     pending_dialogue: Option<Res<PendingDialogueRestore>>,
     mut commands: Commands,
 ) {
+    let is_load = pending_dialogue.is_some();
+
     if let Some(restore) = pending_dialogue {
         dialogue.current_text = restore.text.clone();
         dialogue.current_speaker = restore.speaker.clone();
@@ -151,11 +153,11 @@ fn start_script_execution(
         info!("Starting route script: {}", engine.current_script);
     }
 
-    // Auto-start: emit the first AdvanceEvent so script execution begins
-    // immediately on entering Gameplay, matching the original game behavior.
-    advance_ev.write(AdvanceEvent {
-        source: AdvanceSource::Auto,
-    });
+    if !is_load {
+        advance_ev.write(AdvanceEvent {
+            source: AdvanceSource::Auto,
+        });
+    }
 }
 
 fn start_intro_bgm(

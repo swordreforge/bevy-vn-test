@@ -32,8 +32,8 @@ impl Plugin for SaveLoadPlugin {
                 handle_save_load_escape,
                 handle_save_load_page_nav,
             ))
+            .add_systems(OnEnter(AppState::Gameplay), process_scene_restore)
             .add_systems(Update, (
-                process_scene_restore,
                 process_load_restore,
                 handle_auto_save,
             ).run_if(in_state(AppState::Gameplay)));
