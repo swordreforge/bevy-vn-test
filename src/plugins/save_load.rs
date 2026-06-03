@@ -63,6 +63,7 @@ fn setup_save_load_ui(
     save_mgr: Res<SaveManager>,
     game_font: Res<GameFont>,
     mut page: ResMut<SaveLoadPage>,
+    asset_server: Res<AssetServer>,
 ) {
     page.0 = 0;
     let total_pages = ((save_mgr.slots.len() + SLOTS_PER_PAGE - 1) / SLOTS_PER_PAGE).max(1);
@@ -132,53 +133,71 @@ fn setup_save_load_ui(
                         if idx >= save_mgr.slots.len() { continue; }
                         let has_data = save_mgr.slots[idx].is_some();
                         let clickable = mode.0 || has_data;
+                        let bg_handle = save_mgr.slots[idx].as_ref()
+                            .and_then(|d| d.bg_file.as_ref())
+                            .map(|f| asset_server.load::<Image>(format!("image/bg/{}.jpg", f)));
                         let mut slot = row_parent.spawn((
                             SaveSlot(idx),
                             Button,
                             Node {
                                 width: Val::Px(220.0),
                                 height: Val::Px(130.0),
-                                flex_direction: FlexDirection::Column,
-                                padding: UiRect::all(Val::Px(8.0)),
+                                position_type: PositionType::Relative,
+                                overflow: Overflow::clip(),
                                 ..default()
                             },
                             BackgroundColor(if has_data { SLOT_FILLED } else { SLOT_EMPTY }),
                         ));
+                        if let Some(handle) = bg_handle {
+                            slot.insert(ImageNode::new(handle));
+                        }
                         if !clickable {
                             slot.insert(BackgroundColor(SLOT_DISABLED));
                         }
                         slot.with_child((
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Percent(100.0),
+                                position_type: PositionType::Absolute,
+                                flex_direction: FlexDirection::Column,
+                                padding: UiRect::all(Val::Px(6.0)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
+                        )).with_children(|inner| {
+                            inner.spawn((
                                 Text::new(format!("{}", idx + 1)),
                                 TextFont { font: game_font.0.clone(), font_size: 14.0, ..default() },
-                                TextColor(Color::srgb(0.4, 0.4, 0.4)),
+                                TextColor(Color::srgb(0.6, 0.6, 0.6)),
                             ));
                             if let Some(ref data) = save_mgr.slots[idx] {
                                 let preview = truncate(&data.dialogue_text, 60);
-                                slot.with_child((
+                                inner.spawn((
                                     Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
-                                    TextFont { font: game_font.0.clone(), font_size: 15.0, ..default() },
+                                    TextFont { font: game_font.0.clone(), font_size: 14.0, ..default() },
                                     TextColor(Color::WHITE),
                                     Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
                                 ));
                                 let sub = data.bg_file.as_deref().unwrap_or(&data.scene_name);
-                                slot.with_child((
+                                inner.spawn((
                                     Text::new(format!("{}", sub)),
-                                    TextFont { font: game_font.0.clone(), font_size: 11.0, ..default() },
-                                    TextColor(Color::srgb(0.5, 0.5, 0.5)),
+                                    TextFont { font: game_font.0.clone(), font_size: 10.0, ..default() },
+                                    TextColor(Color::srgb(0.7, 0.7, 0.7)),
                                 ));
-                                slot.with_child((
+                                inner.spawn((
                                     Text::new(&data.timestamp),
-                                    TextFont { font: game_font.0.clone(), font_size: 11.0, ..default() },
-                                    TextColor(Color::srgb(0.6, 0.6, 0.6)),
+                                    TextFont { font: game_font.0.clone(), font_size: 10.0, ..default() },
+                                    TextColor(Color::srgb(0.7, 0.7, 0.7)),
                                 ));
                             } else {
-                                slot.with_child((
+                                inner.spawn((
                                     Text::new("-- EMPTY --"),
                                     TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
-                                    TextColor(Color::srgb(0.3, 0.3, 0.3)),
+                                    TextColor(Color::srgb(0.4, 0.4, 0.4)),
                                     Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
                                 ));
                             }
+                        });
                     }
                 });
             }
@@ -476,6 +495,7 @@ fn handle_save_load_page_nav(
     mut commands: Commands,
     game_font: Res<GameFont>,
     mode: Res<SaveLoadMode>,
+    asset_server: Res<AssetServer>,
 ) {
     if !dialogs.is_empty() {
         return;
@@ -526,53 +546,71 @@ fn handle_save_load_page_nav(
                             if idx >= save_mgr.slots.len() { continue; }
                             let has_data = save_mgr.slots[idx].is_some();
                             let clickable = mode.0 || has_data;
+                            let bg_handle = save_mgr.slots[idx].as_ref()
+                                .and_then(|d| d.bg_file.as_ref())
+                                .map(|f| asset_server.load::<Image>(format!("image/bg/{}.jpg", f)));
                             let mut slot = row_parent.spawn((
                                 SaveSlot(idx),
                                 Button,
                                 Node {
                                     width: Val::Px(220.0),
                                     height: Val::Px(130.0),
-                                    flex_direction: FlexDirection::Column,
-                                    padding: UiRect::all(Val::Px(8.0)),
+                                    position_type: PositionType::Relative,
+                                    overflow: Overflow::clip(),
                                     ..default()
                                 },
                                 BackgroundColor(if has_data { SLOT_FILLED } else { SLOT_EMPTY }),
                             ));
+                            if let Some(handle) = bg_handle {
+                                slot.insert(ImageNode::new(handle));
+                            }
                             if !clickable {
                                 slot.insert(BackgroundColor(SLOT_DISABLED));
                             }
                             slot.with_child((
-                                Text::new(format!("{}", idx + 1)),
-                                TextFont { font: game_font.0.clone(), font_size: 14.0, ..default() },
-                                TextColor(Color::srgb(0.4, 0.4, 0.4)),
-                            ));
-                            if let Some(ref data) = save_mgr.slots[idx] {
-                                let preview = truncate(&data.dialogue_text, 60);
-                                slot.with_child((
-                                    Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
-                                    TextFont { font: game_font.0.clone(), font_size: 15.0, ..default() },
-                                    TextColor(Color::WHITE),
-                                    Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
-                                ));
-                                let sub = data.bg_file.as_deref().unwrap_or(&data.scene_name);
-                                slot.with_child((
-                                    Text::new(format!("{}", sub)),
-                                    TextFont { font: game_font.0.clone(), font_size: 11.0, ..default() },
-                                    TextColor(Color::srgb(0.5, 0.5, 0.5)),
-                                ));
-                                slot.with_child((
-                                    Text::new(&data.timestamp),
-                                    TextFont { font: game_font.0.clone(), font_size: 11.0, ..default() },
+                                Node {
+                                    width: Val::Percent(100.0),
+                                    height: Val::Percent(100.0),
+                                    position_type: PositionType::Absolute,
+                                    flex_direction: FlexDirection::Column,
+                                    padding: UiRect::all(Val::Px(6.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
+                            )).with_children(|inner| {
+                                inner.spawn((
+                                    Text::new(format!("{}", idx + 1)),
+                                    TextFont { font: game_font.0.clone(), font_size: 14.0, ..default() },
                                     TextColor(Color::srgb(0.6, 0.6, 0.6)),
                                 ));
-                            } else {
-                                slot.with_child((
-                                    Text::new("-- EMPTY --"),
-                                    TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
-                                    TextColor(Color::srgb(0.3, 0.3, 0.3)),
-                                    Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
-                                ));
-                            }
+                                if let Some(ref data) = save_mgr.slots[idx] {
+                                    let preview = truncate(&data.dialogue_text, 60);
+                                    inner.spawn((
+                                        Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
+                                        TextFont { font: game_font.0.clone(), font_size: 14.0, ..default() },
+                                        TextColor(Color::WHITE),
+                                        Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
+                                    ));
+                                    let sub = data.bg_file.as_deref().unwrap_or(&data.scene_name);
+                                    inner.spawn((
+                                        Text::new(format!("{}", sub)),
+                                        TextFont { font: game_font.0.clone(), font_size: 10.0, ..default() },
+                                        TextColor(Color::srgb(0.7, 0.7, 0.7)),
+                                    ));
+                                    inner.spawn((
+                                        Text::new(&data.timestamp),
+                                        TextFont { font: game_font.0.clone(), font_size: 10.0, ..default() },
+                                        TextColor(Color::srgb(0.7, 0.7, 0.7)),
+                                    ));
+                                } else {
+                                    inner.spawn((
+                                        Text::new("-- EMPTY --"),
+                                        TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
+                                        TextColor(Color::srgb(0.4, 0.4, 0.4)),
+                                        Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
+                                    ));
+                                }
+                            });
                         }
                     });
                 }
