@@ -123,8 +123,22 @@ fn start_script_execution(
     mut advance_ev: MessageWriter<AdvanceEvent>,
     pending_dialogue: Option<Res<PendingDialogueRestore>>,
     mut commands: Commands,
+    mut auto_skip: ResMut<AutoSkipTimer>,
+    mut choice_state: ResMut<ChoiceState>,
+    mut window_override: ResMut<WindowOverride>,
+    mut intro: ResMut<IntroPhase>,
+    mut backlog: ResMut<Backlog>,
 ) {
     let is_load = pending_dialogue.is_some();
+
+    auto_skip.auto_timer = None;
+    auto_skip.skip_timer = None;
+    auto_skip.waiting_for_voice = false;
+    choice_state.active = false;
+    choice_state.options.clear();
+    window_override.0 = false;
+    intro.0 = false;
+    backlog.entries.clear();
 
     if let Some(restore) = pending_dialogue {
         dialogue.current_text = restore.text.clone();

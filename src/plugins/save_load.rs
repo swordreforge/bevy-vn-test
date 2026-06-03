@@ -1,14 +1,14 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 use crate::components::*;
-use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, CgState, DialogueState, GameFont, PendingDialogueRestore, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, TextureCache, UnlockState, BgState};
+use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, CgState, DialogueState, GameFont, PendingDialogueRestore, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, TextureCache, UnlockState, BgState, SpriteOverlayManager, SeManager, QuakeState, ChoiceState, VoiceManager, GameRestrictions, WindowOverride, IntroPhase, PendingBgm, PendingSe};
 use crate::state::AppState;
 use crate::script::{ScriptCmd, ScriptEngine};
 use crate::rendering_messages::{
     ShowFgMessage, HideFgMessage,
 };
 use crate::audio_messages::{
-    PlayBgmMessage, PlayBgmXMessage,
+    PlayBgmMessage, PlayBgmXMessage, StopBgmMessage, StopBgmXMessage,
 };
 use crate::plugins::event_system::{ViewPhase, ViewState};
 use crate::plugins::event_system::view_data;
@@ -469,6 +469,14 @@ fn handle_confirm(
                     text: data.dialogue_text.clone(),
                     speaker: data.dialogue_speaker.clone(),
                 });
+                commands.insert_resource(QuakeState::default());
+                commands.insert_resource(ChoiceState::default());
+                commands.init_resource::<VoiceManager>();
+                commands.insert_resource(GameRestrictions::default());
+                commands.insert_resource(WindowOverride(false));
+                commands.insert_resource(IntroPhase(false));
+                commands.insert_resource(PendingBgm(None));
+                commands.insert_resource(PendingSe(Vec::new()));
             }
             commands.remove_resource::<ConfirmState>();
             if mode.0 {
@@ -710,6 +718,9 @@ fn process_scene_restore(
     mut bg_query: Query<&mut ImageNode, With<BackgroundRoot>>,
     mut show_fg_writer: MessageWriter<ShowFgMessage>,
     mut hide_fg_writer: MessageWriter<HideFgMessage>,
+    mut overlay_mgr: ResMut<SpriteOverlayManager>,
+    mut se_mgr: ResMut<SeManager>,
+    mut overlay_screen: Query<(Entity, &mut BackgroundColor, &mut Visibility), With<ScreenOverlayRoot>>,
 ) {
     let Some(pending) = pending else { return };
     hide_fg_writer.write(HideFgMessage { char_id: "all".to_string(), transition: None, duration: None });
@@ -719,6 +730,20 @@ fn process_scene_restore(
     cg_state.active = false;
     cg_state.texture = None;
     cg_state.current_file = None;
+    for (_, entity) in overlay_mgr.sprites.drain() {
+        commands.entity(entity).despawn();
+    }
+    for (entity, mut bg, mut vis) in overlay_screen.iter_mut() {
+        *vis = Visibility::Hidden;
+        bg.0.set_alpha(0.0);
+        commands.entity(entity).remove::<OverlayTween>();
+    }
+    for &entity in &bg_state.entities {
+        commands.entity(entity).remove::<BgScroll>();
+    }
+    for (_, entity) in se_mgr.entities.drain() {
+        commands.entity(entity).despawn();
+    }
     for cmd in &pending.0 {
         match cmd {
             ScriptCmd::SetBg { file, .. } => {
@@ -791,14 +816,29 @@ fn process_load_restore(
     mut commands: Commands,
     mut play_bgm: MessageWriter<PlayBgmMessage>,
     mut play_bgmx: MessageWriter<PlayBgmXMessage>,
+    mut stop_bgm: MessageWriter<StopBgmMessage>,
+    mut stop_bgmx: MessageWriter<StopBgmXMessage>,
+    view_query: Query<Entity, With<ViewState>>,
+    mut face_query: Query<(Entity, &mut Visibility), With<FacePortrait>>,
 ) {
     let Some(pending) = pending else { return };
 
+    for entity in view_query.iter() {
+        commands.entity(entity).despawn();
+    }
+    for (_, mut vis) in face_query.iter_mut() {
+        *vis = Visibility::Hidden;
+    }
+
     if let Some(bgm_id) = &pending.bgm_id {
         play_bgm.write(PlayBgmMessage { id: bgm_id.clone(), volume: None, fade_in: None });
+    } else {
+        stop_bgm.write(StopBgmMessage { id: None, fade_out: None });
     }
     if let Some(bgmx_id) = &pending.bgmx_id {
         play_bgmx.write(PlayBgmXMessage { id: bgmx_id.clone(), volume: None, fade_in: None });
+    } else {
+        stop_bgmx.write(StopBgmXMessage { id: None, fade_out: None });
     }
     if let Some(char_id) = &pending.view_char_id {
         if let Some(entry) = view_data::lookup_view_entry(char_id) {
