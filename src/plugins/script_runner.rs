@@ -932,6 +932,7 @@ fn process_advance(
                     engine.call_script(&script, label.as_deref());
                 }
                 Some(ScriptCmd::Return) => {
+                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                     engine.finished = false;
                     engine.return_from_call();
                 }
