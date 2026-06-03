@@ -164,37 +164,39 @@ fn setup_save_load_ui(
                             slot.insert(BackgroundColor(SLOT_DISABLED));
                         }
                         slot.with_child((
-                                Node {
-                                    width: Val::Percent(100.0),
-                                    height: Val::Percent(100.0),
-                                    position_type: PositionType::Absolute,
-                                    flex_direction: FlexDirection::Column,
-                                    justify_content: JustifyContent::FlexEnd,
-                                    align_items: AlignItems::Start,
-                                    overflow: Overflow::clip(),
-                                    padding: UiRect::all(Val::Px(6.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.50)),
-                            )).with_children(|inner| {
-                                if let Some(ref data) = save_mgr.slots[idx] {
-                                    let preview = truncate(&data.dialogue_text, 22);
-                                    inner.spawn((
-                                        Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
-                                        TextFont { font: game_font.0.clone(), font_size: 13.0, ..default() },
-                                        TextColor(Color::WHITE),
-                                    ));
-                                    inner.spawn((
-                                        Text::new(&data.timestamp),
-                                        TextFont { font: game_font.0.clone(), font_size: 10.0, ..default() },
-                                        TextColor(Color::srgb(0.7, 0.7, 0.7)),
-                                        Node { margin: UiRect::top(Val::Px(2.0)), ..default() },
-                                    ));
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Percent(100.0),
+                                position_type: PositionType::Absolute,
+                                overflow: Overflow::clip(),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.50)),
+                        )).with_children(|inner| {
+                            if let Some(ref data) = save_mgr.slots[idx] {
+                                let preview = truncate(&data.dialogue_text, 22);
+                                inner.spawn((
+                                    Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
+                                    TextFont { font: game_font.0.clone(), font_size: 13.0, ..default() },
+                                    TextColor(Color::WHITE),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        bottom: Val::Px(6.0),
+                                        left: Val::Px(6.0),
+                                        ..default()
+                                    },
+                                ));
                             } else {
                                 inner.spawn((
                                     Text::new("-- EMPTY --"),
                                     TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
                                     TextColor(Color::srgb(0.4, 0.4, 0.4)),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        bottom: Val::Px(6.0),
+                                        left: Val::Px(6.0),
+                                        ..default()
+                                    },
                                 ));
                             }
                         });
@@ -585,11 +587,7 @@ fn handle_save_load_page_nav(
                                     width: Val::Percent(100.0),
                                     height: Val::Percent(100.0),
                                     position_type: PositionType::Absolute,
-                                    flex_direction: FlexDirection::Column,
-                                    justify_content: JustifyContent::FlexEnd,
-                                    align_items: AlignItems::Start,
                                     overflow: Overflow::clip(),
-                                    padding: UiRect::all(Val::Px(6.0)),
                                     ..default()
                                 },
                                 BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.50)),
@@ -600,18 +598,24 @@ fn handle_save_load_page_nav(
                                         Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
                                         TextFont { font: game_font.0.clone(), font_size: 13.0, ..default() },
                                         TextColor(Color::WHITE),
-                                    ));
-                                    inner.spawn((
-                                        Text::new(&data.timestamp),
-                                        TextFont { font: game_font.0.clone(), font_size: 10.0, ..default() },
-                                        TextColor(Color::srgb(0.7, 0.7, 0.7)),
-                                        Node { margin: UiRect::top(Val::Px(2.0)), ..default() },
+                                        Node {
+                                            position_type: PositionType::Absolute,
+                                            bottom: Val::Px(6.0),
+                                            left: Val::Px(6.0),
+                                            ..default()
+                                        },
                                     ));
                                 } else {
                                     inner.spawn((
                                         Text::new("-- EMPTY --"),
                                         TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
                                         TextColor(Color::srgb(0.4, 0.4, 0.4)),
+                                        Node {
+                                            position_type: PositionType::Absolute,
+                                            bottom: Val::Px(6.0),
+                                            left: Val::Px(6.0),
+                                            ..default()
+                                        },
                                     ));
                                 }
                             });
@@ -878,7 +882,7 @@ fn truncate(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
         s.to_string()
     } else {
-        s.chars().take(max).map(|c| if c == '\n' { ' ' } else { c }).collect()
+        format!("{}…", s.chars().take(max.saturating_sub(1)).map(|c| if c == '\n' { ' ' } else { c }).collect::<String>())
     }
 }
 
