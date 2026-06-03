@@ -19,7 +19,7 @@ use crate::resources::{
     save_unlock_state, sync_affection_from_work, map_video_file, AffectionMap, Backlog,
     BacklogEntry, ChoiceState, CompletedRoute, DialogueState, GameRestrictions, IntroPhase,
     PendingSpriteVideoBlock, PendingVideo, QuakeState, RainOverlayState, RouteConfig, Settings,
-    SpriteOverlayManager, SpriteVideoManager, UnlockState,
+    SpriteOverlayManager, SpriteVideoManager, UnlockState, VoiceManager,
 };
 use crate::resources::{AfterStoryGroup, SelectedRoute, ViewBlocking, WindowOverride};
 use crate::script::{
@@ -27,6 +27,7 @@ use crate::script::{
     ScriptCmd, ScriptEngine, Transition,
 };
 use crate::state::AppState;
+use bevy::ecs::query::QueryEntityError;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
@@ -36,6 +37,7 @@ pub struct ScriptRunnerPlugin;
 pub struct AutoSkipTimer {
     pub auto_timer: Option<Timer>,
     pub skip_timer: Option<Timer>,
+    pub waiting_for_voice: bool,
 }
 
 impl Default for AutoSkipTimer {
@@ -43,6 +45,7 @@ impl Default for AutoSkipTimer {
         Self {
             auto_timer: None,
             skip_timer: None,
+            waiting_for_voice: false,
         }
     }
 }
@@ -76,6 +79,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     loop_se_writer: MessageWriter<'w, LoopSeMessage>,
     stop_streaming_se_writer: MessageWriter<'w, StopStreamingSeMessage>,
     play_voice_writer: MessageWriter<'w, PlayVoiceMessage>,
+    voice_mgr: Res<'w, VoiceManager>,
     scroll_bg_writer: MessageWriter<'w, ScrollBgMessage>,
     animate_sprite_writer: MessageWriter<'w, AnimateSpriteMessage>,
     settings: Res<'w, Settings>,
@@ -162,7 +166,10 @@ fn start_intro_bgm(
     }
 }
 
-fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
+fn reset_engine_on_title(
+    mut engine: ResMut<ScriptEngine>,
+    mut auto_skip: ResMut<AutoSkipTimer>,
+) {
     engine.current_line = 0;
     engine.current_route = None;
     engine.call_stack.clear();
@@ -172,6 +179,7 @@ fn reset_engine_on_title(mut engine: ResMut<ScriptEngine>) {
     engine.local_flags.clear();
     engine.dialogue_idx = 0;
     engine.finished = false;
+    auto_skip.waiting_for_voice = false;
     if engine.scripts.contains_key("main") {
         engine.current_script = "main".to_string();
     } else if engine.scripts.contains_key("aiy00010") {
@@ -262,6 +270,7 @@ fn process_advance(
         ref mut loop_se_writer,
         ref mut stop_streaming_se_writer,
         ref mut play_voice_writer,
+        ref voice_mgr,
         ref mut scroll_bg_writer,
         ref mut animate_sprite_writer,
         ref mut settings,
@@ -280,6 +289,7 @@ fn process_advance(
         if ev.source == AdvanceSource::UserInput {
             auto_skip.auto_timer = None;
             auto_skip.skip_timer = None;
+            auto_skip.waiting_for_voice = false;
         }
 
         // If View is active, block script execution
@@ -1540,7 +1550,8 @@ fn process_advance(
                 }
                 Some(ScriptCmd::PushHistory) => {}
                 Some(ScriptCmd::WaitVoice) => {
-                    auto_skip.auto_timer = Some(Timer::from_seconds(2.0, TimerMode::Once));
+                    auto_skip.waiting_for_voice = voice_mgr.entity.is_some();
+                    auto_skip.auto_timer = None;
                     break;
                 }
                 Some(ScriptCmd::QueryMode { .. }) => {
@@ -1709,6 +1720,8 @@ fn handle_auto_skip(
     choice_state: Res<ChoiceState>,
     settings: Res<Settings>,
     view_blocking: Res<ViewBlocking>,
+    voice_mgr: Res<VoiceManager>,
+    voice_sink: Query<&AudioSink>,
 ) {
     if view_blocking.0 {
         return;
@@ -1724,6 +1737,7 @@ fn handle_auto_skip(
         !dialogue.is_displaying || dialogue.text_progress >= dialogue.current_text.len();
 
     if settings.skip_mode {
+        auto_skip.waiting_for_voice = false;
         if !text_fully_displayed || dialogue.current_text.is_empty() {
             if dialogue.current_text.is_empty() && !dialogue.is_displaying {
                 advance_ev.write(AdvanceEvent {
@@ -1758,6 +1772,14 @@ fn handle_auto_skip(
             auto_skip.auto_timer = None;
             return;
         }
+
+        if auto_skip.waiting_for_voice {
+            if voice_still_playing(&voice_mgr, &voice_sink) {
+                return;
+            }
+            auto_skip.waiting_for_voice = false;
+        }
+
         let timer = auto_skip
             .auto_timer
             .get_or_insert_with(|| Timer::from_seconds(settings.auto_delay_secs, TimerMode::Once));
@@ -1771,6 +1793,8 @@ fn handle_auto_skip(
         return;
     }
 
+    auto_skip.waiting_for_voice = false;
+
     if let Some(timer) = &mut auto_skip.auto_timer {
         timer.tick(time.delta());
         if timer.just_finished() {
@@ -1779,6 +1803,19 @@ fn handle_auto_skip(
                 source: AdvanceSource::Auto,
             });
         }
+    }
+}
+
+fn voice_still_playing(voice_mgr: &VoiceManager, voice_sink: &Query<&AudioSink>) -> bool {
+    let Some(entity) = voice_mgr.entity else {
+        return false;
+    };
+    match voice_sink.get(entity) {
+        Ok(sink) => !sink.empty(),
+        Err(QueryEntityError::QueryDoesNotMatch(..)) => {
+            true
+        }
+        Err(_) => false,
     }
 }
 
