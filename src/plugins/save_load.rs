@@ -164,30 +164,32 @@ fn setup_save_load_ui(
                             slot.insert(BackgroundColor(SLOT_DISABLED));
                         }
                         slot.with_child((
-                            Node {
-                                width: Val::Percent(100.0),
-                                height: Val::Percent(100.0),
-                                position_type: PositionType::Absolute,
-                                flex_direction: FlexDirection::Column,
-                                justify_content: JustifyContent::FlexEnd,
-                                padding: UiRect::all(Val::Px(6.0)),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.50)),
-                        )).with_children(|inner| {
-                            if let Some(ref data) = save_mgr.slots[idx] {
-                                let preview = truncate(&data.dialogue_text, 40);
-                                inner.spawn((
-                                    Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
-                                    TextFont { font: game_font.0.clone(), font_size: 13.0, ..default() },
-                                    TextColor(Color::WHITE),
-                                ));
-                                inner.spawn((
-                                    Text::new(&data.timestamp),
-                                    TextFont { font: game_font.0.clone(), font_size: 10.0, ..default() },
-                                    TextColor(Color::srgb(0.7, 0.7, 0.7)),
-                                    Node { margin: UiRect::top(Val::Px(2.0)), ..default() },
-                                ));
+                                Node {
+                                    width: Val::Percent(100.0),
+                                    height: Val::Percent(100.0),
+                                    position_type: PositionType::Absolute,
+                                    flex_direction: FlexDirection::Column,
+                                    justify_content: JustifyContent::FlexEnd,
+                                    align_items: AlignItems::Start,
+                                    overflow: Overflow::clip(),
+                                    padding: UiRect::all(Val::Px(6.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.50)),
+                            )).with_children(|inner| {
+                                if let Some(ref data) = save_mgr.slots[idx] {
+                                    let preview = truncate(&data.dialogue_text, 22);
+                                    inner.spawn((
+                                        Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
+                                        TextFont { font: game_font.0.clone(), font_size: 13.0, ..default() },
+                                        TextColor(Color::WHITE),
+                                    ));
+                                    inner.spawn((
+                                        Text::new(&data.timestamp),
+                                        TextFont { font: game_font.0.clone(), font_size: 10.0, ..default() },
+                                        TextColor(Color::srgb(0.7, 0.7, 0.7)),
+                                        Node { margin: UiRect::top(Val::Px(2.0)), ..default() },
+                                    ));
                             } else {
                                 inner.spawn((
                                     Text::new("-- EMPTY --"),
@@ -585,13 +587,15 @@ fn handle_save_load_page_nav(
                                     position_type: PositionType::Absolute,
                                     flex_direction: FlexDirection::Column,
                                     justify_content: JustifyContent::FlexEnd,
+                                    align_items: AlignItems::Start,
+                                    overflow: Overflow::clip(),
                                     padding: UiRect::all(Val::Px(6.0)),
                                     ..default()
                                 },
                                 BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.50)),
                             )).with_children(|inner| {
                                 if let Some(ref data) = save_mgr.slots[idx] {
-                                    let preview = truncate(&data.dialogue_text, 40);
+                                    let preview = truncate(&data.dialogue_text, 22);
                                     inner.spawn((
                                         Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
                                         TextFont { font: game_font.0.clone(), font_size: 13.0, ..default() },
