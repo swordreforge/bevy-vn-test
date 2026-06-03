@@ -1379,6 +1379,7 @@ fn process_advance(
                     });
                 }
                 Some(ScriptCmd::View { ref char_id }) => {
+                    clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                     if let Some(entry) = view_data::lookup_view_entry(char_id) {
                         let tween_entry = view_data::lookup_tween_entry(entry.pen_type)
                             .unwrap_or_else(|| view_data::lookup_tween_entry(2).unwrap());

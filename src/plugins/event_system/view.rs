@@ -91,6 +91,7 @@ fn advance_view(
                     ..default()
                 },
                 ViewSprite,
+                ZIndex(2),
             )).id();
             entities.push(base);
 
@@ -116,6 +117,7 @@ fn advance_view(
                     ..default()
                 },
                 ViewSprite,
+                ZIndex(2),
             )).id();
             entities.push(name);
             view.name_entity = Some(name);
@@ -133,6 +135,7 @@ fn advance_view(
                 },
                 ViewSprite,
                 ViewPen,
+                ZIndex(2),
             )).id();
             entities.push(pen);
             view.pen_entity = Some(pen);
