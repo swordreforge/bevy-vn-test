@@ -11,6 +11,7 @@ assets_pak/
 zstd_tmp/
 
 # Game assets (binary data, not source)
+
 assets/audio/
 assets/fonts/
 assets/image/
