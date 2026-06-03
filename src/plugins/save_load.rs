@@ -125,6 +125,7 @@ fn setup_save_load_ui(
                     Node {
                         display: Display::Flex,
                         flex_direction: FlexDirection::Row,
+                        justify_content: JustifyContent::Center,
                         column_gap: Val::Px(12.0),
                         margin: UiRect::vertical(Val::Px(6.0)),
                         ..default()
@@ -539,6 +540,7 @@ fn handle_save_load_page_nav(
                         Node {
                             display: Display::Flex,
                             flex_direction: FlexDirection::Row,
+                            justify_content: JustifyContent::Center,
                             column_gap: Val::Px(12.0),
                             margin: UiRect::vertical(Val::Px(6.0)),
                             ..default()
