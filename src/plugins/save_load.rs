@@ -1,14 +1,14 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 use crate::components::*;
-use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, CgState, DialogueState, GameFont, PendingDialogueRestore, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, UnlockState, BgState};
+use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, CgState, DialogueState, GameFont, PendingDialogueRestore, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, TextureCache, UnlockState, BgState};
 use crate::state::AppState;
 use crate::script::{ScriptCmd, ScriptEngine};
 use crate::rendering_messages::{
-    SetBgMessage, ShowFgMessage, HideFgMessage, ShowCgMessage, HideCgMessage,
+    ShowFgMessage, HideFgMessage,
 };
 use crate::audio_messages::{
-    PlayBgmMessage, PlayBgmXMessage, StopBgmMessage,
+    PlayBgmMessage, PlayBgmXMessage,
 };
 use crate::plugins::event_system::{ViewPhase, ViewState};
 use crate::plugins::event_system::view_data;
@@ -32,8 +32,8 @@ impl Plugin for SaveLoadPlugin {
                 handle_save_load_escape,
                 handle_save_load_page_nav,
             ))
-            .add_systems(OnEnter(AppState::Gameplay), process_scene_restore)
             .add_systems(Update, (
+                process_scene_restore,
                 process_load_restore,
                 handle_auto_save,
             ).run_if(in_state(AppState::Gameplay)));
@@ -691,19 +691,26 @@ fn scan_script_backwards(
 fn process_scene_restore(
     pending: Option<Res<PendingSceneRestore>>,
     mut commands: Commands,
-    mut set_bg_writer: MessageWriter<SetBgMessage>,
+    asset_server: Res<AssetServer>,
+    mut bg_state: ResMut<BgState>,
+    mut cg_state: ResMut<CgState>,
+    mut cache: ResMut<TextureCache>,
+    mut bg_query: Query<&mut ImageNode, With<BackgroundRoot>>,
     mut show_fg_writer: MessageWriter<ShowFgMessage>,
     mut hide_fg_writer: MessageWriter<HideFgMessage>,
-    mut show_cg_writer: MessageWriter<ShowCgMessage>,
-    mut hide_cg_writer: MessageWriter<HideCgMessage>,
-    _play_bgm_writer: MessageWriter<PlayBgmMessage>,
-    _stop_bgm_writer: MessageWriter<StopBgmMessage>,
 ) {
     let Some(pending) = pending else { return };
     for cmd in &pending.0 {
         match cmd {
             ScriptCmd::SetBg { file, .. } => {
-                set_bg_writer.write(SetBgMessage { file: file.clone(), transition: None, duration: None });
+                let path = format!("image/bg/{}.jpg", file);
+                let handle = asset_server.load::<Image>(&path);
+                for &entity in &bg_state.entities {
+                    if let Ok(mut image_node) = bg_query.get_mut(entity) {
+                        image_node.image = handle.clone();
+                    }
+                }
+                bg_state.current_bg = Some(file.clone());
             }
             ScriptCmd::ShowFg { char_id, expression, position, .. } => {
                 show_fg_writer.write(ShowFgMessage {
@@ -718,10 +725,40 @@ fn process_scene_restore(
                 hide_fg_writer.write(HideFgMessage { char_id: char_id.clone(), transition: None, duration: None });
             }
             ScriptCmd::ShowCg { file, .. } => {
-                show_cg_writer.write(ShowCgMessage { file: file.clone(), transition: None, duration: None });
+                if let Some(entity) = cg_state.entity.take() {
+                    commands.entity(entity).despawn();
+                }
+                let path = ev_file_path(file);
+                let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
+                    asset_server.load(&path)
+                }).clone();
+                let entity = commands.spawn((
+                    CgRoot,
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(100.0),
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        ..default()
+                    },
+                    ImageNode::new(handle.clone()),
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 1.0)),
+                    Visibility::Visible,
+                    ZIndex(2),
+                )).id();
+                cg_state.active = true;
+                cg_state.entity = Some(entity);
+                cg_state.texture = Some(handle);
+                cg_state.current_file = Some(file.clone());
             }
             ScriptCmd::HideCg { .. } => {
-                hide_cg_writer.write(HideCgMessage { transition: None, duration: None });
+                if let Some(entity) = cg_state.entity.take() {
+                    commands.entity(entity).despawn();
+                }
+                cg_state.active = false;
+                cg_state.texture = None;
+                cg_state.current_file = None;
             }
             _ => {}
         }
