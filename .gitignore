@@ -35,8 +35,20 @@ big-change.txt
 # Generated tool output
 tools/ocr_debug/
 
-# tmp doc
-docs/开发过程文档/
-docs/技术债务/
-docs/superpowers
+# Work docs (plans, specs, progress notes)
+docs/
+
+# One-off scripts / generated data
+tools/*.py
+tools/bgm_title_map.json
+
+# Config artifact
+pack_config.ron
+
+# Backup files
+android/*.backup
+android/*.bak.*
+
+# Misc notes
+assets/missing.txt
 
