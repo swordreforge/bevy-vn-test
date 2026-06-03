@@ -38,9 +38,9 @@ impl Plugin for SaveLoadPlugin {
     }
 }
 
-const SLOT_FILLED: Color = Color::srgba(0.12, 0.12, 0.12, 0.95);
-const SLOT_EMPTY: Color = Color::srgba(0.08, 0.08, 0.08, 0.95);
-const SLOT_DISABLED: Color = Color::srgba(0.04, 0.04, 0.04, 0.95);
+const SLOT_FILLED: Color = Color::srgba(0.12, 0.12, 0.12, 0.35);
+const SLOT_EMPTY: Color = Color::srgba(0.08, 0.08, 0.08, 0.20);
+const SLOT_DISABLED: Color = Color::srgba(0.04, 0.04, 0.04, 0.15);
 const SLOTS_PER_PAGE: usize = 15;
 
 #[derive(Resource)]
