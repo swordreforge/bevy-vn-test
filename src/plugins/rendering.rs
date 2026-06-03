@@ -234,6 +234,7 @@ fn handle_set_bg(
             cg_state.active = false;
             cg_state.texture = None;
             cg_state.fade = None;
+            cg_state.current_file = None;
         }
 
         // Complete any in-progress fade instantly
@@ -698,6 +699,7 @@ fn update_cg_fade(
             cg_state.active = false;
             cg_state.texture = None;
             cg_state.entity = None;
+            cg_state.current_file = None;
         }
         cg_state.fade = None;
     }
