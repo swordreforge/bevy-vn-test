@@ -1,0 +1,20 @@
+(
+    bundles: [
+        (name: "data", includes: [
+            "fonts/",
+            "scripts/",
+            "shaders/",
+            "routes.ron",
+            "missing.txt",
+            "image/obj/",
+        ]),
+        (name: "bgm", includes: ["audio/bgm/"]),
+        (name: "voice", includes: ["audio/voice/"]),
+        (name: "se", includes: ["audio/se/"]),
+        (name: "video", includes: [
+            "image/anime/",
+            "movie/",
+        ]),
+        (name: "image", includes: ["image/"]),
+    ],
+)

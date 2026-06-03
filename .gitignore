@@ -1,10 +1,35 @@
 target/
 *.pdb
-assets/scripts/*.bscript.ron
-android/
-!android/build.sh
+*.apk
+*.so
+*.zip
+*.pak
+*.zst
 error.log
 scripts.zip
-*.apk
 assets_pak/
-*.pak
+zstd_tmp/
+
+# Game assets (binary data, not source)
+assets/audio/
+assets/fonts/
+assets/image/
+assets/movie/
+root/
+
+# Generated script files
+assets/scripts/*.bscript.ron
+
+# Android platform duplicates
+android/app/src/main/assets/
+android/local.properties
+
+# IDE / temp files
+.superpowers/
+*.swp
+*~
+new.txt
+big-change.txt
+
+# Generated tool output
+tools/ocr_debug/
