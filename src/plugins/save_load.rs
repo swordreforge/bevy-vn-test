@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 use crate::components::*;
-use crate::resources::{BgmManager, BgmXManager, GameFont, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, UnlockState};
+use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, DialogueState, GameFont, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, UnlockState, BgState};
 use crate::state::AppState;
 use crate::script::{ScriptCmd, ScriptEngine};
 use crate::rendering_messages::{
@@ -20,6 +20,7 @@ impl Plugin for SaveLoadPlugin {
         app.insert_resource(SaveManager::new(75))
             .init_resource::<SaveDir>()
             .init_resource::<SaveLoadPage>()
+            .init_resource::<AutoSaveRequested>()
             .add_systems(Startup, |mut mgr: ResMut<SaveManager>, dir: Res<SaveDir>| mgr.refresh_from_disk(&dir))
             .add_systems(OnEnter(AppState::SaveLoad), setup_save_load_ui)
             .add_systems(OnExit(AppState::SaveLoad), cleanup_save_load_ui)
@@ -32,6 +33,7 @@ impl Plugin for SaveLoadPlugin {
             .add_systems(Update, (
                 process_scene_restore,
                 process_load_restore,
+                handle_auto_save,
             ).run_if(in_state(AppState::Gameplay)));
     }
 }
@@ -146,36 +148,37 @@ fn setup_save_load_ui(
                             slot.insert(BackgroundColor(SLOT_DISABLED));
                         }
                         slot.with_child((
-                            Text::new(format!("{}", idx + 1)),
-                            TextFont { font: game_font.0.clone(), font_size: 14.0, ..default() },
-                            TextColor(Color::srgb(0.4, 0.4, 0.4)),
-                        ));
-                        if let Some(ref data) = save_mgr.slots[idx] {
-                            slot.with_child((
-                                Text::new(&data.scene_name),
-                                TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
-                                TextColor(Color::WHITE),
-                                Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
+                                Text::new(format!("{}", idx + 1)),
+                                TextFont { font: game_font.0.clone(), font_size: 14.0, ..default() },
+                                TextColor(Color::srgb(0.4, 0.4, 0.4)),
                             ));
-                            slot.with_child((
-                                Text::new(&data.timestamp),
-                                TextFont { font: game_font.0.clone(), font_size: 12.0, ..default() },
-                                TextColor(Color::srgb(0.6, 0.6, 0.6)),
-                                Node { margin: UiRect::top(Val::Px(2.0)), ..default() },
-                            ));
-                            slot.with_child((
-                                Text::new(format!("line {}", data.script_line)),
-                                TextFont { font: game_font.0.clone(), font_size: 12.0, ..default() },
-                                TextColor(Color::srgb(0.6, 0.6, 0.6)),
-                            ));
-                        } else {
-                            slot.with_child((
-                                Text::new("-- EMPTY --"),
-                                TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
-                                TextColor(Color::srgb(0.3, 0.3, 0.3)),
-                                Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
-                            ));
-                        }
+                            if let Some(ref data) = save_mgr.slots[idx] {
+                                let preview = truncate(&data.dialogue_text, 60);
+                                slot.with_child((
+                                    Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
+                                    TextFont { font: game_font.0.clone(), font_size: 15.0, ..default() },
+                                    TextColor(Color::WHITE),
+                                    Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
+                                ));
+                                let sub = data.bg_file.as_deref().unwrap_or(&data.scene_name);
+                                slot.with_child((
+                                    Text::new(format!("{}", sub)),
+                                    TextFont { font: game_font.0.clone(), font_size: 11.0, ..default() },
+                                    TextColor(Color::srgb(0.5, 0.5, 0.5)),
+                                ));
+                                slot.with_child((
+                                    Text::new(&data.timestamp),
+                                    TextFont { font: game_font.0.clone(), font_size: 11.0, ..default() },
+                                    TextColor(Color::srgb(0.6, 0.6, 0.6)),
+                                ));
+                            } else {
+                                slot.with_child((
+                                    Text::new("-- EMPTY --"),
+                                    TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
+                                    TextColor(Color::srgb(0.3, 0.3, 0.3)),
+                                    Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
+                                ));
+                            }
                     }
                 });
             }
@@ -356,12 +359,55 @@ fn handle_confirm(
     for interaction in &yes_query {
         if *interaction == Interaction::Pressed {
             if mode.0 {
-                let data = build_save_data(
-                    &script_engine, &affection, &unlock_state,
-                    &settings, &bgm, &bgmx,
-                    view_query.single().ok(),
-                );
-                save_mgr.save_slot(idx, data, &save_dir);
+                let scene = script_engine.current_script.clone();
+                let path = format!("{}.bscript.ron", script_engine.current_script);
+                let line = script_engine.current_line;
+                let call_stack = script_engine.call_stack.clone();
+                let flags = script_engine.flags.clone();
+                let global_flags = script_engine.global_flags.clone();
+                let local_work = script_engine.local_work.clone();
+                let local_flags = script_engine.local_flags.clone();
+                let aff = affection.0.clone();
+                let unlocked = unlock_state.clone();
+                let wc = settings.window_color_idx;
+                let vcid = view_query.single().ok().map(|vs| vs.char_id.clone());
+                let bgm_id = bgm.current_id.clone();
+                let bgmx_id = bgmx.current_id.clone();
+                let save_idx = idx;
+                commands.queue(move |world: &mut World| {
+                    use std::time::SystemTime;
+                    let ts = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .map(|d| format!("{}", d.as_secs()))
+                        .unwrap_or_default();
+                    let dialogue = world.resource::<DialogueState>();
+                    let bg_state = world.resource::<BgState>();
+                    let data = SaveData {
+                        version: 2,
+                        timestamp: ts,
+                        scene_name: scene,
+                        script_path: path,
+                        script_line: line,
+                        call_stack,
+                        flags,
+                        global_flags,
+                        local_work,
+                        local_flags,
+                        affection: aff,
+                        unlock_state: unlocked,
+                        play_time: 0,
+                        window_color_idx: wc,
+                        view_char_id: vcid,
+                        bgm_id,
+                        bgmx_id,
+                        dialogue_text: dialogue.current_text.clone(),
+                        dialogue_speaker: dialogue.current_speaker.clone(),
+                        bg_file: bg_state.current_bg.clone(),
+                    };
+                    let dir = world.resource::<SaveDir>().clone();
+                    let mut mgr = world.resource_mut::<SaveManager>();
+                    mgr.save_slot(save_idx, data, &dir);
+                });
             } else if let Some(data) = save_mgr.load_slot_from_disk(idx, &save_dir) {
                 let scene_name = data.scene_name.clone();
                 let script_line = data.script_line;
@@ -501,21 +547,22 @@ fn handle_save_load_page_nav(
                                 TextColor(Color::srgb(0.4, 0.4, 0.4)),
                             ));
                             if let Some(ref data) = save_mgr.slots[idx] {
+                                let preview = truncate(&data.dialogue_text, 60);
                                 slot.with_child((
-                                    Text::new(&data.scene_name),
-                                    TextFont { font: game_font.0.clone(), font_size: 16.0, ..default() },
+                                    Text::new(if preview.is_empty() { data.scene_name.clone() } else { preview }),
+                                    TextFont { font: game_font.0.clone(), font_size: 15.0, ..default() },
                                     TextColor(Color::WHITE),
                                     Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
                                 ));
+                                let sub = data.bg_file.as_deref().unwrap_or(&data.scene_name);
                                 slot.with_child((
-                                    Text::new(&data.timestamp),
-                                    TextFont { font: game_font.0.clone(), font_size: 12.0, ..default() },
-                                    TextColor(Color::srgb(0.6, 0.6, 0.6)),
-                                    Node { margin: UiRect::top(Val::Px(2.0)), ..default() },
+                                    Text::new(format!("{}", sub)),
+                                    TextFont { font: game_font.0.clone(), font_size: 11.0, ..default() },
+                                    TextColor(Color::srgb(0.5, 0.5, 0.5)),
                                 ));
                                 slot.with_child((
-                                    Text::new(format!("line {}", data.script_line)),
-                                    TextFont { font: game_font.0.clone(), font_size: 12.0, ..default() },
+                                    Text::new(&data.timestamp),
+                                    TextFont { font: game_font.0.clone(), font_size: 11.0, ..default() },
                                     TextColor(Color::srgb(0.6, 0.6, 0.6)),
                                 ));
                             } else {
@@ -714,6 +761,8 @@ fn build_save_data(
     bgm: &BgmManager,
     bgmx: &BgmXManager,
     view_state: Option<&ViewState>,
+    dialogue: &DialogueState,
+    bg_state: &BgState,
 ) -> SaveData {
     use std::time::SystemTime;
     let timestamp = SystemTime::now()
@@ -738,5 +787,44 @@ fn build_save_data(
         view_char_id: view_state.map(|vs| vs.char_id.clone()),
         bgm_id: bgm.current_id.clone(),
         bgmx_id: bgmx.current_id.clone(),
+        dialogue_text: dialogue.current_text.clone(),
+        dialogue_speaker: dialogue.current_speaker.clone(),
+        bg_file: bg_state.current_bg.clone(),
     }
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        s.chars().take(max).map(|c| if c == '\n' { ' ' } else { c }).collect()
+    }
+}
+
+fn handle_auto_save(
+    mut requested: ResMut<AutoSaveRequested>,
+    script_engine: Res<ScriptEngine>,
+    affection: Res<AffectionMap>,
+    unlock_state: Res<UnlockState>,
+    settings: Res<Settings>,
+    bgm: Res<BgmManager>,
+    bgmx: Res<BgmXManager>,
+    view_query: Query<&ViewState>,
+    dialogue: Res<DialogueState>,
+    bg_state: Res<BgState>,
+    mut save_mgr: ResMut<SaveManager>,
+    save_dir: Res<SaveDir>,
+) {
+    if !requested.0 {
+        return;
+    }
+    requested.0 = false;
+
+    let data = build_save_data(
+        &script_engine, &affection, &unlock_state,
+        &settings, &bgm, &bgmx,
+        view_query.single().ok(),
+        &dialogue, &bg_state,
+    );
+    save_mgr.save_slot(0, data, &save_dir);
 }

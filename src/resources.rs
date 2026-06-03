@@ -70,6 +70,12 @@ pub struct SaveData {
     pub bgm_id: Option<String>,
     #[serde(default)]
     pub bgmx_id: Option<String>,
+    #[serde(default)]
+    pub dialogue_text: String,
+    #[serde(default)]
+    pub dialogue_speaker: Option<String>,
+    #[serde(default)]
+    pub bg_file: Option<String>,
 }
 
 #[derive(Resource, Clone)]
@@ -142,6 +148,9 @@ impl SaveManager {
         Some(data)
     }
 }
+
+#[derive(Resource, Default)]
+pub struct AutoSaveRequested(pub bool);
 
 pub fn load_settings() -> Settings {
     let dir = persist_dir();
@@ -448,6 +457,7 @@ pub struct BgState {
     pub entities: [Entity; 2],
     pub active_idx: usize,
     pub fade: Option<BgCrossFade>,
+    pub current_bg: Option<String>,
 }
 
 impl Default for BgState {
@@ -456,6 +466,7 @@ impl Default for BgState {
             entities: [Entity::PLACEHOLDER; 2],
             active_idx: 0,
             fade: None,
+            current_bg: None,
         }
     }
 }

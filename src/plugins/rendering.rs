@@ -252,6 +252,7 @@ fn handle_set_bg(
         let path = format!("image/bg/{}", file);
         let stem = msg.file.trim_end_matches(".png").trim_end_matches(".jpg");
         let resolved = obj_index.0.get(stem).cloned().unwrap_or(path);
+        bg_state.current_bg = Some(stem.to_string());
         let handle = cache.cache.entry(resolved.clone()).or_insert_with(|| {
             asset_server.load(&resolved)
         }).clone();

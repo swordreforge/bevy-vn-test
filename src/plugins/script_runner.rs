@@ -16,8 +16,8 @@ use crate::rendering_messages::{
 };
 use crate::plugins::video::{spawn_sprite_video, spawn_video, start_rain_video};
 use crate::resources::{
-    save_unlock_state, sync_affection_from_work, map_video_file, AffectionMap, Backlog,
-    BacklogEntry, ChoiceState, CompletedRoute, DialogueState, GameRestrictions, IntroPhase,
+    save_unlock_state, sync_affection_from_work, map_video_file, AffectionMap, AutoSaveRequested,
+    Backlog, BacklogEntry, ChoiceState, CompletedRoute, DialogueState, GameRestrictions, IntroPhase,
     PendingSpriteVideoBlock, PendingVideo, QuakeState, RainOverlayState, RouteConfig, Settings,
     SpriteOverlayManager, SpriteVideoManager, UnlockState, VoiceManager,
 };
@@ -84,6 +84,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
     animate_sprite_writer: MessageWriter<'w, AnimateSpriteMessage>,
     settings: Res<'w, Settings>,
     auto_skip: ResMut<'w, AutoSkipTimer>,
+    auto_save: ResMut<'w, AutoSaveRequested>,
     intro: ResMut<'w, IntroPhase>,
     overlay_mgr: ResMut<'w, SpriteOverlayManager>,
     restrictions: ResMut<'w, GameRestrictions>,
@@ -275,6 +276,7 @@ fn process_advance(
         ref mut animate_sprite_writer,
         ref mut settings,
         ref mut auto_skip,
+        ref mut auto_save,
         ref mut intro,
         ref mut overlay_mgr,
         ref mut restrictions,
@@ -510,7 +512,9 @@ fn process_advance(
                             }
                         }
                     }
-                    Some(ScriptCmd::SavePoint) => {}
+                    Some(ScriptCmd::SavePoint) => {
+                        auto_save.0 = true;
+                    }
                     Some(ScriptCmd::UnlockCg { file }) => {
                         unlock_state.cg_unlocked.insert(file);
                     }
@@ -1041,7 +1045,9 @@ fn process_advance(
                         }
                     }
                 }
-                Some(ScriptCmd::SavePoint) => {}
+                Some(ScriptCmd::SavePoint) => {
+                    auto_save.0 = true;
+                }
                 Some(ScriptCmd::UnlockCg { file }) => {
                     unlock_state.cg_unlocked.insert(file);
                 }
