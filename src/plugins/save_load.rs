@@ -712,6 +712,13 @@ fn process_scene_restore(
     mut hide_fg_writer: MessageWriter<HideFgMessage>,
 ) {
     let Some(pending) = pending else { return };
+    hide_fg_writer.write(HideFgMessage { char_id: "all".to_string(), transition: None, duration: None });
+    if let Some(entity) = cg_state.entity.take() {
+        commands.entity(entity).despawn();
+    }
+    cg_state.active = false;
+    cg_state.texture = None;
+    cg_state.current_file = None;
     for cmd in &pending.0 {
         match cmd {
             ScriptCmd::SetBg { file, .. } => {
