@@ -16,6 +16,7 @@ assets/fonts/
 assets/image/
 assets/movie/
 root/
+saves/
 
 # Generated script files
 assets/scripts/*.bscript.ron
@@ -33,3 +34,9 @@ big-change.txt
 
 # Generated tool output
 tools/ocr_debug/
+
+# tmp doc
+docs/开发过程文档/
+docs/技术债务/
+docs/superpowers
+
