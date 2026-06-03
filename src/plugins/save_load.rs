@@ -758,15 +758,32 @@ fn process_scene_restore(
     mut bg_state: ResMut<BgState>,
     mut cg_state: ResMut<CgState>,
     mut cache: ResMut<TextureCache>,
-    mut bg_query: Query<&mut ImageNode, With<BackgroundRoot>>,
+    mut sprite_mgr: ResMut<SpriteManager>,
     mut show_fg_writer: MessageWriter<ShowFgMessage>,
     mut hide_fg_writer: MessageWriter<HideFgMessage>,
     mut overlay_mgr: ResMut<SpriteOverlayManager>,
     mut se_mgr: ResMut<SeManager>,
-    mut overlay_screen: Query<(Entity, &mut BackgroundColor, &mut Visibility), With<ScreenOverlayRoot>>,
+    mut queries: ParamSet<(
+        Query<&mut ImageNode, With<BackgroundRoot>>,
+        Query<(&mut ImageNode, &mut Visibility), With<SpriteSlotMarker>>,
+        Query<(Entity, &mut BackgroundColor, &mut Visibility), With<ScreenOverlayRoot>>,
+    )>,
 ) {
     let Some(pending) = pending else { return };
-    hide_fg_writer.write(HideFgMessage { char_id: "all".to_string(), transition: None, duration: None });
+    // Clear all FG sprites before restore to avoid stale visibility from previous scene
+    {
+        let mut fg_query = queries.p1();
+        for (_, slot) in sprite_mgr.slots.iter_mut() {
+            if let Ok((mut image_node, mut vis)) = fg_query.get_mut(slot.entity) {
+                image_node.image = Handle::default();
+                *vis = Visibility::Hidden;
+                slot.char_id.clear();
+                slot.expression.clear();
+                slot.texture = None;
+                slot.fade = None;
+            }
+        }
+    }
     if let Some(entity) = cg_state.entity.take() {
         commands.entity(entity).despawn();
     }
@@ -776,7 +793,7 @@ fn process_scene_restore(
     for (_, entity) in overlay_mgr.sprites.drain() {
         commands.entity(entity).despawn();
     }
-    for (entity, mut bg, mut vis) in overlay_screen.iter_mut() {
+    for (entity, mut bg, mut vis) in queries.p2().iter_mut() {
         *vis = Visibility::Hidden;
         bg.0.set_alpha(0.0);
         commands.entity(entity).remove::<OverlayTween>();
@@ -793,6 +810,7 @@ fn process_scene_restore(
                 let stem = file.trim_end_matches(".png").trim_end_matches(".jpg");
                 let path = format!("image/bg/{}.jpg", stem);
                 let handle = asset_server.load::<Image>(&path);
+                let mut bg_query = queries.p0();
                 for &entity in &bg_state.entities {
                     if let Ok(mut image_node) = bg_query.get_mut(entity) {
                         image_node.image = handle.clone();
