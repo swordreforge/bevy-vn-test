@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 use crate::components::*;
-use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, CgState, DialogueState, GameFont, PendingDialogueRestore, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, TextureCache, UnlockState, BgState, SpriteOverlayManager, SeManager, QuakeState, ChoiceState, VoiceManager, GameRestrictions, WindowOverride, IntroPhase, PendingBgm, PendingSe};
+use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, CgState, DialogueState, GameFont, PendingDialogueRestore, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, TextureCache, UnlockState, BgState, SpriteOverlayManager, SeManager, QuakeState, ChoiceState, VoiceManager, GameRestrictions, WindowOverride, IntroPhase, PendingBgm, PendingSe, SpriteManager, FgSpriteSave};
 use crate::state::AppState;
 use crate::script::{ScriptCmd, ScriptEngine};
+use crate::plugins::rendering::char_dir;
 use crate::rendering_messages::{
     ShowFgMessage, HideFgMessage,
 };
@@ -136,16 +137,6 @@ fn setup_save_load_ui(
                         if idx >= save_mgr.slots.len() { continue; }
                         let has_data = save_mgr.slots[idx].is_some();
                         let clickable = mode.0 || has_data;
-                        let thumb_handle = save_mgr.slots[idx].as_ref().and_then(|d| {
-                            if let Some(ref cg) = d.cg_file {
-                                Some(asset_server.load::<Image>(ev_file_path(cg)))
-                            } else if let Some(ref bg) = d.bg_file {
-                                let stem = bg.trim_end_matches(".png").trim_end_matches(".jpg");
-                                Some(asset_server.load::<Image>(format!("image/bg/{}.jpg", stem)))
-                            } else {
-                                None
-                            }
-                        });
                         let mut slot = row_parent.spawn((
                             SaveSlot(idx),
                             Button,
@@ -158,8 +149,34 @@ fn setup_save_load_ui(
                             },
                             BackgroundColor(if has_data { SLOT_FILLED } else { SLOT_EMPTY }),
                         ));
-                        if let Some(handle) = thumb_handle {
-                            slot.insert(ImageNode::new(handle));
+                        if let Some(ref data) = save_mgr.slots[idx] {
+                            if let Some(ref cg) = data.cg_file {
+                                slot.insert(ImageNode::new(asset_server.load::<Image>(ev_file_path(cg))));
+                            } else if let Some(ref bg) = data.bg_file {
+                                let stem = bg.trim_end_matches(".png").trim_end_matches(".jpg");
+                                slot.insert(ImageNode::new(asset_server.load::<Image>(format!("image/bg/{}.jpg", stem))));
+                                for fg in &data.fg_sprites {
+                                    if let Some(dir) = char_dir(&fg.char_id) {
+                                        let path = format!("image/fg/{}/tati_{}.png", dir, fg.char_id);
+                                        slot.with_child((
+                                            Node {
+                                                width: Val::Px(140.0),
+                                                height: Val::Px(130.0),
+                                                position_type: PositionType::Absolute,
+                                                top: Val::Px(0.0),
+                                                left: Val::Px(40.0),
+                                                ..default()
+                                            },
+                                            ImageNode::new(asset_server.load::<Image>(&path)),
+                                        ));
+                                    }
+                                }
+                            } else if let Some(fg) = data.fg_sprites.first() {
+                                if let Some(dir) = char_dir(&fg.char_id) {
+                                    let path = format!("image/fg/{}/tati_{}.png", dir, fg.char_id);
+                                    slot.insert(ImageNode::new(asset_server.load::<Image>(&path)));
+                                }
+                            }
                         }
                         if !clickable {
                             slot.insert(BackgroundColor(SLOT_DISABLED));
@@ -405,8 +422,17 @@ fn handle_confirm(
                     let dialogue = world.resource::<DialogueState>();
                     let bg_state = world.resource::<BgState>();
                     let cg_state = world.resource::<CgState>();
+                    let sprite_mgr = world.resource::<SpriteManager>();
+                    let fg_sprites: Vec<FgSpriteSave> = sprite_mgr.slots.iter()
+                        .filter(|(_, s)| !s.char_id.is_empty())
+                        .map(|(pos, s)| FgSpriteSave {
+                            char_id: s.char_id.clone(),
+                            expression: s.expression.clone(),
+                            position: pos.clone(),
+                        })
+                        .collect();
                     let data = SaveData {
-                        version: 2,
+                        version: 3,
                         timestamp: ts,
                         scene_name: scene,
                         script_path: path,
@@ -427,6 +453,7 @@ fn handle_confirm(
                         dialogue_speaker: dialogue.current_speaker.clone(),
                         bg_file: bg_state.current_bg.clone(),
                         cg_file: cg_state.current_file.clone(),
+                        fg_sprites,
                     };
                     let dir = world.resource::<SaveDir>().clone();
                     let mut mgr = world.resource_mut::<SaveManager>();
@@ -461,7 +488,23 @@ fn handle_confirm(
                     window_color_idx: data.window_color_idx,
                 });
 
-                let cmds = collect_scene_restore(&script_engine);
+                let mut cmds = collect_scene_restore(&script_engine);
+                cmds.retain(|cmd| !matches!(cmd, ScriptCmd::ShowCg { .. } | ScriptCmd::HideCg { .. }));
+                match &data.cg_file {
+                    Some(file) => cmds.push(ScriptCmd::ShowCg { file: file.clone(), transition: None }),
+                    None => cmds.push(ScriptCmd::HideCg { transition: None }),
+                }
+                if !data.fg_sprites.is_empty() {
+                    cmds.retain(|cmd| !matches!(cmd, ScriptCmd::ShowFg { .. } | ScriptCmd::HideFg { .. }));
+                    for fg in &data.fg_sprites {
+                        cmds.push(ScriptCmd::ShowFg {
+                            char_id: fg.char_id.clone(),
+                            expression: fg.expression.clone(),
+                            position: fg.position.clone(),
+                            transition: None,
+                        });
+                    }
+                }
                 if !cmds.is_empty() {
                     commands.insert_resource(PendingSceneRestore(cmds));
                 }
@@ -897,14 +940,23 @@ fn build_save_data(
     dialogue: &DialogueState,
     bg_state: &BgState,
     cg_state: &CgState,
+    sprite_mgr: &SpriteManager,
 ) -> SaveData {
     use std::time::SystemTime;
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map(|d| format!("{}", d.as_secs()))
         .unwrap_or_default();
+    let fg_sprites: Vec<FgSpriteSave> = sprite_mgr.slots.iter()
+        .filter(|(_, s)| !s.char_id.is_empty())
+        .map(|(pos, s)| FgSpriteSave {
+            char_id: s.char_id.clone(),
+            expression: s.expression.clone(),
+            position: pos.clone(),
+        })
+        .collect();
     SaveData {
-        version: 2,
+        version: 3,
         timestamp,
         scene_name: engine.current_script.clone(),
         script_path: format!("{}.bscript.ron", engine.current_script),
@@ -925,6 +977,7 @@ fn build_save_data(
         dialogue_speaker: dialogue.current_speaker.clone(),
         bg_file: bg_state.current_bg.clone(),
         cg_file: cg_state.current_file.clone(),
+        fg_sprites,
     }
 }
 
@@ -948,6 +1001,7 @@ fn handle_auto_save(
     dialogue: Res<DialogueState>,
     bg_state: Res<BgState>,
     cg_state: Res<CgState>,
+    sprite_mgr: Res<SpriteManager>,
     mut save_mgr: ResMut<SaveManager>,
     save_dir: Res<SaveDir>,
 ) {
@@ -961,6 +1015,7 @@ fn handle_auto_save(
         &settings, &bgm, &bgmx,
         view_query.single().ok(),
         &dialogue, &bg_state, &cg_state,
+        &sprite_mgr,
     );
     save_mgr.save_slot(0, data, &save_dir);
 }

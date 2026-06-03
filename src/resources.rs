@@ -78,6 +78,15 @@ pub struct SaveData {
     pub bg_file: Option<String>,
     #[serde(default)]
     pub cg_file: Option<String>,
+    #[serde(default)]
+    pub fg_sprites: Vec<FgSpriteSave>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FgSpriteSave {
+    pub char_id: String,
+    pub expression: String,
+    pub position: FgPosition,
 }
 
 #[derive(Resource, Clone)]

@@ -11,7 +11,7 @@ use crate::rendering_messages::{
 
 include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
 
-fn char_dir(char_id: &str) -> Option<&'static str> {
+pub(crate) fn char_dir(char_id: &str) -> Option<&'static str> {
     let prefix = &char_id[..2];
     match prefix {
         "01" => Some("001_eus"),
