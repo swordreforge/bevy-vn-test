@@ -17,8 +17,7 @@ impl Plugin for DialoguePlugin {
                 update_dialogue,
                 apply_window_appearance,
             ).chain().run_if(in_state(AppState::Gameplay)))
-            .add_systems(OnExit(AppState::Gameplay), hide_dialogue)
-            .add_systems(OnEnter(AppState::Title), cleanup_dialogue);
+            .add_systems(OnExit(AppState::Gameplay), cleanup_dialogue);
     }
 }
 
@@ -101,14 +100,6 @@ fn setup_dialogue_ui(
         ));
     });
     initialized.0 = true;
-}
-
-fn hide_dialogue(
-    mut hide_query: Query<&mut Visibility, With<DialogueUiRoot>>,
-) {
-    for mut vis in hide_query.iter_mut() {
-        *vis = Visibility::Hidden;
-    }
 }
 
 fn cleanup_dialogue(

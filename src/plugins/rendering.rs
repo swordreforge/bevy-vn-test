@@ -85,7 +85,7 @@ impl Plugin for RenderingPlugin {
             .init_resource::<QuakeState>()
             .init_resource::<PendingTextures>()
             .add_systems(OnEnter(AppState::Gameplay), setup_rendering)
-            .add_systems(OnEnter(AppState::Title), cleanup_rendering)
+            .add_systems(OnExit(AppState::Gameplay), cleanup_rendering)
             .add_systems(Update, (
                 process_pending_textures,
                 update_bg_fade,
