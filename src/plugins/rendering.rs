@@ -646,9 +646,8 @@ fn process_pending_textures(
     mut bg_state: ResMut<BgState>,
     mut cg_state: ResMut<CgState>,
     mut sprite_mgr: ResMut<SpriteManager>,
-    mut bg_query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor, &mut Node)>,
-    mut fg_query: Query<(&mut ImageNode, &mut Visibility)>,
-    mut cg_query: Query<(&mut ImageNode, &mut Visibility)>,
+    mut bg_query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor, &mut Node), With<BackgroundRoot>>,
+    mut sprite_query: Query<(&mut ImageNode, &mut Visibility), Without<BackgroundRoot>>,
 ) {
     // ── Process pending BG ──
     if let Some(p) = &mut pending.bg {
@@ -686,11 +685,11 @@ fn process_pending_textures(
         }
     }
 
-    // ── Process pending FG ──
+    // ── Process pending FG + CG (both lack BackgroundRoot) ──
     pending.fg.retain(|_pos, p| {
         p.frames_waited += 1;
         if images.contains(&p.handle) {
-            if let Ok((mut image_node, mut vis)) = fg_query.get_mut(p.entity) {
+            if let Ok((mut image_node, mut vis)) = sprite_query.get_mut(p.entity) {
                 image_node.image = p.handle.clone();
                 match p.transition {
                     Some(Transition::Fade) => {
@@ -716,11 +715,10 @@ fn process_pending_textures(
         }
     });
 
-    // ── Process pending CG ──
     if let Some(p) = &mut pending.cg {
         p.frames_waited += 1;
         if images.contains(&p.handle) {
-            if let Ok((mut image_node, _vis)) = cg_query.get_mut(p.entity) {
+            if let Ok((mut image_node, _vis)) = sprite_query.get_mut(p.entity) {
                 if matches!(p.transition, Some(Transition::Fade)) {
                     image_node.image = p.handle.clone();
                     image_node.color.set_alpha(0.0);
