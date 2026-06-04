@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use crate::choice_messages::ChoiceSelectedMessage;
 use crate::components::{ChoiceUiRoot, ChoiceButtonIndex};
 use crate::resources::{ChoiceState, GameFont};
+use crate::state::AppState;
 
 pub struct ChoicePlugin;
 
@@ -14,7 +15,7 @@ impl Plugin for ChoicePlugin {
                 choice_ui_spawn.run_if(|state: Res<ChoiceState>| state.active),
                 handle_choice_selection,
                 choice_ui_cleanup.run_if(|state: Res<ChoiceState>| !state.active),
-            ));
+            ).run_if(in_state(AppState::Gameplay)));
     }
 }
 
