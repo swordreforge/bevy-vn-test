@@ -381,7 +381,7 @@ fn process_advance(
         }
 
         // Skip mode: when not in a choice and skip is enabled, skip through everything
-        if settings.skip_mode {
+        if settings.skip_mode && !choice_state.active {
             let mut pending_voice = None;
             while engine.has_more() {
                 let cmd = engine.advance().cloned();
@@ -882,6 +882,11 @@ fn process_advance(
                     | Some(ScriptCmd::Tween { .. })
                     | Some(ScriptCmd::FadeScene { .. })
                     | Some(ScriptCmd::NoOp { .. }) => {}
+                    Some(ScriptCmd::Choice { options }) => {
+                        choice_state.active = true;
+                        choice_state.options = options;
+                        break;
+                    }
                     Some(cmd) => {
                         info!("Script cmd (no-op): {:?}", cmd);
                     }
