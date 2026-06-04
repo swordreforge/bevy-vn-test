@@ -98,6 +98,7 @@ pub struct ProcessAdvanceParams<'w, 's> {
 impl Plugin for ScriptRunnerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AutoSkipTimer>()
+            .init_resource::<GameplaySessionActive>()
             .init_resource::<IntroPhase>()
             .init_resource::<PendingVideo>()
             .init_resource::<WindowOverride>()
