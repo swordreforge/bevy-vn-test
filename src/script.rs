@@ -496,7 +496,9 @@ impl ScriptEngine {
 
     pub fn detect_route_completion(&self, config: &RouteConfig) -> Option<String> {
         let script = self.current_route.as_deref().unwrap_or(&self.current_script);
-        config.find_by_script(script).map(|e| e.name.clone())
+        config.find_by_ending_script(script)
+            .or_else(|| config.find_by_script(script))
+            .map(|e| e.name.clone())
     }
 }
 

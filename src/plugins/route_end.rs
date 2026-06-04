@@ -29,13 +29,10 @@ impl Plugin for RouteEndPlugin {
 fn setup_route_end(
     mut commands: Commands,
     game_font: Res<GameFont>,
-    config: Res<RouteConfig>,
+    _config: Res<RouteConfig>,
     completed: Res<CompletedRoute>,
 ) {
-    let route_name = completed.0.as_deref()
-        .and_then(|s| config.find_by_script(s))
-        .map(|e| e.name.as_str())
-        .unwrap_or("");
+    let route_name = completed.0.as_deref().unwrap_or("");
 
     commands.spawn((
         RouteEndScreen,

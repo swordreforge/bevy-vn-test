@@ -2,8 +2,15 @@ use crate::script::{FgPosition, Transition};
 use crate::state::AppState;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+
+fn script_to_num(s: &str) -> u32 {
+    s.chars()
+        .filter(|c| c.is_ascii_digit())
+        .collect::<String>()
+        .parse()
+        .unwrap_or(0)
+}
 
 pub struct SpriteFade {
     pub timer: Timer,
@@ -323,6 +330,8 @@ pub struct RouteEntry {
     #[serde(default)]
     pub ending_flags: Vec<u32>,
     #[serde(default)]
+    pub ending_scripts: Vec<String>,
+    #[serde(default)]
     pub always_unlocked: bool,
     #[serde(default)]
     pub after_stories: Vec<AfterStoryEntry>,
@@ -356,10 +365,14 @@ impl RouteConfig {
     }
 
     pub fn find_by_script(&self, script: &str) -> Option<&RouteEntry> {
-        self.heroines_including_extra().find(|e| {
-            let prefix = &e.script[..5.min(e.script.len())];
-            script.starts_with(prefix)
-        })
+        let target_num = script_to_num(script);
+        let mut entries: Vec<&RouteEntry> = self.heroines_including_extra().collect();
+        entries.sort_by_key(|e| script_to_num(&e.script));
+        entries.into_iter().rev().find(|e| target_num >= script_to_num(&e.script))
+    }
+
+    pub fn find_by_ending_script(&self, script: &str) -> Option<&RouteEntry> {
+        self.heroines_including_extra().find(|e| e.ending_scripts.iter().any(|s| s == script))
     }
 }
 

@@ -347,6 +347,18 @@ fn process_advance(
 
         // If script ended and no next script, wait for state transition
         if engine.finished {
+            if engine.current_route.is_some() {
+                if let Some(name) = engine.detect_route_completion(config) {
+                    unlock_state.mark_route_cleared(&name);
+                    completed_route.0 = Some(name);
+                    auto_save.0 = true;
+                    next_state.set(AppState::RouteEnd);
+                } else {
+                    next_state.set(AppState::Title);
+                }
+                engine.current_route = None;
+                engine.current_script.clear();
+            }
             continue;
         }
 

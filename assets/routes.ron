@@ -27,10 +27,13 @@
              (script: "aiy70420", name: "后日谈 2", order: 2),
          ]),
         (index: 5, name: "Lavi", script: "aiy50010", unlock_flag: 55, hero_work: Some(5), ending_flags: [163, 164, 165],
+         ending_scripts: ["aiy30280a", "aiy30300", "aiy30310a"],
          after_stories: [
              (script: "aiy70510", name: "后日谈", order: 1),
              (script: "aiy70520", name: "后日谈 2", order: 2),
          ]),
+        (index: 6, name: "Tia", script: "aiy50290", unlock_flag: 56, ending_flags: [166, 167],
+         after_stories: []),
     ],
     extra: None,
     route_unlock_flags: [103, 105, 107, 108, 110, 111],
