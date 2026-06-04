@@ -825,3 +825,6 @@ impl Default for RainOverlayState {
         }
     }
 }
+
+#[derive(Resource, Default)]
+pub struct GameplaySessionActive(pub bool);

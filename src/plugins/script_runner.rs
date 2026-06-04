@@ -17,7 +17,7 @@ use crate::rendering_messages::{
 use crate::plugins::video::{spawn_sprite_video, spawn_video, start_rain_video};
 use crate::resources::{
     save_unlock_state, sync_affection_from_work, map_video_file, AffectionMap, AutoSaveRequested,
-    Backlog, BacklogEntry, ChoiceState, CompletedRoute, DialogueState, GameRestrictions, IntroPhase, PendingDialogueRestore,
+    Backlog, BacklogEntry, ChoiceState, CompletedRoute, DialogueState, GameplaySessionActive, GameRestrictions, IntroPhase, PendingDialogueRestore,
     PendingSpriteVideoBlock, PendingVideo, QuakeState, RainOverlayState, RouteConfig, Settings,
     SpriteOverlayManager, SpriteVideoManager, UnlockState, VoiceManager,
 };
@@ -128,8 +128,14 @@ fn start_script_execution(
     mut window_override: ResMut<WindowOverride>,
     mut intro: ResMut<IntroPhase>,
     mut backlog: ResMut<Backlog>,
+    mut session: ResMut<GameplaySessionActive>,
 ) {
     let is_load = pending_dialogue.is_some();
+
+    if session.0 && !is_load {
+        return; // Returning from sub-menu (Menu/Settings/etc.), not a fresh start
+    }
+    session.0 = true;
 
     auto_skip.auto_timer = None;
     auto_skip.skip_timer = None;
@@ -196,7 +202,9 @@ fn start_intro_bgm(
 fn reset_engine_on_title(
     mut engine: ResMut<ScriptEngine>,
     mut auto_skip: ResMut<AutoSkipTimer>,
+    mut session: ResMut<GameplaySessionActive>,
 ) {
+    session.0 = false;
     engine.current_line = 0;
     engine.current_route = None;
     engine.call_stack.clear();
