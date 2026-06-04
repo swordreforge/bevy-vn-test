@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::components::*;
 use crate::state::AppState;
-use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, ObjFileIndex, QuakeState, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
+use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, ObjFileIndex, PendingBg, PendingCg, PendingFg, PendingTextures, QuakeState, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
 use crate::script::{FgPosition, Transition};
 use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowFaceMessage, HideFaceMessage,
@@ -66,9 +66,11 @@ impl Plugin for RenderingPlugin {
             .init_resource::<SpriteOverlayManager>()
             .init_resource::<RenderingInitialized>()
             .init_resource::<QuakeState>()
+            .init_resource::<PendingTextures>()
             .add_systems(OnEnter(AppState::Gameplay), setup_rendering)
             .add_systems(OnEnter(AppState::Title), cleanup_rendering)
             .add_systems(Update, (
+                process_pending_textures,
                 update_bg_fade,
                 update_fg_fade,
                 update_cg_fade,
@@ -93,6 +95,7 @@ impl Plugin for RenderingPlugin {
                 handle_scroll_bg,
                 handle_animate_sprite,
                 advance_animated_sprites,
+                process_pending_textures,
             ).chain().run_if(in_state(AppState::Gameplay)));
     }
 }
@@ -202,6 +205,7 @@ fn cleanup_rendering(
     mut cg_state: ResMut<CgState>,
     mut overlay_mgr: ResMut<SpriteOverlayManager>,
     mut cache: ResMut<TextureCache>,
+    mut pending: ResMut<PendingTextures>,
     mut initialized: ResMut<RenderingInitialized>,
 ) {
     for entity in &query {
@@ -212,6 +216,7 @@ fn cleanup_rendering(
     *cg_state = CgState::default();
     overlay_mgr.sprites.clear();
     cache.cache.clear();
+    *pending = PendingTextures::default();
     initialized.0 = false;
 }
 
@@ -221,6 +226,8 @@ fn handle_set_bg(
     mut cg_state: ResMut<CgState>,
     mut cache: ResMut<TextureCache>,
     asset_server: Res<AssetServer>,
+    images: Res<Assets<Image>>,
+    mut pending: ResMut<PendingTextures>,
     mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor, &mut Node)>,
     mut commands: Commands,
     obj_index: Res<ObjFileIndex>,
@@ -237,15 +244,17 @@ fn handle_set_bg(
             cg_state.current_file = None;
         }
 
+        // Cancel any pending BG
+        pending.bg = None;
+
         // Complete any in-progress fade instantly
         if bg_state.fade.is_some() {
-            if let Ok((_, mut vis, _, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
+            let old_active = bg_state.active_idx;
+            if let Ok((mut old_img, mut vis, _, _)) = query.get_mut(bg_state.entities[old_active]) {
                 *vis = Visibility::Hidden;
+                old_img.color.set_alpha(1.0);
             }
             bg_state.active_idx = 1 - bg_state.active_idx;
-            if let Ok((_, _, mut bg, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
-                bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
-            }
             bg_state.fade = None;
         }
 
@@ -265,30 +274,44 @@ fn handle_set_bg(
         let inactive_idx = 1 - bg_state.active_idx;
         let inactive_entity = bg_state.entities[inactive_idx];
 
-        if let Ok((mut image_node, mut vis, mut bg, mut node)) = query.get_mut(inactive_entity) {
-            image_node.image = handle;
+        if let Ok((mut image_node, mut vis, _bg, mut node)) = query.get_mut(inactive_entity) {
             node.width = Val::Percent(100.0);
             node.height = Val::Percent(100.0);
             node.left = Val::Px(0.0);
             node.top = Val::Px(0.0);
-            match msg.transition {
-                Some(Transition::Fade) => {
-                    let dur = msg.duration.unwrap_or(0.5) as f32;
-                    bg.0 = Color::srgba(0.0, 0.0, 0.0, 0.0);
-                    *vis = Visibility::Visible;
-                    bg_state.fade = Some(BgCrossFade {
-                        timer: Timer::from_seconds(dur, TimerMode::Once),
-                    });
-                }
-                _ => {
-                    *vis = Visibility::Visible;
-                    bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
-                    if let Ok((_, mut old_vis, _, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
-                        *old_vis = Visibility::Hidden;
+
+            if images.contains(&handle) {
+                image_node.image = handle.clone();
+                match msg.transition {
+                    Some(Transition::Fade) => {
+                        let dur = msg.duration.unwrap_or(0.5) as f32;
+                        image_node.color.set_alpha(0.0);
+                        *vis = Visibility::Visible;
+                        bg_state.fade = Some(BgCrossFade {
+                            timer: Timer::from_seconds(dur, TimerMode::Once),
+                        });
                     }
-                    bg_state.active_idx = inactive_idx;
-                    bg_state.fade = None;
+                    _ => {
+                        image_node.color.set_alpha(1.0);
+                        *vis = Visibility::Visible;
+                        if let Ok((mut old_img, mut old_vis, _, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
+                            *old_vis = Visibility::Hidden;
+                            old_img.color.set_alpha(1.0);
+                        }
+                        bg_state.active_idx = inactive_idx;
+                        bg_state.fade = None;
+                    }
                 }
+            } else {
+                image_node.image = handle.clone();
+                pending.bg = Some(PendingBg {
+                    handle,
+                    entity: inactive_entity,
+                    target_idx: inactive_idx,
+                    transition: msg.transition.clone(),
+                    duration: msg.duration,
+                    frames_waited: 0,
+                });
             }
         }
     }
@@ -320,10 +343,10 @@ fn handle_scroll_bg(
         let active_idx = bg_state.active_idx;
         let active_entity = bg_state.entities[active_idx];
 
-        if let Ok((entity, mut node, mut image_node, mut vis, mut bg)) = query.get_mut(active_entity) {
+        if let Ok((entity, mut node, mut image_node, mut vis, _bg)) = query.get_mut(active_entity) {
             image_node.image = handle.clone();
+            image_node.color.set_alpha(1.0);
             *vis = Visibility::Visible;
-            bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0);
 
             if let Some(image) = images.get(&handle) {
                 let w = image.texture_descriptor.size.width as f32;
@@ -385,6 +408,8 @@ fn handle_show_fg(
     mut sprite_mgr: ResMut<SpriteManager>,
     mut cache: ResMut<TextureCache>,
     asset_server: Res<AssetServer>,
+    images: Res<Assets<Image>>,
+    mut pending: ResMut<PendingTextures>,
     mut query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor)>,
 ) {
     for msg in msg.read() {
@@ -403,23 +428,33 @@ fn handle_show_fg(
             slot.expression = msg.expression.clone();
             slot.texture = Some(handle.clone());
 
-            if let Ok((mut image_node, mut vis, mut bg)) = query.get_mut(slot.entity) {
-                image_node.image = handle;
-                match msg.transition {
-                    Some(Transition::Fade) => {
-                        let dur = msg.duration.unwrap_or(0.5) as f32;
-                        bg.0 = Color::srgba(0.0, 0.0, 0.0, 0.0);
-                        *vis = Visibility::Visible;
-                        slot.fade = Some(SpriteFade {
-                            timer: Timer::from_seconds(dur, TimerMode::Once),
-                            kind: SpriteFadeKind::FadeIn,
-                        });
+            if let Ok((mut image_node, mut vis, _)) = query.get_mut(slot.entity) {
+                if images.contains(&handle) {
+                    image_node.image = handle.clone();
+                    match msg.transition {
+                        Some(Transition::Fade) => {
+                            let dur = msg.duration.unwrap_or(0.5) as f32;
+                            image_node.color.set_alpha(0.0);
+                            *vis = Visibility::Visible;
+                            slot.fade = Some(SpriteFade {
+                                timer: Timer::from_seconds(dur, TimerMode::Once),
+                                kind: SpriteFadeKind::FadeIn,
+                            });
+                        }
+                        _ => {
+                            image_node.color.set_alpha(1.0);
+                            *vis = Visibility::Visible;
+                            slot.fade = None;
+                        }
                     }
-                    _ => {
-                        bg.0 = Color::srgba(0.0, 0.0, 0.0, 0.0);
-                        *vis = Visibility::Visible;
-                        slot.fade = None;
-                    }
+                } else {
+                    pending.fg.insert(msg.position.clone(), PendingFg {
+                        handle,
+                        entity: slot.entity,
+                        transition: msg.transition.clone(),
+                        duration: msg.duration,
+                        frames_waited: 0,
+                    });
                 }
             }
         } else {
@@ -508,53 +543,71 @@ fn handle_show_cg(
     mut cg_state: ResMut<CgState>,
     mut cache: ResMut<TextureCache>,
     asset_server: Res<AssetServer>,
+    images: Res<Assets<Image>>,
+    mut pending: ResMut<PendingTextures>,
     mut commands: Commands,
 ) {
     for msg in msg.read() {
-        if let Some(entity) = cg_state.entity.take() {
-            commands.entity(entity).despawn();
-        }
+        pending.cg = None;
 
         let path = ev_file_path(&msg.file);
         let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
             asset_server.load(&path)
         }).clone();
 
-        let initial_alpha = match msg.transition {
-            Some(Transition::Fade) => 0.0,
-            _ => 1.0,
+        let entity = if let Some(entity) = cg_state.entity {
+            entity
+        } else {
+            let e = commands.spawn((
+                CgRoot,
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(0.0),
+                    left: Val::Px(0.0),
+                    ..default()
+                },
+                ImageNode {
+                    image: Handle::default(),
+                    color: Color::srgba(1.0, 1.0, 1.0, 0.0),
+                    ..default()
+                },
+                Visibility::Visible,
+                ZIndex(2),
+            )).id();
+            cg_state.entity = Some(e);
+            e
         };
 
-        let entity = commands.spawn((
-            CgRoot,
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                position_type: PositionType::Absolute,
-                top: Val::Px(0.0),
-                left: Val::Px(0.0),
-                ..default()
-            },
-            ImageNode::new(handle.clone()),
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, initial_alpha)),
-            Visibility::Visible,
-            ZIndex(2),
-        )).id();
-
         cg_state.active = true;
-        cg_state.entity = Some(entity);
-        cg_state.texture = Some(handle);
+        cg_state.texture = Some(handle.clone());
         cg_state.current_file = Some(msg.file.clone());
 
-        match msg.transition {
-            Some(Transition::Fade) => {
+        if images.contains(&handle) {
+            if let Ok(mut entry) = commands.get_entity(entity) {
+                let has_fade = matches!(msg.transition, Some(Transition::Fade));
+                entry.insert(ImageNode {
+                    image: handle,
+                    color: Color::srgba(1.0, 1.0, 1.0, if has_fade { 0.0 } else { 1.0 }),
+                    ..default()
+                });
+            }
+            if matches!(msg.transition, Some(Transition::Fade)) {
                 let dur = msg.duration.unwrap_or(0.5) as f32;
                 cg_state.fade = Some(CgFade {
                     timer: Timer::from_seconds(dur, TimerMode::Once),
                     kind: CgFadeKind::FadeIn,
                 });
             }
-            _ => {}
+        } else {
+            pending.cg = Some(PendingCg {
+                handle,
+                entity,
+                transition: msg.transition.clone(),
+                duration: msg.duration,
+                frames_waited: 0,
+            });
         }
     }
 }
@@ -587,10 +640,109 @@ fn handle_hide_cg(
     }
 }
 
+fn process_pending_textures(
+    images: Res<Assets<Image>>,
+    mut pending: ResMut<PendingTextures>,
+    mut bg_state: ResMut<BgState>,
+    mut cg_state: ResMut<CgState>,
+    mut sprite_mgr: ResMut<SpriteManager>,
+    mut bg_query: Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor, &mut Node)>,
+    mut fg_query: Query<(&mut ImageNode, &mut Visibility)>,
+    mut cg_query: Query<(&mut ImageNode, &mut Visibility)>,
+) {
+    // ── Process pending BG ──
+    if let Some(p) = &mut pending.bg {
+        p.frames_waited += 1;
+        if images.contains(&p.handle) {
+            if let Ok((mut image_node, mut vis, _bg, mut node)) = bg_query.get_mut(p.entity) {
+                image_node.image = p.handle.clone();
+                node.width = Val::Percent(100.0);
+                node.height = Val::Percent(100.0);
+                node.left = Val::Px(0.0);
+                node.top = Val::Px(0.0);
+                match p.transition {
+                    Some(Transition::Fade) => {
+                        let dur = p.duration.unwrap_or(0.5) as f32;
+                        image_node.color.set_alpha(0.0);
+                        *vis = Visibility::Visible;
+                        bg_state.fade = Some(BgCrossFade {
+                            timer: Timer::from_seconds(dur, TimerMode::Once),
+                        });
+                    }
+                    _ => {
+                        image_node.color.set_alpha(1.0);
+                        *vis = Visibility::Visible;
+                        let old_active = 1 - p.target_idx;
+                        if let Ok((mut old_img, mut old_vis, _, _)) = bg_query.get_mut(bg_state.entities[old_active]) {
+                            *old_vis = Visibility::Hidden;
+                            old_img.color.set_alpha(1.0);
+                        }
+                        bg_state.active_idx = p.target_idx;
+                        bg_state.fade = None;
+                    }
+                }
+            }
+            pending.bg = None;
+        }
+    }
+
+    // ── Process pending FG ──
+    pending.fg.retain(|_pos, p| {
+        p.frames_waited += 1;
+        if images.contains(&p.handle) {
+            if let Ok((mut image_node, mut vis)) = fg_query.get_mut(p.entity) {
+                image_node.image = p.handle.clone();
+                match p.transition {
+                    Some(Transition::Fade) => {
+                        let dur = p.duration.unwrap_or(0.5) as f32;
+                        image_node.color.set_alpha(0.0);
+                        *vis = Visibility::Visible;
+                        if let Some(slot) = sprite_mgr.slots.values_mut().find(|s| s.entity == p.entity) {
+                            slot.fade = Some(SpriteFade {
+                                timer: Timer::from_seconds(dur, TimerMode::Once),
+                                kind: SpriteFadeKind::FadeIn,
+                            });
+                        }
+                    }
+                    _ => {
+                        image_node.color.set_alpha(1.0);
+                        *vis = Visibility::Visible;
+                    }
+                }
+            }
+            false
+        } else {
+            true
+        }
+    });
+
+    // ── Process pending CG ──
+    if let Some(p) = &mut pending.cg {
+        p.frames_waited += 1;
+        if images.contains(&p.handle) {
+            if let Ok((mut image_node, _vis)) = cg_query.get_mut(p.entity) {
+                if matches!(p.transition, Some(Transition::Fade)) {
+                    image_node.image = p.handle.clone();
+                    image_node.color.set_alpha(0.0);
+                    let dur = p.duration.unwrap_or(0.5) as f32;
+                    cg_state.fade = Some(CgFade {
+                        timer: Timer::from_seconds(dur, TimerMode::Once),
+                        kind: CgFadeKind::FadeIn,
+                    });
+                } else {
+                    image_node.image = p.handle.clone();
+                    image_node.color.set_alpha(1.0);
+                }
+            }
+            pending.cg = None;
+        }
+    }
+}
+
 fn update_bg_fade(
     time: Res<Time>,
     mut bg_state: ResMut<BgState>,
-    mut query: Query<(&mut BackgroundColor, &mut Visibility)>,
+    mut query: Query<(&mut ImageNode, &mut Visibility)>,
 ) {
     if bg_state.fade.is_none() {
         return;
@@ -606,11 +758,11 @@ fn update_bg_fade(
         fade.timer.tick(time.delta());
         let t = fade.timer.fraction();
 
-        if let Ok((mut bg, _)) = query.get_mut(active_entity) {
-            bg.0 = Color::srgba(0.0, 0.0, 0.0, 1.0 - t);
+        if let Ok((mut image, _)) = query.get_mut(active_entity) {
+            image.color.set_alpha(1.0 - t);
         }
-        if let Ok((mut bg, _)) = query.get_mut(inactive_entity) {
-            bg.0 = Color::srgba(0.0, 0.0, 0.0, t);
+        if let Ok((mut image, _)) = query.get_mut(inactive_entity) {
+            image.color.set_alpha(t);
         }
 
         let finished = fade.timer.just_finished();
@@ -631,7 +783,7 @@ fn update_bg_fade(
 fn update_fg_fade(
     time: Res<Time>,
     mut sprite_mgr: ResMut<SpriteManager>,
-    mut query: Query<(&mut BackgroundColor, &mut Visibility)>,
+    mut query: Query<(&mut ImageNode, &mut Visibility)>,
 ) {
     for (_position, slot) in sprite_mgr.slots.iter_mut() {
         let finished = {
@@ -643,12 +795,12 @@ fn update_fg_fade(
             fade.timer.tick(time.delta());
             let t = fade.timer.fraction();
 
-            if let Ok((mut bg, _)) = query.get_mut(slot.entity) {
+            if let Ok((mut image, _)) = query.get_mut(slot.entity) {
                 let alpha = match fade.kind {
                     SpriteFadeKind::FadeIn => t,
                     SpriteFadeKind::FadeOut => 1.0 - t,
                 };
-                bg.0 = Color::srgba(0.0, 0.0, 0.0, alpha);
+                image.color.set_alpha(alpha);
             }
 
             let finished = fade.timer.just_finished();
@@ -656,6 +808,9 @@ fn update_fg_fade(
                 if let Ok((_, mut vis)) = query.get_mut(slot.entity) {
                     *vis = Visibility::Hidden;
                 }
+                slot.char_id.clear();
+                slot.expression.clear();
+                slot.texture = None;
             }
             finished
         };
@@ -670,7 +825,7 @@ fn update_cg_fade(
     time: Res<Time>,
     mut cg_state: ResMut<CgState>,
     mut commands: Commands,
-    mut query: Query<(&mut BackgroundColor, &mut Visibility)>,
+    mut query: Query<(&mut ImageNode, &mut Visibility)>,
 ) {
     let Some(ref mut fade) = cg_state.fade else {
         return;
@@ -682,12 +837,12 @@ fn update_cg_fade(
     let finished = fade.timer.just_finished();
     let entity = cg_state.entity;
     if let Some(entity) = entity {
-        if let Ok((mut bg, _)) = query.get_mut(entity) {
+        if let Ok((mut image, _)) = query.get_mut(entity) {
             let alpha = match kind {
                 CgFadeKind::FadeIn => t,
                 CgFadeKind::FadeOut => 1.0 - t,
             };
-            bg.0 = Color::srgba(0.0, 0.0, 0.0, alpha);
+            image.color.set_alpha(alpha);
         }
     }
 
@@ -700,6 +855,12 @@ fn update_cg_fade(
             cg_state.texture = None;
             cg_state.entity = None;
             cg_state.current_file = None;
+        } else {
+            if let Some(entity) = entity {
+                if let Ok((mut image, _)) = query.get_mut(entity) {
+                    image.color.set_alpha(1.0);
+                }
+            }
         }
         cg_state.fade = None;
     }

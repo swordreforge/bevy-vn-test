@@ -1,4 +1,4 @@
-use crate::script::FgPosition;
+use crate::script::{FgPosition, Transition};
 use crate::state::AppState;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -521,6 +521,38 @@ pub struct TextureCache {
 #[derive(Resource, Default)]
 pub struct SpriteOverlayManager {
     pub sprites: HashMap<String, Entity>,
+}
+
+#[derive(Resource, Default)]
+pub struct PendingTextures {
+    pub bg: Option<PendingBg>,
+    pub fg: HashMap<FgPosition, PendingFg>,
+    pub cg: Option<PendingCg>,
+}
+
+pub struct PendingBg {
+    pub handle: Handle<Image>,
+    pub entity: Entity,
+    pub target_idx: usize,
+    pub transition: Option<Transition>,
+    pub duration: Option<f64>,
+    pub frames_waited: u32,
+}
+
+pub struct PendingFg {
+    pub handle: Handle<Image>,
+    pub entity: Entity,
+    pub transition: Option<Transition>,
+    pub duration: Option<f64>,
+    pub frames_waited: u32,
+}
+
+pub struct PendingCg {
+    pub handle: Handle<Image>,
+    pub entity: Entity,
+    pub transition: Option<Transition>,
+    pub duration: Option<f64>,
+    pub frames_waited: u32,
 }
 
 pub struct PendingBgmLoad {
