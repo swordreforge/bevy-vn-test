@@ -21,16 +21,16 @@
          after_stories: [
              (script: "aiy70320", name: "后日谈", order: 1),
          ]),
-        (index: 4, name: "Lysia", script: "aiy40010", unlock_flag: 54, hero_work: Some(4), ending_flags: [160, 161, 162],
-         after_stories: [
-             (script: "aiy70410", name: "后日谈", order: 1),
-             (script: "aiy70420", name: "后日谈 2", order: 2),
-         ]),
         (index: 5, name: "Lavi", script: "aiy50010", unlock_flag: 55, hero_work: Some(5), ending_flags: [163, 164, 165],
          ending_scripts: ["aiy30280a", "aiy30300", "aiy30310a"],
          after_stories: [
              (script: "aiy70510", name: "后日谈", order: 1),
              (script: "aiy70520", name: "后日谈 2", order: 2),
+         ]),
+        (index: 4, name: "Lysia", script: "aiy40010", unlock_flag: 54, hero_work: Some(4), ending_flags: [160, 161, 162],
+         after_stories: [
+             (script: "aiy70410", name: "后日谈", order: 1),
+             (script: "aiy70420", name: "后日谈 2", order: 2),
          ]),
         (index: 6, name: "Tia", script: "aiy50290", unlock_flag: 56, ending_flags: [166, 167],
          after_stories: []),
