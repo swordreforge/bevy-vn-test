@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 use crate::components::*;
-use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, CgState, DialogueState, GameFont, PendingDialogueRestore, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, TextureCache, UnlockState, BgState, SpriteOverlayManager, SeManager, QuakeState, ChoiceState, VoiceManager, GameRestrictions, WindowOverride, IntroPhase, PendingBgm, PendingSe, SpriteManager, FgSpriteSave};
+use crate::resources::{AutoSaveRequested, BgmManager, BgmXManager, CgState, DialogueState, GameFont, PendingDialogueRestore, SaveDir, SaveLoadMode, SaveLoadPage, SaveManager, SaveData, AffectionMap, Settings, TextureCache, UnlockState, BgState, SpriteOverlayManager, SeManager, QuakeState, ChoiceState, VoiceManager, GameRestrictions, WindowOverride, IntroPhase, PendingBgm, PendingSe, PendingTextures, SpriteManager, FgSpriteSave};
 use crate::state::AppState;
 use crate::script::{ScriptCmd, ScriptEngine};
-use crate::plugins::rendering::char_dir;
+use crate::plugins::rendering::{char_dir, resolve_fg_path};
 use crate::rendering_messages::{
     ShowFgMessage, HideFgMessage,
 };
@@ -15,6 +15,9 @@ use crate::plugins::event_system::{ViewPhase, ViewState};
 use crate::plugins::event_system::view_data;
 
 include!(concat!(env!("OUT_DIR"), "/game_data.rs"));
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SceneRestoreSet;
 
 pub struct SaveLoadPlugin;
 
@@ -33,8 +36,8 @@ impl Plugin for SaveLoadPlugin {
                 handle_save_load_escape,
                 handle_save_load_page_nav,
             ))
+            .add_systems(Update, process_scene_restore.in_set(SceneRestoreSet).run_if(in_state(AppState::Gameplay)))
             .add_systems(Update, (
-                process_scene_restore,
                 process_load_restore,
                 handle_auto_save,
             ).run_if(in_state(AppState::Gameplay)));
@@ -157,7 +160,7 @@ fn setup_save_load_ui(
                                 slot.insert(ImageNode::new(asset_server.load::<Image>(format!("image/bg/{}.jpg", stem))));
                                 for fg in &data.fg_sprites {
                                     if let Some(dir) = char_dir(&fg.char_id) {
-                                        let path = format!("image/fg/{}/tati_{}.png", dir, fg.char_id);
+                                        let path = resolve_fg_path(&fg.char_id, dir);
                                         slot.with_child((
                                             Node {
                                                 width: Val::Px(140.0),
@@ -173,7 +176,7 @@ fn setup_save_load_ui(
                                 }
                             } else if let Some(fg) = data.fg_sprites.first() {
                                 if let Some(dir) = char_dir(&fg.char_id) {
-                                    let path = format!("image/fg/{}/tati_{}.png", dir, fg.char_id);
+                                    let path = resolve_fg_path(&fg.char_id, dir);
                                     slot.insert(ImageNode::new(asset_server.load::<Image>(&path)));
                                 }
                             }
@@ -520,6 +523,7 @@ fn handle_confirm(
                 commands.insert_resource(IntroPhase(false));
                 commands.insert_resource(PendingBgm(None));
                 commands.insert_resource(PendingSe(Vec::new()));
+                commands.insert_resource(PendingTextures::default());
             }
             commands.remove_resource::<ConfirmState>();
             if mode.0 {
@@ -764,7 +768,7 @@ fn process_scene_restore(
     mut overlay_mgr: ResMut<SpriteOverlayManager>,
     mut se_mgr: ResMut<SeManager>,
     mut queries: ParamSet<(
-        Query<&mut ImageNode, With<BackgroundRoot>>,
+        Query<(&mut ImageNode, &mut Visibility, &mut BackgroundColor), With<BackgroundRoot>>,
         Query<(&mut ImageNode, &mut Visibility), With<SpriteSlotMarker>>,
         Query<(Entity, &mut BackgroundColor, &mut Visibility), With<ScreenOverlayRoot>>,
     )>,
@@ -811,11 +815,14 @@ fn process_scene_restore(
                 let path = format!("image/bg/{}.jpg", stem);
                 let handle = asset_server.load::<Image>(&path);
                 let mut bg_query = queries.p0();
-                for &entity in &bg_state.entities {
-                    if let Ok(mut image_node) = bg_query.get_mut(entity) {
+                for (i, &entity) in bg_state.entities.iter().enumerate() {
+                    if let Ok((mut image_node, mut vis, _bg)) = bg_query.get_mut(entity) {
                         image_node.image = handle.clone();
+                        image_node.color.set_alpha(1.0);
+                        *vis = if i == 0 { Visibility::Visible } else { Visibility::Hidden };
                     }
                 }
+                bg_state.active_idx = 0;
                 bg_state.current_bg = Some(stem.to_string());
             }
             ScriptCmd::ShowFg { char_id, expression, position, .. } => {

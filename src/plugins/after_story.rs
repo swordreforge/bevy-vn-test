@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::resources::{AfterStoryEntry, AfterStoryGroup, GameFont, RouteConfig, SelectedRoute};
+use crate::resources::{AfterStoryEntry, AfterStoryGroup, GameFont, RouteConfig, SelectedRoute, UnlockState};
 use crate::state::AppState;
 
 pub struct AfterStoryPlugin;
@@ -36,8 +36,9 @@ fn setup_after_story(
     config: Res<RouteConfig>,
     engine: Res<crate::script::ScriptEngine>,
     group: Res<AfterStoryGroup>,
+    unlock_state: Res<UnlockState>,
 ) {
-    build_ui(&mut commands, &game_font.0, &config, &engine, group.0);
+    build_ui(&mut commands, &game_font.0, &config, &engine, &unlock_state, group.0);
 }
 
 fn build_ui(
@@ -45,6 +46,7 @@ fn build_ui(
     font: &Handle<Font>,
     config: &RouteConfig,
     engine: &crate::script::ScriptEngine,
+    unlock_state: &UnlockState,
     group_idx: Option<usize>,
 ) {
     let is_level_2 = group_idx.is_some();
@@ -85,9 +87,11 @@ fn build_ui(
             let unlocked = if idx < config.heroines.len() {
                 let entry = &config.heroines[idx];
                 entry.always_unlocked
+                    || unlock_state.is_route_cleared(&entry.name)
                     || engine.global_flags.get(&entry.unlock_flag).copied().unwrap_or(0) >= 1
             } else if idx == config.heroines.len() {
-                engine.global_flags.get(&config.all_routes_cleared_flag).copied().unwrap_or(0) >= 1
+                unlock_state.all_routes_cleared(&config)
+                    || engine.global_flags.get(&config.all_routes_cleared_flag).copied().unwrap_or(0) >= 1
             } else {
                 engine.global_flags.get(&config.full_completion_flag).copied().unwrap_or(0) >= 1
             };
@@ -140,6 +144,7 @@ fn build_ui(
                         continue;
                     }
                     let unlocked = entry.always_unlocked
+                        || unlock_state.is_route_cleared(&entry.name)
                         || engine.global_flags.get(&entry.unlock_flag).copied().unwrap_or(0) >= 1;
                     let status = if unlocked { "PLAY" } else { "LOCKED" };
                     let bg = if unlocked {
@@ -180,7 +185,8 @@ fn build_ui(
                 }
 
                 if !config.extra_after_stories.is_empty() {
-                    let unlocked = engine.global_flags.get(&config.all_routes_cleared_flag).copied().unwrap_or(0) >= 1;
+                    let unlocked = unlock_state.all_routes_cleared(&config)
+                        || engine.global_flags.get(&config.all_routes_cleared_flag).copied().unwrap_or(0) >= 1;
                     let status = if unlocked { "PLAY" } else { "LOCKED" };
                     let bg = if unlocked {
                         Color::srgba(0.15, 0.3, 0.5, 0.9)
@@ -286,13 +292,14 @@ fn build_ui(
 }
 
 fn handle_group_buttons(
-    mut commands: Commands,
     query: Query<(&AfterStoryGroupButton, &Interaction), Changed<Interaction>>,
+    mut commands: Commands,
     mut group: ResMut<AfterStoryGroup>,
-    engine: Res<crate::script::ScriptEngine>,
-    config: Res<RouteConfig>,
     root_query: Query<Entity, With<AfterStoryRoot>>,
+    config: Res<RouteConfig>,
     game_font: Res<GameFont>,
+    engine: Res<crate::script::ScriptEngine>,
+    unlock_state: Res<UnlockState>,
 ) {
     for (btn, interaction) in &query {
         if *interaction != Interaction::Pressed { continue; }
@@ -311,7 +318,7 @@ fn handle_group_buttons(
         for entity in &root_query {
             commands.entity(entity).despawn();
         }
-        build_ui(&mut commands, &game_font.0, &config, &engine, group.0);
+        build_ui(&mut commands, &game_font.0, &config, &engine, &unlock_state, group.0);
     }
 }
 
@@ -348,6 +355,7 @@ fn handle_back_button(
     config: Res<RouteConfig>,
     game_font: Res<GameFont>,
     engine: Res<crate::script::ScriptEngine>,
+    unlock_state: Res<UnlockState>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed { continue; }
@@ -356,7 +364,7 @@ fn handle_back_button(
             for entity in &root_query {
                 commands.entity(entity).despawn();
             }
-            build_ui(&mut commands, &game_font.0, &config, &engine, group.0);
+            build_ui(&mut commands, &game_font.0, &config, &engine, &unlock_state, group.0);
         } else {
             next_state.set(AppState::Title);
         }
@@ -372,6 +380,7 @@ fn handle_keyboard(
     config: Res<RouteConfig>,
     game_font: Res<GameFont>,
     engine: Res<crate::script::ScriptEngine>,
+    unlock_state: Res<UnlockState>,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
         if group.0.is_some() {
@@ -379,7 +388,7 @@ fn handle_keyboard(
             for entity in &root_query {
                 commands.entity(entity).despawn();
             }
-            build_ui(&mut commands, &game_font.0, &config, &engine, group.0);
+            build_ui(&mut commands, &game_font.0, &config, &engine, &unlock_state, group.0);
         } else {
             next_state.set(AppState::Title);
         }

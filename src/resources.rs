@@ -305,6 +305,10 @@ impl UnlockState {
     pub fn mark_route_cleared(&mut self, name: &str) {
         self.routes_cleared.insert(name.to_string());
     }
+
+    pub fn all_routes_cleared(&self, config: &RouteConfig) -> bool {
+        config.heroines.iter().all(|entry| self.routes_cleared.contains(&entry.name))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

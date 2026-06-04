@@ -2,6 +2,10 @@ use bevy::prelude::*;
 use crate::components::*;
 use crate::state::AppState;
 use crate::resources::{BgState, BgCrossFade, CgState, CgFade, CgFadeKind, ObjFileIndex, PendingBg, PendingCg, PendingFg, PendingTextures, QuakeState, SpriteManager, SpriteFade, SpriteFadeKind, SpriteOverlayManager, TextureCache};
+use crate::plugins::save_load::SceneRestoreSet;
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+struct RenderChain1;
 use crate::script::{FgPosition, Transition};
 use crate::rendering_messages::{
     SetBgMessage, ShowFgMessage, HideFgMessage, ShowFaceMessage, HideFaceMessage,
@@ -38,6 +42,19 @@ pub(crate) fn char_dir(char_id: &str) -> Option<&'static str> {
         "44" => Some("044_nud"),
         _ => None,
     }
+}
+
+pub(crate) fn resolve_fg_path(char_id: &str, dir: &str) -> String {
+    let base = format!("image/fg/{}/tati_{}.png", dir, char_id);
+    if !std::path::Path::new("assets").join(&base).exists() {
+        for prefix in &["z", "zz", "zzz"] {
+            let alt = format!("image/fg/{}/tati_{}{}.png", dir, prefix, char_id);
+            if std::path::Path::new("assets").join(&alt).exists() {
+                return alt;
+            }
+        }
+    }
+    base
 }
 
 #[derive(Resource, Default)]
@@ -77,7 +94,7 @@ impl Plugin for RenderingPlugin {
                 handle_set_bg,
                 handle_show_fg,
                 handle_hide_fg,
-            ).chain().run_if(in_state(AppState::Gameplay)))
+            ).chain().in_set(RenderChain1).after(SceneRestoreSet).run_if(in_state(AppState::Gameplay)))
             .add_systems(Update, (
                 handle_show_face,
                 handle_hide_face,
@@ -96,7 +113,7 @@ impl Plugin for RenderingPlugin {
                 handle_animate_sprite,
                 advance_animated_sprites,
                 process_pending_textures,
-            ).chain().run_if(in_state(AppState::Gameplay)));
+            ).chain().after(RenderChain1).after(SceneRestoreSet).run_if(in_state(AppState::Gameplay)));
     }
 }
 
@@ -256,6 +273,10 @@ fn handle_set_bg(
             }
             bg_state.active_idx = 1 - bg_state.active_idx;
             bg_state.fade = None;
+            // Reset the (now active) buffer that was fading in to full alpha
+            if let Ok((mut new_img, _, _, _)) = query.get_mut(bg_state.entities[bg_state.active_idx]) {
+                new_img.color.set_alpha(1.0);
+            }
         }
 
         let file = if msg.file.contains('.') { msg.file.clone() } else { format!("{}.jpg", msg.file) };
@@ -419,7 +440,7 @@ fn handle_show_fg(
                 warn!("No FG mapping for char_id: {}", msg.char_id);
                 continue;
             };
-            let path = format!("image/fg/{}/tati_{}.png", dir, msg.char_id);
+            let path = resolve_fg_path(&msg.char_id, dir);
             let handle = cache.cache.entry(path.clone()).or_insert_with(|| {
                 asset_server.load(&path)
             }).clone();

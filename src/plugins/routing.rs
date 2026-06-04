@@ -74,6 +74,7 @@ fn setup_route_selection(
         )).with_children(|grid| {
             for entry in config.heroines_including_extra() {
                 let unlocked = entry.always_unlocked
+                    || unlock_state.is_route_cleared(&entry.name)
                     || engine.global_flags.get(&entry.unlock_flag).copied().unwrap_or(0) >= 1;
                 let cleared = unlock_state.is_route_cleared(&entry.name);
 
@@ -147,6 +148,7 @@ fn handle_route_buttons(
     query: Query<(&RouteButton, &Interaction), Changed<Interaction>>,
     config: Res<RouteConfig>,
     engine: Res<crate::script::ScriptEngine>,
+    unlock_state: Res<UnlockState>,
     mut selected_route: ResMut<SelectedRoute>,
     mut screen_transition: ResMut<ScreenTransition>,
 ) {
@@ -156,6 +158,7 @@ fn handle_route_buttons(
         }
         let Some(entry) = config.find_by_index(btn.0) else { continue };
         let unlocked = entry.always_unlocked
+            || unlock_state.is_route_cleared(&entry.name)
             || engine.global_flags.get(&entry.unlock_flag).copied().unwrap_or(0) >= 1;
         if !unlocked { continue; }
 

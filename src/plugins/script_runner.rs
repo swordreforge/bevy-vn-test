@@ -201,7 +201,8 @@ fn reset_engine_on_title(
     engine.current_route = None;
     engine.call_stack.clear();
     engine.flags.clear();
-    engine.global_flags.clear();
+    // global_flags persist across title — they hold route unlock flags
+    // and are cleared when starting a new route in start_script_execution.
     engine.local_work.clear();
     engine.local_flags.clear();
     engine.dialogue_idx = 0;
@@ -502,7 +503,10 @@ fn process_advance(
                         } else if let Some(name) = engine.detect_route_completion(config) {
                             unlock_state.mark_route_cleared(&name);
                             completed_route.0 = Some(name);
+                            auto_save.0 = true;
                             next_state.set(AppState::RouteEnd);
+                        } else {
+                            next_state.set(AppState::Title);
                         }
                         engine.current_route = None;
                         engine.call_stack.clear();
@@ -709,26 +713,18 @@ fn process_advance(
                             });
                         }
                     }
-                    Some(ScriptCmd::PlaySe { file, volume }) => {
-                        play_se_writer.write(PlaySeMessage { file, volume });
+                    Some(ScriptCmd::PlaySe { .. }) => {
+                        // Skip SE audio during fast-forward to avoid flooding PendingSe
                     }
-                    Some(ScriptCmd::LoopSe {
-                        file,
-                        volume,
-                        channel,
-                    }) => {
-                        loop_se_writer.write(LoopSeMessage {
-                            file,
-                            volume,
-                            channel,
-                        });
+                    Some(ScriptCmd::LoopSe { .. }) => {
+                        // Skip loop SE during fast-forward
                     }
-                    Some(ScriptCmd::StopStreamingSe { channel }) => {
-                        stop_streaming_se_writer.write(StopStreamingSeMessage { channel });
+                    Some(ScriptCmd::StopStreamingSe { .. }) => {
+                        // Skip SE stop during fast-forward
                     }
                     Some(ScriptCmd::PlayVoice { file }) => {
                         pending_voice = Some(file.clone());
-                        play_voice_writer.write(PlayVoiceMessage { file, volume: None });
+                        // Skip voice audio during fast-forward
                     }
                     Some(ScriptCmd::ScrollBg {
                         file,
@@ -1038,7 +1034,10 @@ fn process_advance(
                     } else if let Some(name) = engine.detect_route_completion(config) {
                         unlock_state.mark_route_cleared(&name);
                         completed_route.0 = Some(name);
+                        auto_save.0 = true;
                         next_state.set(AppState::RouteEnd);
+                    } else {
+                        next_state.set(AppState::Title);
                     }
                     engine.current_route = None;
                     engine.call_stack.clear();
