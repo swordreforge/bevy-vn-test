@@ -517,23 +517,7 @@ fn process_advance(
                         }
                     }
                     Some(ScriptCmd::Halt) => {
-                        if selected_route.1 {
-                            selected_route.1 = false;
-                            after_story_group.0 = None;
-                            next_state.set(AppState::AfterStory);
-                        } else if let Some(name) = engine.detect_route_completion(config) {
-                            unlock_state.mark_route_cleared(&name);
-                            completed_route.0 = Some(name);
-                            auto_save.0 = true;
-                            next_state.set(AppState::RouteEnd);
-                        } else {
-                            next_state.set(AppState::Title);
-                        }
-                        engine.current_route = None;
-                        engine.call_stack.clear();
-                        engine.current_script.clear();
-                        engine.current_line = 0;
-                        engine.finished = true;
+                        break;
                     }
                     Some(ScriptCmd::PlayMovie { file }) => {
                         info!("Video skipped: {}", file);
@@ -921,11 +905,16 @@ fn process_advance(
                     engine.finished = false;
                 } else if engine.next_script() {
                     info!("Script finished: advancing to {}", engine.current_script);
+                } else if selected_route.1 {
+                    selected_route.1 = false;
+                    after_story_group.0 = None;
+                    next_state.set(AppState::AfterStory);
                 } else if engine.current_route.is_some() {
                     info!("Route script finished, detecting completion");
                     if let Some(name) = engine.detect_route_completion(config) {
                         unlock_state.mark_route_cleared(&name);
                         completed_route.0 = Some(name);
+                        auto_save.0 = true;
                         next_state.set(AppState::RouteEnd);
                     } else {
                         next_state.set(AppState::Title);
@@ -1053,23 +1042,7 @@ fn process_advance(
                     }
                 }
                 Some(ScriptCmd::Halt) => {
-                    if selected_route.1 {
-                        selected_route.1 = false;
-                        after_story_group.0 = None;
-                        next_state.set(AppState::AfterStory);
-                    } else if let Some(name) = engine.detect_route_completion(config) {
-                        unlock_state.mark_route_cleared(&name);
-                        completed_route.0 = Some(name);
-                        auto_save.0 = true;
-                        next_state.set(AppState::RouteEnd);
-                    } else {
-                        next_state.set(AppState::Title);
-                    }
-                    engine.current_route = None;
-                    engine.call_stack.clear();
-                    engine.current_script.clear();
-                    engine.current_line = 0;
-                    engine.finished = true;
+                    break;
                 }
                 Some(ScriptCmd::AffectionChange { char_id, delta }) => {
                     *affection.0.entry(char_id).or_insert(0) += delta;
@@ -1739,6 +1712,10 @@ fn process_advance(
                 engine.finished = false;
             } else if engine.next_script() {
                 info!("Script finished: advancing to {}", engine.current_script);
+            } else if selected_route.1 {
+                selected_route.1 = false;
+                after_story_group.0 = None;
+                next_state.set(AppState::AfterStory);
             } else if engine.current_route.is_some() {
                 info!("Route script finished, detecting completion");
                 if let Some(name) = engine.detect_route_completion(config) {
