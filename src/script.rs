@@ -495,10 +495,14 @@ impl ScriptEngine {
     }
 
     pub fn detect_route_completion(&self, config: &RouteConfig) -> Option<String> {
-        let script = self.current_route.as_deref().unwrap_or(&self.current_script);
-        config.find_by_ending_script(script)
-            .or_else(|| config.find_by_script(script))
-            .map(|e| e.name.clone())
+        for (i, &flag) in config.route_unlock_flags.iter().enumerate() {
+            if self.global_flags.get(&flag).copied().unwrap_or(0) >= 1 {
+                if let Some(entry) = config.heroines.get(i) {
+                    return Some(entry.name.clone());
+                }
+            }
+        }
+        self.current_route.clone()
     }
 }
 

@@ -377,7 +377,11 @@ impl RouteConfig {
 }
 
 #[derive(Resource, Default)]
-pub struct SelectedRoute(pub Option<String>, pub bool);
+pub struct SelectedRoute {
+    pub start_script: Option<String>,
+    pub route_name: Option<String>,
+    pub is_after_story: bool,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AfterStoryEntry {

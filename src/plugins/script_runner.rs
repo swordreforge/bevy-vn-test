@@ -133,8 +133,8 @@ fn start_script_execution(
 ) {
     let is_load = pending_dialogue.is_some();
 
-    if session.0 && !is_load {
-        return; // Returning from sub-menu (Menu/Settings/etc.), not a fresh start
+    if session.0 && !is_load && selected_route.start_script.is_none() {
+        return; // Returning from sub-menu with no new route
     }
     session.0 = true;
 
@@ -160,15 +160,14 @@ fn start_script_execution(
         dialogue.is_displaying = false;
     }
 
-    if let Some(script) = selected_route.0.take() {
+    if let Some(script) = selected_route.start_script.take() {
         engine.flags.clear();
-        engine.global_flags.clear();
         engine.local_work.clear();
         engine.local_flags.clear();
         engine.dialogue_idx = 0;
         engine.finished = false;
         engine.call_stack.clear();
-        engine.current_route = Some(script.clone());
+        engine.current_route = selected_route.route_name.take();
         engine.current_script = script;
         engine.current_line = 0;
         info!("Starting route script: {}", engine.current_script);
@@ -452,9 +451,6 @@ fn process_advance(
                     Some(ScriptCmd::CallScript { script, label }) => {
                         clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                         engine.finished = false;
-                        if config.find_by_script(&script).is_some() {
-                            engine.current_route = Some(script.clone());
-                        }
                         engine.call_script(&script, label.as_deref());
                     }
                     Some(ScriptCmd::Return) => {
@@ -905,8 +901,8 @@ fn process_advance(
                     engine.finished = false;
                 } else if engine.next_script() {
                     info!("Script finished: advancing to {}", engine.current_script);
-                } else if selected_route.1 {
-                    selected_route.1 = false;
+                } else if selected_route.is_after_story {
+                    selected_route.is_after_story = false;
                     after_story_group.0 = None;
                     next_state.set(AppState::AfterStory);
                 } else if engine.current_route.is_some() {
@@ -977,9 +973,6 @@ fn process_advance(
                 Some(ScriptCmd::CallScript { script, label }) => {
                     clear_scene_sprites(overlay_mgr, &mut commands, hide_fg_writer, hide_cg_writer, &mut overlay_query);
                     engine.finished = false;
-                    if config.find_by_script(&script).is_some() {
-                        engine.current_route = Some(script.clone());
-                    }
                     engine.call_script(&script, label.as_deref());
                 }
                 Some(ScriptCmd::Return) => {
@@ -1712,8 +1705,8 @@ fn process_advance(
                 engine.finished = false;
             } else if engine.next_script() {
                 info!("Script finished: advancing to {}", engine.current_script);
-            } else if selected_route.1 {
-                selected_route.1 = false;
+            } else if selected_route.is_after_story {
+                selected_route.is_after_story = false;
                 after_story_group.0 = None;
                 next_state.set(AppState::AfterStory);
             } else if engine.current_route.is_some() {

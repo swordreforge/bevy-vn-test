@@ -340,8 +340,8 @@ fn handle_entry_buttons(
             config.bonus_skits.iter().collect()
         };
         if btn.0 >= entries.len() { continue; }
-        selected_route.0 = Some(entries[btn.0].script.clone());
-        selected_route.1 = true;
+        selected_route.start_script = Some(entries[btn.0].script.clone());
+        selected_route.is_after_story = true;
         next_state.set(AppState::Gameplay);
     }
 }
