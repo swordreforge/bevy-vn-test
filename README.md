@@ -4,7 +4,7 @@
 
 ## 项目起源
 
-**Aiyoku no Eustia**（日文：穢翼のユースティア）原由 August 社使用其自研的 **Artemis Engine** 开发。该引擎在 Windows 上运行良好，但在 Android 移植版本中，Artemis 内置的 Lua 解释器存在严重的**栈溢出 bug**——游戏运行到特定剧本分支时会陷入**无限递归 panic**，导致应用直接闪退。
+**Aiyoku no Eustia**（日文：穢翼のユースティア）原由 August 社使用其 **Artemis Engine** 开发。该引擎在 Windows 上运行良好，但在 Android 移植版本中，Artemis 内置的 Lua 解释器存在严重的**栈溢出 bug**——游戏运行到特定剧本分支时会陷入**无限递归 panic**，导致应用直接闪退。
 
 本项目的目标是：
 1. 用 Rust + Bevy 从零实现一个可运行的 VN 引擎
